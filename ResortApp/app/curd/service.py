@@ -601,33 +601,112 @@ def get_assigned_services(db: Session, skip: int = 0, limit: int = 100):
         return []
 
 def update_assigned_service_status(db: Session, assigned_id: int, update_data: AssignedServiceUpdate):
+    import traceback
+    from app.models.inventory import InventoryItem, InventoryTransaction, Location
+    from datetime import datetime
+    
     assigned = db.query(AssignedService).filter(AssignedService.id == assigned_id).first()
-    if assigned:
-        old_status = assigned.status
-        # Handle both enum and string status values
-        new_status = update_data.status.value if hasattr(update_data.status, 'value') else str(update_data.status)
-        assigned.status = update_data.status
-        
-        # If status changed to completed, update employee inventory assignments
-        if new_status == "completed" and str(old_status) != "completed":
-            try:
-                from app.models.employee_inventory import EmployeeInventoryAssignment
-                # Mark all inventory assignments for this service as completed (ready for return)
-                assignments = db.query(EmployeeInventoryAssignment).filter(
-                    EmployeeInventoryAssignment.assigned_service_id == assigned_id,
-                    EmployeeInventoryAssignment.status == "assigned"
-                ).all()
+    if not assigned:
+        return None
+    
+    old_status = assigned.status
+    # Handle both enum and string status values
+    new_status = update_data.status.value if hasattr(update_data.status, 'value') else str(update_data.status)
+    assigned.status = update_data.status
+    
+    # If status changed to completed, handle inventory returns
+    if new_status == "completed" and str(old_status) != "completed":
+        try:
+            from app.models.employee_inventory import EmployeeInventoryAssignment
+            
+            # Mark all inventory assignments for this service as completed (ready for return)
+            assignments = db.query(EmployeeInventoryAssignment).filter(
+                EmployeeInventoryAssignment.assigned_service_id == assigned_id,
+                EmployeeInventoryAssignment.status.in_(["assigned", "in_use", "completed"])
+            ).all()
+            
+            for assignment in assignments:
+                assignment.status = "completed"  # Ready for return
+                print(f"[DEBUG] Marked inventory assignment {assignment.id} as completed (ready for return)")
+            
+            # Process inventory returns if provided
+            if update_data.inventory_returns and len(update_data.inventory_returns) > 0:
+                print(f"[DEBUG] Processing {len(update_data.inventory_returns)} inventory returns")
                 
-                for assignment in assignments:
-                    assignment.status = "completed"  # Ready for return
-                    print(f"[DEBUG] Marked inventory assignment {assignment.id} as completed (ready for return)")
-            except ImportError:
-                print("[WARNING] EmployeeInventoryAssignment model not found, skipping status update")
-        
-        db.commit()
-        db.refresh(assigned)
-        return assigned
-    return None
+                # Find main warehouse location
+                main_location = db.query(Location).filter(
+                    (Location.location_type == "WAREHOUSE") | 
+                    (Location.location_type == "CENTRAL_WAREHOUSE") |
+                    (Location.is_inventory_point == True)
+                ).first()
+                
+                if not main_location:
+                    main_location = db.query(Location).filter(
+                        Location.location_type.in_(["WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE"])
+                    ).first()
+                
+                for return_item in update_data.inventory_returns:
+                    assignment = db.query(EmployeeInventoryAssignment).filter(
+                        EmployeeInventoryAssignment.id == return_item.assignment_id,
+                        EmployeeInventoryAssignment.assigned_service_id == assigned_id
+                    ).first()
+                    
+                    if not assignment:
+                        print(f"[WARNING] Inventory assignment {return_item.assignment_id} not found for service {assigned_id}")
+                        continue
+                    
+                    quantity_returned = float(return_item.quantity_returned)
+                    balance = assignment.balance_quantity
+                    
+                    if quantity_returned <= 0:
+                        print(f"[WARNING] Invalid return quantity {quantity_returned} for assignment {assignment.id}")
+                        continue
+                    
+                    if quantity_returned > balance:
+                        print(f"[WARNING] Return quantity {quantity_returned} exceeds balance {balance} for assignment {assignment.id}")
+                        quantity_returned = balance  # Return maximum available
+                    
+                    # Update assignment
+                    assignment.quantity_returned += quantity_returned
+                    if assignment.quantity_returned >= assignment.quantity_assigned:
+                        assignment.is_returned = True
+                        assignment.status = "returned"
+                        assignment.returned_at = datetime.utcnow()
+                    else:
+                        assignment.status = "partially_returned"
+                    
+                    # Add stock back to inventory
+                    item = db.query(InventoryItem).filter(InventoryItem.id == assignment.item_id).first()
+                    if item:
+                        item.current_stock += quantity_returned
+                        print(f"[DEBUG] Returned {quantity_returned} {item.unit or 'pcs'} of {item.name}. New stock: {item.current_stock}")
+                        
+                        # Create return transaction
+                        transaction = InventoryTransaction(
+                            item_id=assignment.item_id,
+                            transaction_type="in",
+                            quantity=quantity_returned,
+                            unit_price=item.unit_price,
+                            total_amount=item.unit_price * quantity_returned if item.unit_price else None,
+                            reference_number=f"SVC-RETURN-{assigned_id}",
+                            notes=f"Return from Service Completion: {assigned.service.name if assigned.service else 'Unknown'} - {return_item.notes or 'Service completed'}",
+                            created_by=None
+                        )
+                        db.add(transaction)
+                        print(f"[DEBUG] Created return transaction for {item.name}")
+                    else:
+                        print(f"[WARNING] Inventory item {assignment.item_id} not found")
+                
+        except ImportError:
+            print("[WARNING] EmployeeInventoryAssignment model not found, skipping inventory return processing")
+        except Exception as e:
+            print(f"[ERROR] Error processing inventory returns: {str(e)}")
+            print(traceback.format_exc())
+            # Don't fail the status update if return processing fails
+    
+    db.commit()
+    db.refresh(assigned)
+    return assigned
 
 def delete_assigned_service(db: Session, assigned_id: int):
     assigned = db.query(AssignedService).filter(AssignedService.id == assigned_id).first()

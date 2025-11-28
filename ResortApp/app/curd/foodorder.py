@@ -2,7 +2,9 @@ from sqlalchemy.orm import Session
 from app.models.foodorder import FoodOrder, FoodOrderItem
 from app.models.booking import Booking, BookingRoom
 from app.models.Package import PackageBooking, PackageBookingRoom
+from app.models.service_request import ServiceRequest
 from app.schemas.foodorder import FoodOrderCreate, FoodOrderUpdate
+from datetime import datetime
 
 def get_guest_for_room(room_id, db: Session):
     """Get guest name for a room from either regular or package bookings"""
@@ -43,7 +45,9 @@ def create_food_order(db: Session, order_data: FoodOrderCreate):
         amount=order_data.amount,
         assigned_employee_id=order_data.assigned_employee_id,
         status="active",
-        billing_status="unbilled"
+        billing_status="unbilled",
+        order_type=getattr(order_data, 'order_type', 'dine_in'),
+        delivery_request=getattr(order_data, 'delivery_request', None)
     )
     db.add(order)
     db.commit()
@@ -100,8 +104,28 @@ def update_food_order(db: Session, order_id: int, update_data: FoodOrderUpdate):
         order.assigned_employee_id = update_data.assigned_employee_id
     if update_data.status is not None:
         order.status = update_data.status
-    if update_data.billing_status is not None:  # ✅ Now handled
+        # If completing a room service order, create a service request
+        if update_data.status == "completed" and order.order_type == "room_service":
+            # Check if service request already exists
+            existing_request = db.query(ServiceRequest).filter(
+                ServiceRequest.food_order_id == order.id
+            ).first()
+            if not existing_request:
+                service_request = ServiceRequest(
+                    food_order_id=order.id,
+                    room_id=order.room_id,
+                    employee_id=order.assigned_employee_id,
+                    request_type="delivery",
+                    description=order.delivery_request or f"Room service delivery for food order #{order.id}",
+                    status="pending"
+                )
+                db.add(service_request)
+    if update_data.billing_status is not None:
         order.billing_status = update_data.billing_status
+    if update_data.order_type is not None:
+        order.order_type = update_data.order_type
+    if update_data.delivery_request is not None:
+        order.delivery_request = update_data.delivery_request
 
     if update_data.items is not None:
         db.query(FoodOrderItem).filter(FoodOrderItem.order_id == order.id).delete()

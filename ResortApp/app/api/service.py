@@ -679,7 +679,8 @@ def get_all_assigned_services(db: Session = Depends(get_db), skip: int = 0, limi
                     "number": assigned.room.number
                 },
                 "assigned_at": assigned.assigned_at,
-                "status": status_enum
+                "status": status_enum,
+                "last_used_at": assigned.last_used_at
             })
         
         return result
@@ -776,7 +777,12 @@ def get_employee_inventory_assignments(
         )
         
         if status:
-            query = query.filter(EmployeeInventoryAssignment.status == status)
+            # Support comma-separated status values
+            status_list = [s.strip() for s in status.split(',')]
+            if len(status_list) > 1:
+                query = query.filter(EmployeeInventoryAssignment.status.in_(status_list))
+            else:
+                query = query.filter(EmployeeInventoryAssignment.status == status_list[0])
         
         assignments = query.options(
             joinedload(EmployeeInventoryAssignment.item),
@@ -791,6 +797,12 @@ def get_employee_inventory_assignments(
                 "employee_id": assignment.employee_id,
                 "assigned_service_id": assignment.assigned_service_id,
                 "item_id": assignment.item_id,
+                "item": {
+                    "id": assignment.item.id if assignment.item else None,
+                    "name": assignment.item.name if assignment.item else "Unknown",
+                    "item_code": assignment.item.item_code if assignment.item else None,
+                    "unit": assignment.item.unit if assignment.item else "pcs",
+                } if assignment.item else None,
                 "item_name": assignment.item.name if assignment.item else "Unknown",
                 "item_code": assignment.item.item_code if assignment.item else None,
                 "unit": assignment.item.unit if assignment.item else "pcs",

@@ -7,14 +7,14 @@ import {
   Package, 
   Plus, 
   Edit, 
-  Trash2, 
+  Trash2,
+  X, 
   AlertTriangle, 
   ShoppingCart, 
   Building2,
   TrendingUp,
   FileText,
   Search,
-  X,
   Printer,
   Download,
   Share2,
@@ -161,6 +161,105 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
             </div>
           </div>
           
+          {/* Room Usage Section - Only show for GUEST_ROOM locations */}
+          {locationData.room_usage && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">Room Usage Information</h3>
+              
+              {/* Current Guest Info */}
+              {locationData.room_usage.booking_info && (
+                <div className="mb-4 p-3 bg-white rounded-lg border border-blue-100">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-600">Current Guest:</span>
+                    <span className="text-lg font-bold text-blue-700">{locationData.room_usage.booking_info.guest_name}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                    {locationData.room_usage.booking_info.guest_mobile && (
+                      <div>
+                        <span className="font-medium">Mobile:</span> {locationData.room_usage.booking_info.guest_mobile}
+                      </div>
+                    )}
+                    {locationData.room_usage.booking_info.guest_email && (
+                      <div>
+                        <span className="font-medium">Email:</span> {locationData.room_usage.booking_info.guest_email}
+                      </div>
+                    )}
+                    {locationData.room_usage.booking_info.check_in && (
+                      <div>
+                        <span className="font-medium">Check-in:</span> {new Date(locationData.room_usage.booking_info.check_in).toLocaleDateString()}
+                      </div>
+                    )}
+                    {locationData.room_usage.booking_info.check_out && (
+                      <div>
+                        <span className="font-medium">Check-out:</span> {new Date(locationData.room_usage.booking_info.check_out).toLocaleDateString()}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Services Used */}
+              {locationData.room_usage.services_used && locationData.room_usage.services_used.length > 0 ? (
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-gray-600">Services Used:</span>
+                    <span className="text-sm font-semibold text-gray-800">
+                      {locationData.room_usage.total_services} service(s) - Total: ₹{locationData.room_usage.total_service_charges.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Service</th>
+                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Employee</th>
+                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Charges</th>
+                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Status</th>
+                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Assigned</th>
+                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Last Used</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {locationData.room_usage.services_used.map((service, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="px-2 py-1 text-gray-900 font-medium">{service.service_name}</td>
+                            <td className="px-2 py-1 text-gray-600">{service.employee_name || "N/A"}</td>
+                            <td className="px-2 py-1 text-gray-900 font-semibold">₹{service.charges}</td>
+                            <td className="px-2 py-1">
+                              <span className={`px-2 py-0.5 text-xs rounded-full ${
+                                service.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                service.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {service.status}
+                              </span>
+                            </td>
+                            <td className="px-2 py-1 text-gray-600 text-xs">
+                              {service.assigned_at ? new Date(service.assigned_at).toLocaleString() : "N/A"}
+                            </td>
+                            <td className="px-2 py-1 text-gray-600 text-xs">
+                              {service.last_used_at ? (
+                                <span className="text-green-600 font-medium">
+                                  {new Date(service.last_used_at).toLocaleString()}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 italic">Never</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-500 italic mb-4">
+                  No services have been used in this room yet.
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <h3 className="text-lg font-semibold text-gray-800 mb-3">Items & Stock</h3>
             <div className="overflow-x-auto">
@@ -248,6 +347,19 @@ const Inventory = () => {
   const [locationStock, setLocationStock] = useState([]);
   const [selectedLocationStock, setSelectedLocationStock] = useState(null);
   const [locationStockDetails, setLocationStockDetails] = useState(null);
+  const [recipes, setRecipes] = useState([]);
+  const [foodItems, setFoodItems] = useState([]);
+  const [showRecipeModal, setShowRecipeModal] = useState(false);
+  const [editingRecipe, setEditingRecipe] = useState(null);
+  const [recipeForm, setRecipeForm] = useState({
+    food_item_id: "",
+    name: "",
+    description: "",
+    servings: 1,
+    prep_time_minutes: "",
+    cook_time_minutes: "",
+    ingredients: []
+  });
   const [transactionFilters, setTransactionFilters] = useState({
     type: "all", // all, purchase, usage, waste, adjustment
     category: "all",
@@ -503,6 +615,39 @@ const Inventory = () => {
       } else if (activeTab === "location-stock") {
         const res = await API.get("/inventory/stock-by-location");
         setLocationStock(res.data || []);
+      } else if (activeTab === "recipe") {
+        try {
+          console.log("Fetching recipes from:", API.defaults.baseURL + "/recipes");
+          const res = await API.get("/recipes");
+          console.log("Recipes fetched successfully:", res.data?.length || 0, "recipes");
+          setRecipes(res.data || []);
+        } catch (err) {
+          console.error("Failed to fetch recipes:", err);
+          console.error("Request URL:", err.config?.url);
+          console.error("Base URL:", err.config?.baseURL);
+          console.error("Full URL:", err.config?.baseURL + err.config?.url);
+          console.error("Error details:", {
+            status: err.response?.status,
+            statusText: err.response?.statusText,
+            data: err.response?.data,
+            message: err.message
+          });
+          // Show more detailed error message
+          if (err.response?.status === 404) {
+            const fullUrl = (err.config?.baseURL || '') + (err.config?.url || '');
+            alert(`Recipe endpoint not found (404).\n\nRequested URL: ${fullUrl}\n\nPlease check:\n1. Backend server is running on port 8011\n2. Recipe router is registered\n3. Try hard refresh (Ctrl+Shift+R)`);
+          } else {
+            alert(`Failed to fetch recipes: ${err.response?.data?.detail || err.message || "Unknown error"}`);
+          }
+          setRecipes([]); // Set empty array on error
+        }
+        // Also fetch food items for the recipe form
+        try {
+          const foodRes = await API.get("/food-items");
+          setFoodItems(foodRes.data || []);
+        } catch (err) {
+          console.error("Failed to fetch food items:", err);
+        }
       }
     } catch (error) {
       console.error("Error fetching data:", error);
@@ -1399,7 +1544,7 @@ const Inventory = () => {
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="flex border-b border-gray-200">
-            {["items", "categories", "vendors", "purchases", "transactions", "requisitions", "issues", "waste", "locations", "assets", "location-stock"].map((tab) => (
+            {["items", "categories", "vendors", "purchases", "transactions", "requisitions", "issues", "waste", "locations", "assets", "location-stock", "recipe"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -1412,7 +1557,7 @@ const Inventory = () => {
                     : "text-gray-600 hover:text-gray-900"
                 }`}
               >
-                {tab === "location-stock" ? "Location Stock" : tab}
+                {tab === "location-stock" ? "Location Stock" : tab === "recipe" ? "Recipe" : tab}
               </button>
             ))}
           </div>
@@ -2050,6 +2195,112 @@ const Inventory = () => {
                     }}
                   />
                 )}
+
+                {activeTab === "recipe" && (
+                  <div className="space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-semibold text-gray-800">Food Item Recipes</h3>
+                      <button
+                        onClick={() => {
+                          setRecipeForm({
+                            food_item_id: "",
+                            name: "",
+                            description: "",
+                            servings: 1,
+                            prep_time_minutes: "",
+                            cook_time_minutes: "",
+                            ingredients: []
+                          });
+                          setEditingRecipe(null);
+                          setShowRecipeModal(true);
+                        }}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                      >
+                        + Add Recipe
+                      </button>
+                    </div>
+
+                    {recipes.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        No recipes found. Click "Add Recipe" to create one.
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Food Item</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recipe Name</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Servings</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ingredients</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cost/Serving</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {recipes.map((recipe) => (
+                              <tr key={recipe.id} className="hover:bg-gray-50">
+                                <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                  {recipe.food_item_name || `Food Item #${recipe.food_item_id}`}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-900">{recipe.name}</td>
+                                <td className="px-4 py-3 text-sm text-gray-600">{recipe.servings}</td>
+                                <td className="px-4 py-3 text-sm text-gray-600">
+                                  {recipe.ingredients.length} ingredient(s)
+                                </td>
+                                <td className="px-4 py-3 text-sm font-semibold text-green-600">
+                                  ₹{recipe.total_cost?.toFixed(2) || "0.00"}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        setEditingRecipe(recipe);
+                                        setRecipeForm({
+                                          food_item_id: recipe.food_item_id,
+                                          name: recipe.name,
+                                          description: recipe.description || "",
+                                          servings: recipe.servings,
+                                          prep_time_minutes: recipe.prep_time_minutes || "",
+                                          cook_time_minutes: recipe.cook_time_minutes || "",
+                                          ingredients: recipe.ingredients.map(ing => ({
+                                            inventory_item_id: ing.inventory_item_id,
+                                            quantity: ing.quantity,
+                                            unit: ing.unit,
+                                            notes: ing.notes || ""
+                                          }))
+                                        });
+                                        setShowRecipeModal(true);
+                                      }}
+                                      className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={async () => {
+                                        if (window.confirm("Are you sure you want to delete this recipe?")) {
+                                          try {
+                                            await API.delete(`/recipes/${recipe.id}`);
+                                            fetchData();
+                                          } catch (error) {
+                                            alert("Failed to delete recipe: " + (error.response?.data?.detail || error.message));
+                                          }
+                                        }
+                                      }}
+                                      className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600"
+                                    >
+                                      Delete
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -2590,6 +2841,44 @@ const Inventory = () => {
           onClose={() => {
             setLocationStockDetails(null);
             setSelectedLocationStock(null);
+          }}
+        />
+      )}
+
+      {/* Recipe Form Modal */}
+      {showRecipeModal && (
+        <RecipeFormModal
+          form={recipeForm}
+          setForm={setRecipeForm}
+          foodItems={foodItems}
+          items={items}
+          editingRecipe={editingRecipe}
+          onSubmit={async (formData) => {
+            try {
+              if (editingRecipe) {
+                await API.put(`/recipes/${editingRecipe.id}`, formData);
+              } else {
+                await API.post("/recipes", formData);
+              }
+              setShowRecipeModal(false);
+              setEditingRecipe(null);
+              fetchData();
+            } catch (error) {
+              alert("Failed to save recipe: " + (error.response?.data?.detail || error.message));
+            }
+          }}
+          onClose={() => {
+            setShowRecipeModal(false);
+            setEditingRecipe(null);
+            setRecipeForm({
+              food_item_id: "",
+              name: "",
+              description: "",
+              servings: 1,
+              prep_time_minutes: "",
+              cook_time_minutes: "",
+              ingredients: []
+            });
           }}
         />
       )}
@@ -6967,6 +7256,216 @@ const AssetDetailsModal = ({ asset, items, locations, onClose }) => {
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// Recipe Form Modal
+const RecipeFormModal = ({ form, setForm, foodItems, items, editingRecipe, onSubmit, onClose }) => {
+  const addIngredient = () => {
+    setForm({
+      ...form,
+      ingredients: [...form.ingredients, { inventory_item_id: "", quantity: 0, unit: "pcs", notes: "" }]
+    });
+  };
+
+  const removeIngredient = (index) => {
+    setForm({
+      ...form,
+      ingredients: form.ingredients.filter((_, i) => i !== index)
+    });
+  };
+
+  const updateIngredient = (index, field, value) => {
+    const newIngredients = [...form.ingredients];
+    newIngredients[index] = { ...newIngredients[index], [field]: value };
+    setForm({ ...form, ingredients: newIngredients });
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!form.food_item_id || !form.name || form.ingredients.length === 0) {
+      alert("Please fill in all required fields and add at least one ingredient");
+      return;
+    }
+    onSubmit(form);
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <h2 className="text-2xl font-bold text-gray-800">
+            {editingRecipe ? "Edit Recipe" : "Add Recipe"}
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Food Item *</label>
+            <select
+              value={form.food_item_id}
+              onChange={(e) => setForm({ ...form, food_item_id: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              required
+            >
+              <option value="">Select Food Item</option>
+              {foodItems.map((item) => (
+                <option key={item.id} value={item.id}>{item.name}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Recipe Name *</label>
+            <input
+              type="text"
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2"
+              rows="3"
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Servings *</label>
+              <input
+                type="number"
+                value={form.servings}
+                onChange={(e) => setForm({ ...form, servings: parseInt(e.target.value) || 1 })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                min="1"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Prep Time (minutes)</label>
+              <input
+                type="number"
+                value={form.prep_time_minutes}
+                onChange={(e) => setForm({ ...form, prep_time_minutes: e.target.value ? parseInt(e.target.value) : "" })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                min="0"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Cook Time (minutes)</label>
+              <input
+                type="number"
+                value={form.cook_time_minutes}
+                onChange={(e) => setForm({ ...form, cook_time_minutes: e.target.value ? parseInt(e.target.value) : "" })}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2"
+                min="0"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-gray-700">Ingredients *</label>
+              <button
+                type="button"
+                onClick={addIngredient}
+                className="px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
+              >
+                + Add Ingredient
+              </button>
+            </div>
+            {form.ingredients.length === 0 ? (
+              <p className="text-sm text-gray-500 italic">No ingredients added. Click "Add Ingredient" to add one.</p>
+            ) : (
+              <div className="space-y-2">
+                {form.ingredients.map((ingredient, index) => (
+                  <div key={index} className="flex gap-2 items-end p-3 border border-gray-200 rounded-lg">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Inventory Item</label>
+                      <select
+                        value={ingredient.inventory_item_id}
+                        onChange={(e) => updateIngredient(index, "inventory_item_id", e.target.value)}
+                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        required
+                      >
+                        <option value="">Select Item</option>
+                        {items.map((item) => (
+                          <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="w-24">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
+                      <input
+                        type="number"
+                        value={ingredient.quantity}
+                        onChange={(e) => updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)}
+                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        step="0.01"
+                        min="0"
+                        required
+                      />
+                    </div>
+                    <div className="w-24">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Unit</label>
+                      <input
+                        type="text"
+                        value={ingredient.unit}
+                        onChange={(e) => updateIngredient(index, "unit", e.target.value)}
+                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        required
+                      />
+                    </div>
+                    <div className="w-32">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                      <input
+                        type="text"
+                        value={ingredient.notes}
+                        onChange={(e) => updateIngredient(index, "notes", e.target.value)}
+                        className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                        placeholder="e.g., chopped"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeIngredient(index)}
+                      className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            >
+              {editingRecipe ? "Update Recipe" : "Create Recipe"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

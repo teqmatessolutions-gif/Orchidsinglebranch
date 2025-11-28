@@ -46,6 +46,7 @@ class AssignedService(Base):
     assigned_at = Column(DateTime, default=datetime.utcnow)
     status = Column(Enum(ServiceStatus), default=ServiceStatus.pending)
     billing_status = Column(String, default="unbilled")
+    last_used_at = Column(DateTime, nullable=True)  # Timestamp when service was last used (marked during checkout)
 
     service = relationship("Service")
     employee = relationship("Employee")

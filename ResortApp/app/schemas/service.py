@@ -79,8 +79,14 @@ class AssignedServiceBase(BaseModel):
 class AssignedServiceCreate(AssignedServiceBase):
     pass
 
+class InventoryReturnItem(BaseModel):
+    assignment_id: int
+    quantity_returned: float
+    notes: Optional[str] = None
+
 class AssignedServiceUpdate(BaseModel):
     status: ServiceStatus
+    inventory_returns: Optional[List[InventoryReturnItem]] = None  # Optional inventory items to return when completing
 
 class AssignedServiceOut(BaseModel):
     id: int
@@ -89,6 +95,7 @@ class AssignedServiceOut(BaseModel):
     room: RoomOut
     assigned_at: datetime
     status: ServiceStatus
+    last_used_at: Optional[datetime] = None  # Timestamp when service was last used (during checkout)
 
     class Config:
         from_attributes = True

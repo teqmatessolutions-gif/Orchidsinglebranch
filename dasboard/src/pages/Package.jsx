@@ -123,7 +123,7 @@ const commonChartOptions = {
   },
 };
 
-const Packages = () => {
+const Packages = ({ noLayout = false }) => {
   const [packages, setPackages] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [allRooms, setAllRooms] = useState([]); // Store all rooms for filtering
@@ -622,8 +622,8 @@ const Packages = () => {
 
   if (loading) return <p className="text-center text-gray-600 font-serif">Loading packages, rooms, and bookings...</p>;
 
-  return (
-    <DashboardLayout>
+  const content = (
+    <>
       {/* Image Gallery Modal */}
       {selectedPackageImages && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={() => setSelectedPackageImages(null)}>
@@ -1118,6 +1118,16 @@ const Packages = () => {
           isSubmitting={isSubmitting}
         />
       )}
+    </>
+  );
+
+  if (noLayout) {
+    return content;
+  }
+
+  return (
+    <DashboardLayout>
+      {content}
     </DashboardLayout>
   );
 };

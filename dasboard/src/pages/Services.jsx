@@ -9,19 +9,22 @@ import { Loader2 } from "lucide-react";
 import { getMediaBaseUrl } from "../utils/env";
 
 // Reusable card component for a consistent look
-const Card = ({ title, className = "", children }) => (
-  <div className={`bg-white rounded-2xl shadow-lg border border-gray-200 p-6 ${className}`}>
-    <h2 className="text-xl font-bold text-gray-800 mb-4">{title}</h2>
+const Card = ({ title, className = "", children }) => {
+  const isGradient = className.includes("gradient");
+  return (
+    <div className={`${isGradient ? '' : 'bg-white'} rounded-2xl shadow-lg ${isGradient ? '' : 'border border-gray-200'} p-6 ${className}`}>
+      {title && <h2 className={`text-xl font-bold mb-4 ${isGradient ? 'text-white' : 'text-gray-800'}`}>{title}</h2>}
     {children}
   </div>
 );
+};
 
 const COLORS = ["#4F46E5", "#6366F1", "#A78BFA", "#F472B6"];
 
 const Services = () => {
   const [services, setServices] = useState([]);
   const [assignedServices, setAssignedServices] = useState([]);
-  const [form, setForm] = useState({ name: "", description: "", charges: "", is_visible_to_guest: false });
+  const [form, setForm] = useState({ name: "", description: "", charges: "", is_visible_to_guest: false, average_completion_time: "" });
   const [selectedImages, setSelectedImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
@@ -34,6 +37,7 @@ const Services = () => {
     room_id: "",
     status: "pending",
   });
+  const [extraInventoryItems, setExtraInventoryItems] = useState([]); // Extra inventory items for assignment
   const [selectedServiceDetails, setSelectedServiceDetails] = useState(null); // Store selected service details
   const [rooms, setRooms] = useState([]);
   const [allRooms, setAllRooms] = useState([]);
@@ -46,12 +50,50 @@ const Services = () => {
     from: "",
     to: "",
   });
+  const [serviceFilters, setServiceFilters] = useState({
+    search: "",
+    visible: "",
+    hasInventory: "",
+    hasImages: "",
+  });
+  const [itemFilters, setItemFilters] = useState({
+    search: "",
+    service: "",
+    category: "",
+  });
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [editingServiceId, setEditingServiceId] = useState(null);
   const [viewingAssignedService, setViewingAssignedService] = useState(null);
+  const [completingServiceId, setCompletingServiceId] = useState(null);
+  const [inventoryAssignments, setInventoryAssignments] = useState([]);
+  const [returnQuantities, setReturnQuantities] = useState({});
+  const [returnedItems, setReturnedItems] = useState([]);
+  const [showServiceReport, setShowServiceReport] = useState(false);
+  const [serviceReport, setServiceReport] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportFilters, setReportFilters] = useState({
+    from_date: '',
+    to_date: '',
+    room_number: '',
+    guest_name: '',
+    location_id: ''
+  });
+  const [activeTab, setActiveTab] = useState("dashboard"); // "dashboard", "create", "assign", "assigned", "requests", "report"
+  const [serviceRequests, setServiceRequests] = useState([]);
+
+  // Fetch service requests
+  const fetchServiceRequests = async () => {
+    try {
+      const res = await api.get("/service-requests?limit=1000");
+      setServiceRequests(res.data || []);
+    } catch (error) {
+      console.error("Failed to fetch service requests:", error);
+      setServiceRequests([]);
+    }
+  };
 
   // Fetch all data
   const fetchAll = async () => {
@@ -71,6 +113,11 @@ const Services = () => {
       setAllRooms(rRes?.data || []);
       setEmployees(eRes?.data || []);
       setInventoryItems(invRes?.data || []);
+      
+      // Fetch service requests if on requests tab
+      if (activeTab === "requests") {
+        fetchServiceRequests();
+      }
       
       // Combine regular and package bookings
       const regularBookings = bRes.data?.bookings || [];
@@ -200,6 +247,12 @@ const Services = () => {
     fetchAll();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === "requests") {
+      fetchServiceRequests();
+    }
+  }, [activeTab]);
+
   const loadMoreAssigned = async () => {
     if (isFetchingMore || !hasMore) return;
     setIsFetchingMore(true);
@@ -253,7 +306,7 @@ const Services = () => {
   };
 
   const resetServiceForm = () => {
-    setForm({ name: "", description: "", charges: "", is_visible_to_guest: false });
+    setForm({ name: "", description: "", charges: "", is_visible_to_guest: false, average_completion_time: "" });
     setSelectedImages([]);
     setImagePreviews([]);
     setExistingImages([]);
@@ -271,6 +324,7 @@ const Services = () => {
           ? service.charges.toString()
           : "",
       is_visible_to_guest: !!service.is_visible_to_guest,
+      average_completion_time: service.average_completion_time || "",
     });
     setSelectedInventoryItems(
       (service.inventory_items || []).map((item) => ({
@@ -325,6 +379,9 @@ const Services = () => {
       formData.append('description', form.description);
       formData.append('charges', parseFloat(form.charges));
       formData.append('is_visible_to_guest', form.is_visible_to_guest ? 'true' : 'false');
+      if (form.average_completion_time) {
+        formData.append('average_completion_time', form.average_completion_time);
+      }
       
       // Append images
       selectedImages.forEach((image) => {
@@ -400,6 +457,7 @@ const Services = () => {
         }
       }
       setAssignForm({ ...assignForm, service_id: serviceId });
+      setExtraInventoryItems([]); // Clear extra items when service changes
     } catch (err) {
       console.error("Failed to fetch service details", err);
       // Fallback to cached service if API fails
@@ -409,25 +467,53 @@ const Services = () => {
       } else {
         setSelectedServiceDetails(null);
       }
+      setExtraInventoryItems([]); // Clear extra items on error too
     }
   };
 
   // Assign service
+  const handleAddExtraInventoryItem = () => {
+    setExtraInventoryItems([...extraInventoryItems, { inventory_item_id: "", quantity: 1 }]);
+  };
+
+  const handleUpdateExtraInventoryItem = (index, field, value) => {
+    const updated = [...extraInventoryItems];
+    updated[index] = { ...updated[index], [field]: field === 'quantity' ? parseFloat(value) || 0 : value };
+    setExtraInventoryItems(updated);
+  };
+
+  const handleRemoveExtraInventoryItem = (index) => {
+    setExtraInventoryItems(extraInventoryItems.filter((_, i) => i !== index));
+  };
+
   const handleAssign = async () => {
     if (!assignForm.service_id || !assignForm.employee_id || !assignForm.room_id) {
       alert("Please select service, employee, and room");
       return;
     }
     try {
-      const response = await api.post("/services/assign", {
+      const payload = {
         service_id: parseInt(assignForm.service_id),
         employee_id: parseInt(assignForm.employee_id),
         room_id: parseInt(assignForm.room_id),
-        // Note: status is set by default in the backend model, no need to send it
-      });
+      };
+
+      // Add extra inventory items if any
+      const validExtraItems = extraInventoryItems.filter(
+        item => item.inventory_item_id && item.quantity > 0
+      );
+      if (validExtraItems.length > 0) {
+        payload.extra_inventory_items = validExtraItems.map(item => ({
+          inventory_item_id: parseInt(item.inventory_item_id),
+          quantity: item.quantity
+        }));
+      }
+
+      const response = await api.post("/services/assign", payload);
       alert("Service assigned successfully!");
       setAssignForm({ service_id: "", employee_id: "", room_id: "", status: "pending" });
       setSelectedServiceDetails(null);
+      setExtraInventoryItems([]);
       fetchAll();
     } catch (err) {
       console.error("Failed to assign service", err);
@@ -467,12 +553,105 @@ const Services = () => {
     }
   };
 
+  const [statusChangeTimes, setStatusChangeTimes] = useState({});
+
   const handleStatusChange = async (id, newStatus) => {
+    const changeTime = new Date().toISOString();
+    setStatusChangeTimes(prev => ({ ...prev, [id]: changeTime }));
     try {
+      // If changing to completed, check for inventory items to return
+      if (newStatus === "completed") {
+        // Fetch employee inventory assignments for this service
+        try {
+          const assignedService = assignedServices.find(s => s.id === id);
+          if (assignedService && assignedService.employee) {
+            const empInvRes = await api.get(`/services/employee-inventory/${assignedService.employee.id}?status=assigned,in_use,completed`);
+            const allAssignments = empInvRes.data || [];
+            // Filter assignments for this specific service - only items that were actually used
+            const serviceAssignments = allAssignments.filter(
+              a => a.assigned_service_id === id && a.quantity_used > 0 && a.balance_quantity > 0
+            );
+            
+            if (serviceAssignments.length > 0) {
+              // Show return inventory modal
+              setInventoryAssignments(serviceAssignments);
+              setCompletingServiceId(id);
+              // Initialize return quantities with balance
+              const initialReturns = {};
+              serviceAssignments.forEach(a => {
+                initialReturns[a.id] = a.balance_quantity; // Default to return all
+              });
+              setReturnQuantities(initialReturns);
+              return; // Don't update status yet, wait for user to confirm returns
+            }
+          }
+        } catch (invError) {
+          console.warn("Could not fetch inventory assignments:", invError);
+          // Continue with status update even if inventory fetch fails
+        }
+      }
+      
+      // Update status without inventory returns
       await api.patch(`/services/assigned/${id}`, { status: newStatus });
       fetchAll();
     } catch (error) {
       console.error("Failed to update status:", error);
+      alert(`Failed to update status: ${error.response?.data?.detail || error.message}`);
+    }
+  };
+
+  const handleCompleteWithReturns = async () => {
+    if (!completingServiceId) return;
+    
+    try {
+      // Build inventory returns array - only from used items
+      const inventory_returns = inventoryAssignments
+        .filter(a => {
+          const qty = returnQuantities[a.id];
+          const numQty = parseFloat(qty);
+          const usedQty = a.quantity_used || 0;
+          // Only allow returns if item was used and return quantity is valid
+          return !isNaN(numQty) && numQty > 0 && usedQty > 0 && numQty <= usedQty;
+        })
+        .map(a => {
+          const qty = returnQuantities[a.id];
+          const numQty = parseFloat(qty);
+          const usedQty = a.quantity_used || 0;
+          // Ensure return doesn't exceed used quantity
+          const returnQty = Math.min(numQty, usedQty);
+          return {
+            assignment_id: a.id,
+            quantity_returned: returnQty,
+            notes: `Returned on service completion - Transparent transaction for ${a.item?.name || 'item'} (Used: ${usedQty}, Returned: ${returnQty})`
+          };
+        });
+      
+      // Validate that all returns are from used items
+      const invalidReturns = inventory_returns.filter(ret => {
+        const assignment = inventoryAssignments.find(a => a.id === ret.assignment_id);
+        return !assignment || (assignment.quantity_used || 0) === 0;
+      });
+      
+      if (invalidReturns.length > 0) {
+        alert("Error: Cannot return items that were not used in the service. Please check your return quantities.");
+        return;
+      }
+      
+      // Update status with inventory returns
+      await api.patch(`/services/assigned/${completingServiceId}`, {
+        status: "completed",
+        inventory_returns: inventory_returns.length > 0 ? inventory_returns : null
+      });
+      
+      // Close modal and refresh
+      setCompletingServiceId(null);
+      setInventoryAssignments([]);
+      setReturnQuantities({});
+      fetchAll();
+      alert("Service marked as completed and inventory items returned successfully!");
+    } catch (error) {
+      console.error("Failed to complete service with returns:", error);
+      alert(`Failed to complete service: ${error.response?.data?.detail || error.message}`);
     }
   };
 
@@ -490,20 +669,39 @@ const Services = () => {
       console.log("[DEBUG] Found service from API:", service);
       console.log("[DEBUG] Service inventory items from API:", service?.inventory_items);
       
+      // Fetch returned inventory items if employee is available
+      let returnedItemsData = [];
+      if (assignedService.employee && assignedService.employee.id) {
+        try {
+          const empInvRes = await api.get(`/services/employee-inventory/${assignedService.employee.id}?status=returned,partially_returned`);
+          const allAssignments = empInvRes.data || [];
+          // Filter assignments for this specific service that have been returned
+          returnedItemsData = allAssignments.filter(
+            a => a.assigned_service_id === assignedService.id && a.quantity_returned > 0
+          );
+          console.log("[DEBUG] Found returned items:", returnedItemsData);
+        } catch (invError) {
+          console.warn("Could not fetch returned inventory items:", invError);
+        }
+      }
+      
       if (service) {
         setViewingAssignedService({
           ...assignedService,
           service: service // Include full service details with inventory_items
         });
+        setReturnedItems(returnedItemsData);
       } else {
         // Fallback to assigned service data if service not found
         console.warn("[WARNING] Service not found, using assigned service data");
         setViewingAssignedService(assignedService);
+        setReturnedItems(returnedItemsData);
       }
     } catch (error) {
       console.error("Failed to fetch service details:", error);
       // Still show the assigned service even if we can't fetch full details
       setViewingAssignedService(assignedService);
+      setReturnedItems([]);
     }
   };
 
@@ -561,6 +759,155 @@ const Services = () => {
     );
   });
 
+  // Dashboard Data Processing
+  const getDashboardData = () => {
+    // Service-wise statistics
+    const serviceStats = services.map(service => {
+      const assigned = assignedServices.filter(a => a.service_id === service.id);
+      const completed = assigned.filter(a => a.status === 'completed').length;
+      const pending = assigned.filter(a => a.status === 'pending').length;
+      const inProgress = assigned.filter(a => a.status === 'in_progress').length;
+      
+      // Calculate inventory usage for this service
+      const inventoryUsage = {};
+      // Get inventory items from service definition
+      const serviceInventoryItems = service.inventory_items || [];
+      
+      assigned.forEach(assignment => {
+        // Use service inventory items or fallback to assignment service inventory items
+        const items = serviceInventoryItems.length > 0 
+          ? serviceInventoryItems 
+          : (assignment.service?.inventory_items || []);
+        
+        items.forEach(item => {
+          const itemId = item.id || item.inventory_item_id;
+          if (!inventoryUsage[itemId]) {
+            inventoryUsage[itemId] = {
+              name: item.name,
+              item_code: item.item_code,
+              unit: item.unit || 'pcs',
+              quantity_used: 0,
+              total_cost: 0,
+              assignments: 0
+            };
+          }
+          const qty = item.quantity || 1;
+          inventoryUsage[itemId].quantity_used += qty;
+          inventoryUsage[itemId].total_cost += (item.unit_price || 0) * qty;
+          inventoryUsage[itemId].assignments += 1;
+        });
+      });
+
+      return {
+        service_id: service.id,
+        service_name: service.name,
+        service_charges: service.charges,
+        total_assignments: assigned.length,
+        completed,
+        pending,
+        in_progress: inProgress,
+        total_revenue: completed * service.charges,
+        inventory_items: Object.values(inventoryUsage),
+        inventory_count: Object.keys(inventoryUsage).length
+      };
+    });
+
+    // Overall inventory usage
+    const overallInventoryUsage = {};
+    assignedServices.forEach(assignment => {
+      const serviceId = assignment.service_id;
+      // Find the service in services array to get inventory items
+      const serviceData = services.find(s => s.id === serviceId);
+      const items = serviceData?.inventory_items || assignment.service?.inventory_items || [];
+      
+      items.forEach(item => {
+        const itemId = item.id || item.inventory_item_id;
+        if (!overallInventoryUsage[itemId]) {
+          overallInventoryUsage[itemId] = {
+            id: itemId,
+            name: item.name,
+            item_code: item.item_code,
+            unit: item.unit || 'pcs',
+            unit_price: item.unit_price || 0,
+            quantity_used: 0,
+            total_cost: 0,
+            services_used_in: new Set(),
+            assignments_count: 0
+          };
+        }
+        const qty = item.quantity || 1;
+        overallInventoryUsage[itemId].quantity_used += qty;
+        overallInventoryUsage[itemId].total_cost += (item.unit_price || 0) * qty;
+        overallInventoryUsage[itemId].services_used_in.add(serviceId);
+        overallInventoryUsage[itemId].assignments_count += 1;
+      });
+    });
+
+    // Convert Set to Array for services_used_in
+    Object.values(overallInventoryUsage).forEach(item => {
+      item.services_count = item.services_used_in.size;
+      item.services_used_in = Array.from(item.services_used_in);
+    });
+
+    // Employee performance
+    const employeeStats = {};
+    assignedServices.forEach(assignment => {
+      if (assignment.employee_id && assignment.employee) {
+        const empId = assignment.employee_id;
+        if (!employeeStats[empId]) {
+          employeeStats[empId] = {
+            employee_id: empId,
+            employee_name: assignment.employee.name,
+            total_assignments: 0,
+            completed: 0,
+            in_progress: 0,
+            pending: 0
+          };
+        }
+        employeeStats[empId].total_assignments += 1;
+        if (assignment.status === 'completed') employeeStats[empId].completed += 1;
+        else if (assignment.status === 'in_progress') employeeStats[empId].in_progress += 1;
+        else employeeStats[empId].pending += 1;
+      }
+    });
+
+    // Room-wise statistics
+    const roomStats = {};
+    assignedServices.forEach(assignment => {
+      if (assignment.room_id && assignment.room) {
+        const roomId = assignment.room_id;
+        if (!roomStats[roomId]) {
+          roomStats[roomId] = {
+            room_id: roomId,
+            room_number: assignment.room.number,
+            total_services: 0,
+            total_revenue: 0,
+            services: []
+          };
+        }
+        roomStats[roomId].total_services += 1;
+        if (assignment.status === 'completed') {
+          roomStats[roomId].total_revenue += assignment.service?.charges || 0;
+        }
+        if (!roomStats[roomId].services.find(s => s.id === assignment.service_id)) {
+          roomStats[roomId].services.push({
+            id: assignment.service_id,
+            name: assignment.service?.name
+          });
+        }
+      }
+    });
+
+    return {
+      serviceStats,
+      overallInventoryUsage: Object.values(overallInventoryUsage).sort((a, b) => b.quantity_used - a.quantity_used),
+      employeeStats: Object.values(employeeStats).sort((a, b) => b.total_assignments - a.total_assignments),
+      roomStats: Object.values(roomStats).sort((a, b) => b.total_services - a.total_services)
+    };
+  };
+
+  const dashboardData = getDashboardData();
+
   // KPI Data
   const totalServices = services.length;
   const totalAssigned = assignedServices.length;
@@ -580,43 +927,773 @@ const Services = () => {
     assigned: assignedServices.filter(a => a.service_id === s.id).length,
   }));
 
+  const fetchServiceReport = async () => {
+    setReportLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (reportFilters.from_date) params.append('from_date', reportFilters.from_date);
+      if (reportFilters.to_date) params.append('to_date', reportFilters.to_date);
+      if (reportFilters.room_number) params.append('room_number', reportFilters.room_number);
+      if (reportFilters.guest_name) params.append('guest_name', reportFilters.guest_name);
+      if (reportFilters.location_id) params.append('location_id', reportFilters.location_id);
+      
+      const response = await api.get(`/reports/services/detailed-usage?${params.toString()}`);
+      setServiceReport(response.data);
+    } catch (error) {
+      console.error("Failed to fetch service report:", error);
+      alert(`Failed to load report: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
+  // Service Request Handlers
+  const handleUpdateRequestStatus = async (requestId, newStatus) => {
+    try {
+      await api.put(`/service-requests/${requestId}`, { status: newStatus });
+      fetchServiceRequests();
+    } catch (error) {
+      console.error("Failed to update request status:", error);
+      const msg = error.response?.data?.detail || error.message || "Unknown error";
+      alert(`Failed to update request status: ${msg}`);
+    }
+  };
+
+  const handleAssignEmployeeToRequest = async (requestId, employeeId) => {
+    try {
+      await api.put(`/service-requests/${requestId}`, { employee_id: employeeId });
+      fetchServiceRequests();
+    } catch (error) {
+      console.error("Failed to assign employee:", error);
+      const msg = error.response?.data?.detail || error.message || "Unknown error";
+      alert(`Failed to assign employee: ${msg}`);
+    }
+  };
+
+  const handleDeleteRequest = async (requestId) => {
+    if (!window.confirm("Are you sure you want to delete this service request?")) {
+      return;
+    }
+    try {
+      await api.delete(`/service-requests/${requestId}`);
+      fetchServiceRequests();
+    } catch (error) {
+      console.error("Failed to delete request:", error);
+      const msg = error.response?.data?.detail || error.message || "Unknown error";
+      alert(`Failed to delete request: ${msg}`);
+    }
+  };
+
+  const handleQuickAssignFromRequest = async (request) => {
+    if (services.length === 0) {
+      alert("No services available. Please create a service first.");
+      setActiveTab("create");
+      return;
+    }
+    
+    // Show service selection dialog
+    const serviceOptions = services.map(s => `${s.id}: ${s.name}`).join('\n');
+    const selectedServiceId = window.prompt(
+      `Select a service to assign to Room ${request.room_number || request.room_id}:\n\n${serviceOptions}\n\nEnter service ID:`
+    );
+    
+    if (!selectedServiceId) return;
+    
+    const serviceId = parseInt(selectedServiceId);
+    const selectedService = services.find(s => s.id === serviceId);
+    
+    if (!selectedService) {
+      alert("Invalid service ID");
+      return;
+    }
+
+    // Auto-fill assign form
+    setAssignForm({
+      service_id: serviceId.toString(),
+      employee_id: request.employee_id ? request.employee_id.toString() : "",
+      room_id: request.room_id.toString(),
+      status: "pending",
+    });
+    setSelectedServiceDetails(selectedService);
+    setActiveTab("assign");
+    
+    // Scroll to top
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   return (
     <DashboardLayout>
       <div className="p-6 space-y-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-3xl font-bold text-gray-800">Service Management Dashboard</h2>
-          <button
-            onClick={handleClearAllServices}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-md transition-colors"
-            title="Clear all services and assigned services"
-          >
-            🗑️ Clear All Services
-          </button>
         </div>
 
+        {/* Tabs Navigation */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+          <div className="flex border-b border-gray-200">
+            {[
+              { id: "dashboard", label: "Dashboard" },
+              { id: "create", label: "Services" },
+              { id: "assign", label: "Assign & Manage" },
+              { id: "items", label: "Items Used" },
+              { id: "requests", label: "Service Requests" }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-6 py-3 font-medium transition-colors ${
+                  activeTab === tab.id
+                    ? "text-indigo-600 border-b-2 border-indigo-600"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Dashboard Tab */}
+        {activeTab === "dashboard" && (
+          <div className="space-y-6">
+            {/* Key Metrics Overview */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card title="Total Services" className="bg-gradient-to-br from-blue-500 to-blue-700 text-white">
+                <div className="text-4xl font-bold">{totalServices}</div>
+                <p className="text-sm opacity-90 mt-2">Active services available</p>
+              </Card>
+              <Card title="Total Assignments" className="bg-gradient-to-br from-green-500 to-green-700 text-white">
+                <div className="text-4xl font-bold">{totalAssigned}</div>
+                <p className="text-sm opacity-90 mt-2">{completedCount} completed, {pendingCount} pending</p>
+              </Card>
+              <Card title="Total Revenue" className="bg-gradient-to-br from-purple-500 to-purple-700 text-white">
+                <div className="text-4xl font-bold">
+                  ₹{dashboardData.serviceStats.reduce((sum, s) => sum + s.total_revenue, 0).toFixed(2)}
+                </div>
+                <p className="text-sm opacity-90 mt-2">From completed services</p>
+              </Card>
+              <Card title="Inventory Items Used" className="bg-gradient-to-br from-orange-500 to-orange-700 text-white">
+                <div className="text-4xl font-bold">{dashboardData.overallInventoryUsage.length}</div>
+                <p className="text-sm opacity-90 mt-2">Unique items consumed</p>
+              </Card>
+            </div>
+
+            {/* Charts Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Card title="Service Status Distribution">
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
+                      {pieData.map((entry, index) => (
+                        <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </Card>
+
+              <Card title="Service Assignments">
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={barData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} />
+                    <YAxis allowDecimals={false} />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="assigned" fill="#4F46E5" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </Card>
+            </div>
+
+            {/* Service-Wise Statistics */}
+            <Card title="Service-Wise Performance & Inventory Usage">
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-200 rounded-lg">
+                  <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Service Name</th>
+                      <th className="py-3 px-4 text-center">Total Assignments</th>
+                      <th className="py-3 px-4 text-center">Completed</th>
+                      <th className="py-3 px-4 text-center">In Progress</th>
+                      <th className="py-3 px-4 text-center">Pending</th>
+                      <th className="py-3 px-4 text-right">Revenue (₹)</th>
+                      <th className="py-3 px-4 text-center">Inventory Items</th>
+                      <th className="py-3 px-4 text-left">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboardData.serviceStats.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="py-8 text-center text-gray-500">
+                          No service data available
+                        </td>
+                      </tr>
+                    ) : (
+                      dashboardData.serviceStats.map((stat, idx) => (
+                        <tr key={stat.service_id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors`}>
+                          <td className="py-3 px-4 font-semibold">{stat.service_name}</td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                              {stat.total_assignments}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                              {stat.completed}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+                              {stat.in_progress}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium">
+                              {stat.pending}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold text-green-600">
+                            ₹{stat.total_revenue.toFixed(2)}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium">
+                              {stat.inventory_count} items
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            {stat.inventory_items.length > 0 ? (
+                              <details className="cursor-pointer">
+                                <summary className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                                  View Inventory ({stat.inventory_items.length})
+                                </summary>
+                                <div className="mt-2 p-3 bg-gray-50 rounded-lg space-y-2">
+                                  {stat.inventory_items.map((item, itemIdx) => (
+                                    <div key={itemIdx} className="flex justify-between items-center text-sm border-b pb-2 last:border-0">
+                                      <div>
+                                        <span className="font-medium">{item.name}</span>
+                                        {item.item_code && (
+                                          <span className="text-gray-500 ml-2">({item.item_code})</span>
+                                        )}
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="font-semibold">{item.quantity_used.toFixed(2)} {item.unit}</div>
+                                        <div className="text-xs text-gray-500">₹{item.total_cost.toFixed(2)}</div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            ) : (
+                              <span className="text-sm text-gray-400">No inventory</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Inventory Usage Breakdown */}
+            <Card title="Overall Inventory Usage (Item-Wise)">
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-200 rounded-lg">
+                  <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Item Name</th>
+                      <th className="py-3 px-4 text-left">Item Code</th>
+                      <th className="py-3 px-4 text-center">Total Quantity Used</th>
+                      <th className="py-3 px-4 text-center">Unit</th>
+                      <th className="py-3 px-4 text-center">Unit Price</th>
+                      <th className="py-3 px-4 text-right">Total Cost (₹)</th>
+                      <th className="py-3 px-4 text-center">Used In Services</th>
+                      <th className="py-3 px-4 text-center">Assignments</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dashboardData.overallInventoryUsage.length === 0 ? (
+                      <tr>
+                        <td colSpan="8" className="py-8 text-center text-gray-500">
+                          No inventory items used
+                        </td>
+                      </tr>
+                    ) : (
+                      dashboardData.overallInventoryUsage.map((item, idx) => (
+                        <tr key={item.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors`}>
+                          <td className="py-3 px-4 font-semibold">{item.name}</td>
+                          <td className="py-3 px-4 text-gray-600">{item.item_code || '-'}</td>
+                          <td className="py-3 px-4 text-center font-semibold text-blue-600">
+                            {item.quantity_used.toFixed(2)}
+                          </td>
+                          <td className="py-3 px-4 text-center text-gray-600">{item.unit}</td>
+                          <td className="py-3 px-4 text-center">₹{item.unit_price.toFixed(2)}</td>
+                          <td className="py-3 px-4 text-right font-semibold text-green-600">
+                            ₹{item.total_cost.toFixed(2)}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-3 py-1 bg-purple-100 text-purple-800 rounded-full text-sm font-medium">
+                              {item.services_count} services
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium">
+                              {item.assignments_count}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Employee Performance */}
+            {dashboardData.employeeStats.length > 0 && (
+              <Card title="Employee Performance">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-gray-200 rounded-lg">
+                    <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider">
+                      <tr>
+                        <th className="py-3 px-4 text-left">Employee Name</th>
+                        <th className="py-3 px-4 text-center">Total Assignments</th>
+                        <th className="py-3 px-4 text-center">Completed</th>
+                        <th className="py-3 px-4 text-center">In Progress</th>
+                        <th className="py-3 px-4 text-center">Pending</th>
+                        <th className="py-3 px-4 text-center">Completion Rate</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dashboardData.employeeStats.map((emp, idx) => {
+                        const completionRate = emp.total_assignments > 0 
+                          ? ((emp.completed / emp.total_assignments) * 100).toFixed(1) 
+                          : 0;
+                        return (
+                          <tr key={emp.employee_id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors`}>
+                            <td className="py-3 px-4 font-semibold">{emp.employee_name}</td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                                {emp.total_assignments}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
+                                {emp.completed}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
+                                {emp.in_progress}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="px-3 py-1 bg-gray-100 text-gray-800 rounded-full text-sm font-medium">
+                                {emp.pending}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <div className="flex items-center justify-center">
+                                <div className="w-24 bg-gray-200 rounded-full h-2.5 mr-2">
+                                  <div 
+                                    className="bg-green-600 h-2.5 rounded-full" 
+                                    style={{ width: `${completionRate}%` }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm font-semibold">{completionRate}%</span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
+            {/* Room-Wise Statistics */}
+            {dashboardData.roomStats.length > 0 && (
+              <Card title="Room-Wise Service Statistics">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-gray-200 rounded-lg">
+                    <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider">
+                      <tr>
+                        <th className="py-3 px-4 text-left">Room Number</th>
+                        <th className="py-3 px-4 text-center">Total Services</th>
+                        <th className="py-3 px-4 text-right">Revenue (₹)</th>
+                        <th className="py-3 px-4 text-left">Services Used</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dashboardData.roomStats.map((room, idx) => (
+                        <tr key={room.room_id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors`}>
+                          <td className="py-3 px-4 font-semibold">Room {room.room_number}</td>
+                          <td className="py-3 px-4 text-center">
+                            <span className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                              {room.total_services}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-right font-semibold text-green-600">
+                            ₹{room.total_revenue.toFixed(2)}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex flex-wrap gap-1">
+                              {room.services.slice(0, 3).map((service) => (
+                                <span key={service.id} className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded text-xs">
+                                  {service.name}
+                                </span>
+                              ))}
+                              {room.services.length > 3 && (
+                                <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                                  +{room.services.length - 3} more
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            )}
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card title="Top Performing Service">
+                {dashboardData.serviceStats.length > 0 ? (() => {
+                  const topService = dashboardData.serviceStats.sort((a, b) => b.total_assignments - a.total_assignments)[0];
+                  return (
+                    <div className="space-y-2">
+                      <div className="text-2xl font-bold text-indigo-600">{topService.service_name}</div>
+                      <div className="text-sm text-gray-600">
+                        <div>Assignments: <span className="font-semibold">{topService.total_assignments}</span></div>
+                        <div>Revenue: <span className="font-semibold text-green-600">₹{topService.total_revenue.toFixed(2)}</span></div>
+                        <div>Inventory Items: <span className="font-semibold">{topService.inventory_count}</span></div>
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <p className="text-gray-500">No data available</p>
+                )}
+              </Card>
+
+              <Card title="Most Used Inventory Item">
+                {dashboardData.overallInventoryUsage.length > 0 ? (() => {
+                  const topItem = dashboardData.overallInventoryUsage[0];
+                  return (
+                    <div className="space-y-2">
+                      <div className="text-lg font-bold text-indigo-600">{topItem.name}</div>
+                      <div className="text-sm text-gray-600">
+                        <div>Quantity: <span className="font-semibold">{topItem.quantity_used.toFixed(2)} {topItem.unit}</span></div>
+                        <div>Total Cost: <span className="font-semibold text-red-600">₹{topItem.total_cost.toFixed(2)}</span></div>
+                        <div>Used in: <span className="font-semibold">{topItem.services_count} services</span></div>
+                      </div>
+                    </div>
+                  );
+                })() : (
+                  <p className="text-gray-500">No data available</p>
+                )}
+              </Card>
+
+              <Card title="Total Inventory Cost">
+                <div className="space-y-2">
+                  <div className="text-3xl font-bold text-red-600">
+                    ₹{dashboardData.overallInventoryUsage.reduce((sum, item) => sum + item.total_cost, 0).toFixed(2)}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    <div>Items: <span className="font-semibold">{dashboardData.overallInventoryUsage.length}</span></div>
+                    <div>Total Quantity: <span className="font-semibold">
+                      {dashboardData.overallInventoryUsage.reduce((sum, item) => sum + item.quantity_used, 0).toFixed(2)}
+                    </span></div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* Service Usage Report Section */}
+        {showServiceReport && (
+          <Card title="📊 Detailed Service Usage Report" className="mb-6">
+            <div className="space-y-4">
+              {/* Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-4">
+                <input
+                  type="date"
+                  value={reportFilters.from_date}
+                  onChange={(e) => setReportFilters({ ...reportFilters, from_date: e.target.value })}
+                  placeholder="From Date"
+                  className="border p-2 rounded-lg"
+                />
+                <input
+                  type="date"
+                  value={reportFilters.to_date}
+                  onChange={(e) => setReportFilters({ ...reportFilters, to_date: e.target.value })}
+                  placeholder="To Date"
+                  className="border p-2 rounded-lg"
+                />
+                <input
+                  type="text"
+                  value={reportFilters.room_number}
+                  onChange={(e) => setReportFilters({ ...reportFilters, room_number: e.target.value })}
+                  placeholder="Room Number"
+                  className="border p-2 rounded-lg"
+                />
+                <input
+                  type="text"
+                  value={reportFilters.guest_name}
+                  onChange={(e) => setReportFilters({ ...reportFilters, guest_name: e.target.value })}
+                  placeholder="Guest Name"
+                  className="border p-2 rounded-lg"
+                />
+                <button
+                  onClick={fetchServiceReport}
+                  disabled={reportLoading}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-medium disabled:opacity-50"
+                >
+                  {reportLoading ? "Loading..." : "Generate Report"}
+                </button>
+              </div>
+
+              {/* Report Summary */}
+              {serviceReport && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <span className="text-sm text-gray-600">Total Services:</span>
+                      <p className="text-2xl font-bold text-gray-800">{serviceReport.total_services}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-600">Total Charges:</span>
+                      <p className="text-2xl font-bold text-green-600">₹{serviceReport.total_charges.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <span className="text-sm text-gray-600">Date Range:</span>
+                      <p className="text-lg font-semibold text-gray-800">
+                        {serviceReport.from_date ? new Date(serviceReport.from_date).toLocaleDateString() : 'All'} - 
+                        {serviceReport.to_date ? new Date(serviceReport.to_date).toLocaleDateString() : 'All'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Report Tabs */}
+              {serviceReport && (
+                <div className="space-y-4">
+                  <div className="border-b border-gray-200">
+                    <div className="flex space-x-4">
+                      <button className="px-4 py-2 border-b-2 border-indigo-600 text-indigo-600 font-medium">
+                        All Services ({serviceReport.services.length})
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Services Table */}
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full border border-gray-200 rounded-lg">
+                      <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider">
+                        <tr>
+                          <th className="py-3 px-4 text-left">Service</th>
+                          <th className="py-3 px-4 text-left">Guest</th>
+                          <th className="py-3 px-4 text-left">Room</th>
+                          <th className="py-3 px-4 text-left">Location</th>
+                          <th className="py-3 px-4 text-left">Employee</th>
+                          <th className="py-3 px-4 text-left">Charges</th>
+                          <th className="py-3 px-4 text-left">Status</th>
+                          <th className="py-3 px-4 text-left">Assigned</th>
+                          <th className="py-3 px-4 text-left">Last Used</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {serviceReport.services.map((s, idx) => (
+                          <tr key={idx} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100`}>
+                            <td className="p-3 border-t border-gray-200">
+                              <div>
+                                <span className="font-medium">{s.service_name}</span>
+                                {s.service_description && (
+                                  <p className="text-xs text-gray-500">{s.service_description}</p>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-3 border-t border-gray-200">
+                              {s.guest_name || <span className="text-gray-400 italic">N/A</span>}
+                            </td>
+                            <td className="p-3 border-t border-gray-200">Room {s.room_number}</td>
+                            <td className="p-3 border-t border-gray-200">
+                              {s.location_name ? (
+                                <div>
+                                  <span className="font-medium">{s.location_name}</span>
+                                  {s.location_type && (
+                                    <p className="text-xs text-gray-500">{s.location_type}</p>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-gray-400 italic">N/A</span>
+                              )}
+                            </td>
+                            <td className="p-3 border-t border-gray-200">{s.employee_name}</td>
+                            <td className="p-3 border-t border-gray-200 font-semibold">₹{s.service_charges}</td>
+                            <td className="p-3 border-t border-gray-200">
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                s.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                s.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {s.status}
+                              </span>
+                            </td>
+                            <td className="p-3 border-t border-gray-200 text-sm">
+                              {new Date(s.assigned_at).toLocaleString()}
+                            </td>
+                            <td className="p-3 border-t border-gray-200 text-sm">
+                              {s.last_used_at ? (
+                                <span className="text-green-600 font-medium">
+                                  {new Date(s.last_used_at).toLocaleString()}
+                                </span>
+                              ) : (
+                                <span className="text-gray-400 italic">Never</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Grouped Views */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                    {/* By Room */}
+                    {Object.keys(serviceReport.by_room).length > 0 && (
+                      <div className="bg-white border border-gray-200 rounded-lg p-4">
+                        <h3 className="font-semibold text-lg mb-3">By Room</h3>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {Object.entries(serviceReport.by_room).map(([room, services]) => (
+                            <div key={room} className="border-b pb-2">
+                              <div className="font-medium text-blue-600">Room {room}</div>
+                              <div className="text-sm text-gray-600">{services.length} service(s)</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* By Guest */}
+                    {Object.keys(serviceReport.by_guest).length > 0 && (
+                      <div className="bg-white border border-gray-200 rounded-lg p-4">
+                        <h3 className="font-semibold text-lg mb-3">By Guest</h3>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {Object.entries(serviceReport.by_guest).map(([guest, services]) => (
+                            <div key={guest} className="border-b pb-2">
+                              <div className="font-medium text-green-600">{guest}</div>
+                              <div className="text-sm text-gray-600">{services.length} service(s)</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* By Location */}
+                    {Object.keys(serviceReport.by_location).length > 0 && (
+                      <div className="bg-white border border-gray-200 rounded-lg p-4">
+                        <h3 className="font-semibold text-lg mb-3">By Location/Store</h3>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                          {Object.entries(serviceReport.by_location).map(([location, services]) => (
+                            <div key={location} className="border-b pb-2">
+                              <div className="font-medium text-purple-600">{location}</div>
+                              <div className="text-sm text-gray-600">{services.length} service(s)</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!serviceReport && !reportLoading && (
+                <div className="text-center py-8 text-gray-500">
+                  Click "Generate Report" to view detailed service usage report
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {/* Create Service Tab */}
+        {activeTab === "create" && (
+          <div className="space-y-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="bg-gradient-to-r from-indigo-500 to-indigo-700 text-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center">
-            <p className="text-sm opacity-80">Total Services</p>
-            <p className="text-3xl font-bold">{totalServices}</p>
-          </div>
-          <div className="bg-gradient-to-r from-green-500 to-green-700 text-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center">
-            <p className="text-sm opacity-80">Total Assigned</p>
-            <p className="text-3xl font-bold">{totalAssigned}</p>
-          </div>
-          <div className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center">
-            <p className="text-sm opacity-80">Pending</p>
-            <p className="text-3xl font-bold">{pendingCount}</p>
-          </div>
-          <div className="bg-gradient-to-r from-purple-500 to-purple-700 text-white p-6 rounded-xl shadow-lg flex flex-col items-center justify-center">
-            <p className="text-sm opacity-80">Completed</p>
-            <p className="text-3xl font-bold">{completedCount}</p>
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card title="Total Services" className="bg-gradient-to-br from-blue-500 to-blue-700 text-white">
+                <div className="text-3xl font-bold">{totalServices}</div>
+                <p className="text-sm opacity-90 mt-1">Active services</p>
+              </Card>
+              <Card title="Visible to Guests" className="bg-gradient-to-br from-green-500 to-green-700 text-white">
+                <div className="text-3xl font-bold">{services.filter(s => s.is_visible_to_guest).length}</div>
+                <p className="text-sm opacity-90 mt-1">Guest-visible</p>
+              </Card>
+              <Card title="With Images" className="bg-gradient-to-br from-purple-500 to-purple-700 text-white">
+                <div className="text-3xl font-bold">{services.filter(s => s.images && s.images.length > 0).length}</div>
+                <p className="text-sm opacity-90 mt-1">With images</p>
+              </Card>
+              <Card title="With Inventory" className="bg-gradient-to-br from-orange-500 to-orange-700 text-white">
+                <div className="text-3xl font-bold">{services.filter(s => s.inventory_items && s.inventory_items.length > 0).length}</div>
+                <p className="text-sm opacity-90 mt-1">With items</p>
+              </Card>
         </div>
 
-        {/* Create & Assign Forms */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Create Service */}
+        {/* Filters */}
+        <Card title="Filters">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <input
+              type="text"
+              placeholder="Search by name or description..."
+              value={serviceFilters.search}
+              onChange={(e) => setServiceFilters({ ...serviceFilters, search: e.target.value })}
+              className="border p-2 rounded-lg"
+            />
+            <select
+              value={serviceFilters.visible}
+              onChange={(e) => setServiceFilters({ ...serviceFilters, visible: e.target.value })}
+              className="border p-2 rounded-lg"
+            >
+              <option value="">All Visibility</option>
+              <option value="true">Visible to Guests</option>
+              <option value="false">Hidden</option>
+            </select>
+            <select
+              value={serviceFilters.hasInventory}
+              onChange={(e) => setServiceFilters({ ...serviceFilters, hasInventory: e.target.value })}
+              className="border p-2 rounded-lg"
+            >
+              <option value="">All Services</option>
+              <option value="true">With Inventory</option>
+              <option value="false">Without Inventory</option>
+            </select>
+            <select
+              value={serviceFilters.hasImages}
+              onChange={(e) => setServiceFilters({ ...serviceFilters, hasImages: e.target.value })}
+              className="border p-2 rounded-lg"
+            >
+              <option value="">All Services</option>
+              <option value="true">With Images</option>
+              <option value="false">Without Images</option>
+            </select>
+            <button
+              onClick={() => setServiceFilters({ search: "", visible: "", hasInventory: "", hasImages: "" })}
+              className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </Card>
+
           <Card title="Create New Service">
             <div className="space-y-3">
               {editingServiceId && (
@@ -652,6 +1729,13 @@ const Services = () => {
                 placeholder="Charges"
                 value={form.charges}
                 onChange={(e) => setForm({ ...form, charges: e.target.value })}
+                className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-indigo-400"
+              />
+              <input
+                type="text"
+                placeholder="Average Completion Time (e.g., 30 minutes, 1 hour)"
+                value={form.average_completion_time}
+                onChange={(e) => setForm({ ...form, average_completion_time: e.target.value })}
                 className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-indigo-400"
               />
               {/* Guest Visibility Toggle */}
@@ -780,8 +1864,274 @@ const Services = () => {
             </div>
           </Card>
 
-          {/* Assign Service */}
-          <Card title="Assign Service">
+          {/* All Services Table */}
+          <Card title="All Services">
+            {loading ? (
+              <div className="flex justify-center items-center h-48">
+                <Loader2 size={48} className="animate-spin text-indigo-500" />
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-200 rounded-lg">
+                  <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Image</th>
+                      <th className="py-3 px-4 text-left">Service Name</th>
+                      <th className="py-3 px-4 text-left">Description</th>
+                      <th className="py-3 px-4 text-right">Charges (₹)</th>
+                      <th className="py-3 px-4 text-center">Avg. Time</th>
+                      <th className="py-3 px-4 text-center">Visible</th>
+                      <th className="py-3 px-4 text-center">Inventory</th>
+                      <th className="py-3 px-4 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const filteredServices = services.filter(s => {
+                        if (serviceFilters.search && !s.name.toLowerCase().includes(serviceFilters.search.toLowerCase()) && !s.description?.toLowerCase().includes(serviceFilters.search.toLowerCase())) return false;
+                        if (serviceFilters.visible !== "" && s.is_visible_to_guest !== (serviceFilters.visible === "true")) return false;
+                        if (serviceFilters.hasInventory !== "" && ((s.inventory_items && s.inventory_items.length > 0) !== (serviceFilters.hasInventory === "true"))) return false;
+                        if (serviceFilters.hasImages !== "" && ((s.images && s.images.length > 0) !== (serviceFilters.hasImages === "true"))) return false;
+                        return true;
+                      });
+                      return filteredServices.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="py-8 text-center text-gray-500">
+                            No services found matching filters. Create your first service above.
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredServices.map((s, idx) => (
+                        <tr key={s.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors`}>
+                          <td className="py-3 px-4">
+                            {s.images && s.images.length > 0 ? (
+                              <img src={getImageUrl(s.images[0].image_url)} alt={s.name} className="w-16 h-16 object-cover rounded border" />
+                            ) : (
+                              <div className="w-16 h-16 bg-gray-200 rounded border flex items-center justify-center text-xs text-gray-400">No Image</div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 font-semibold">{s.name}</td>
+                          <td className="py-3 px-4">{s.description}</td>
+                          <td className="py-3 px-4 text-right font-semibold">₹{s.charges}</td>
+                          <td className="py-3 px-4 text-center text-sm">
+                            {s.average_completion_time || <span className="text-gray-400">-</span>}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                              s.is_visible_to_guest 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {s.is_visible_to_guest ? 'Visible' : 'Hidden'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {s.inventory_items && s.inventory_items.length > 0 ? (
+                              <span className="px-2 py-1 rounded text-xs font-semibold bg-indigo-100 text-indigo-800">
+                                {s.inventory_items.length} items
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <div className="flex flex-wrap gap-2 justify-center">
+                              <button
+                                onClick={() => handleEditService(s)}
+                                className="px-3 py-1 rounded text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleToggleVisibility(s.id, s.is_visible_to_guest)}
+                                className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+                                  s.is_visible_to_guest
+                                    ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
+                                    : 'bg-green-500 hover:bg-green-600 text-white'
+                                }`}
+                              >
+                                {s.is_visible_to_guest ? 'Hide' : 'Show'}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteService(s.id)}
+                                className="px-3 py-1 rounded text-sm font-medium bg-red-500 hover:bg-red-600 text-white"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    );
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+          </div>
+        )}
+
+        {/* Items Used Tab */}
+        {activeTab === "items" && (
+          <div className="space-y-6">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card title="Total Items Used" className="bg-gradient-to-br from-blue-500 to-blue-700 text-white">
+                <div className="text-3xl font-bold">{dashboardData.overallInventoryUsage.length}</div>
+                <p className="text-sm opacity-90 mt-1">Unique items</p>
+              </Card>
+              <Card title="Total Quantity" className="bg-gradient-to-br from-green-500 to-green-700 text-white">
+                <div className="text-3xl font-bold">
+                  {dashboardData.overallInventoryUsage.reduce((sum, item) => sum + item.quantity_used, 0).toFixed(1)}
+                </div>
+                <p className="text-sm opacity-90 mt-1">Total consumed</p>
+              </Card>
+              <Card title="Total Cost" className="bg-gradient-to-br from-purple-500 to-purple-700 text-white">
+                <div className="text-3xl font-bold">
+                  ₹{dashboardData.overallInventoryUsage.reduce((sum, item) => sum + item.total_cost, 0).toFixed(2)}
+                </div>
+                <p className="text-sm opacity-90 mt-1">Inventory cost</p>
+              </Card>
+              <Card title="Services Using Items" className="bg-gradient-to-br from-orange-500 to-orange-700 text-white">
+                <div className="text-3xl font-bold">
+                  {new Set(dashboardData.overallInventoryUsage.flatMap(item => item.services_used_in || [])).size}
+                </div>
+                <p className="text-sm opacity-90 mt-1">Active services</p>
+              </Card>
+            </div>
+
+            {/* Filters */}
+            <Card title="Filters">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input
+                  type="text"
+                  placeholder="Search by item name or code..."
+                  value={itemFilters.search}
+                  onChange={(e) => setItemFilters({ ...itemFilters, search: e.target.value })}
+                  className="border p-2 rounded-lg"
+                />
+                <select
+                  value={itemFilters.service}
+                  onChange={(e) => setItemFilters({ ...itemFilters, service: e.target.value })}
+                  className="border p-2 rounded-lg"
+                >
+                  <option value="">All Services</option>
+                  {services.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => setItemFilters({ search: "", service: "", category: "" })}
+                  className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            </Card>
+
+            {/* Items Used Table */}
+            <Card title="Inventory Items Used with Services">
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-200 rounded-lg">
+                  <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Item Name</th>
+                      <th className="py-3 px-4 text-left">Item Code</th>
+                      <th className="py-3 px-4 text-center">Total Quantity</th>
+                      <th className="py-3 px-4 text-center">Unit</th>
+                      <th className="py-3 px-4 text-center">Unit Price</th>
+                      <th className="py-3 px-4 text-right">Total Cost (₹)</th>
+                      <th className="py-3 px-4 text-center">Used In</th>
+                      <th className="py-3 px-4 text-center">Assignments</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const filteredItems = dashboardData.overallInventoryUsage.filter(item => {
+                        if (itemFilters.search && !item.name.toLowerCase().includes(itemFilters.search.toLowerCase()) && !item.item_code?.toLowerCase().includes(itemFilters.search.toLowerCase())) return false;
+                        if (itemFilters.service && !item.services_used_in.includes(parseInt(itemFilters.service))) return false;
+                        return true;
+                      });
+                      return filteredItems.length === 0 ? (
+                        <tr>
+                          <td colSpan="8" className="py-8 text-center text-gray-500">
+                            No items found matching filters
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredItems.map((item, idx) => (
+                          <tr key={item.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors`}>
+                            <td className="py-3 px-4 font-semibold">{item.name}</td>
+                            <td className="py-3 px-4 text-gray-600">{item.item_code || '-'}</td>
+                            <td className="py-3 px-4 text-center font-semibold text-blue-600">
+                              {item.quantity_used.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-center text-gray-600">{item.unit}</td>
+                            <td className="py-3 px-4 text-center">₹{item.unit_price.toFixed(2)}</td>
+                            <td className="py-3 px-4 text-right font-semibold text-green-600">
+                              ₹{item.total_cost.toFixed(2)}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <div className="flex flex-wrap gap-1 justify-center">
+                                {item.services_used_in && item.services_used_in.length > 0 ? (
+                                  item.services_used_in.slice(0, 2).map(serviceId => {
+                                    const service = services.find(s => s.id === serviceId);
+                                    return service ? (
+                                      <span key={serviceId} className="px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs">
+                                        {service.name}
+                                      </span>
+                                    ) : null;
+                                  })
+                                ) : null}
+                                {item.services_count > 2 && (
+                                  <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                                    +{item.services_count - 2} more
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="px-3 py-1 bg-indigo-100 text-indigo-800 rounded-full text-sm font-medium">
+                                {item.assignments_count}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      );
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Assign & Manage Tab - Combined */}
+        {activeTab === "assign" && (
+          <div className="space-y-6">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card title="Total Assigned" className="bg-gradient-to-br from-blue-500 to-blue-700 text-white">
+                <div className="text-3xl font-bold">{totalAssigned}</div>
+                <p className="text-sm opacity-90 mt-1">All assignments</p>
+              </Card>
+              <Card title="Pending" className="bg-gradient-to-br from-yellow-400 to-yellow-600 text-white">
+                <div className="text-3xl font-bold">{pendingCount}</div>
+                <p className="text-sm opacity-90 mt-1">Awaiting completion</p>
+              </Card>
+              <Card title="In Progress" className="bg-gradient-to-br from-orange-500 to-orange-700 text-white">
+                <div className="text-3xl font-bold">{totalAssigned - pendingCount - completedCount}</div>
+                <p className="text-sm opacity-90 mt-1">Currently active</p>
+              </Card>
+              <Card title="Completed" className="bg-gradient-to-br from-green-500 to-green-700 text-white">
+                <div className="text-3xl font-bold">{completedCount}</div>
+                <p className="text-sm opacity-90 mt-1">Finished services</p>
+              </Card>
+            </div>
+
+            {/* Assign Service Form */}
+            <Card title="Assign New Service">
             <div className="space-y-3">
               <select
                 value={assignForm.service_id}
@@ -901,6 +2251,56 @@ const Services = () => {
                 <option value="in_progress">In Progress</option>
                 <option value="completed">Completed</option>
               </select>
+
+              {/* Extra Inventory Items Section */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Extra Inventory Items (Optional - Additional items beyond service requirements)
+                </label>
+                <button
+                  type="button"
+                  onClick={handleAddExtraInventoryItem}
+                  className="mb-2 text-sm bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-1 rounded"
+                >
+                  + Add Extra Inventory Item
+                </button>
+                {extraInventoryItems.map((item, index) => (
+                  <div key={index} className="flex gap-2 mb-2 items-end">
+                    <select
+                      value={item.inventory_item_id}
+                      onChange={(e) => handleUpdateExtraInventoryItem(index, 'inventory_item_id', e.target.value)}
+                      className="flex-1 border p-2 rounded-lg text-sm"
+                    >
+                      <option value="">Select Item</option>
+                      {inventoryItems.map((invItem) => (
+                        <option key={invItem.id} value={invItem.id}>
+                          {invItem.name} {invItem.item_code ? `(${invItem.item_code})` : ''} - {invItem.unit}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => handleUpdateExtraInventoryItem(index, 'quantity', e.target.value)}
+                      placeholder="Qty"
+                      min="0.01"
+                      step="0.01"
+                      className="w-24 border p-2 rounded-lg text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveExtraInventoryItem(index)}
+                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                {extraInventoryItems.length === 0 && (
+                  <p className="text-xs text-gray-500 italic">No extra items added. Service will use only its default inventory items.</p>
+                )}
+              </div>
+
               <button
                 onClick={handleAssign}
                 className="w-full mt-3 bg-green-600 hover:bg-green-700 text-white p-3 rounded-lg shadow-lg font-semibold"
@@ -909,126 +2309,8 @@ const Services = () => {
               </button>
             </div>
           </Card>
-        </div>
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card title="Service Status Distribution">
-            <ResponsiveContainer width="100%" height={250}>
-              <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} label>
-                  {pieData.map((entry, index) => (
-                    <Cell key={index} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </Card>
-
-          <Card title="Service Assignments">
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={barData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis allowDecimals={false} />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="assigned" fill="#4F46E5" />
-              </BarChart>
-            </ResponsiveContainer>
-          </Card>
-        </div>
-
-        {/* View All Services Table */}
-        <Card title="All Services">
-          {loading ? (
-            <div className="flex justify-center items-center h-48">
-              <Loader2 size={48} className="animate-spin text-indigo-500" />
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full border border-gray-200 rounded-lg">
-                <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider">
-                  <tr>
-                    <th className="py-3 px-4 text-left">Image</th>
-                    <th className="py-3 px-4 text-left">Service Name</th>
-                    <th className="py-3 px-4 text-left">Description</th>
-                    <th className="py-3 px-4 text-right">Charges ($)</th>
-                    <th className="py-3 px-4 text-center">Visible to Guests</th>
-                    <th className="py-3 px-4 text-center">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {services.map((s, idx) => (
-                    <tr key={s.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors`}>
-                      <td className="py-3 px-4">
-                        {s.images && s.images.length > 0 ? (
-                          <img src={getImageUrl(s.images[0].image_url)} alt={s.name} className="w-16 h-16 object-cover rounded border" />
-                        ) : (
-                          <div className="w-16 h-16 bg-gray-200 rounded border flex items-center justify-center text-xs text-gray-400">No Image</div>
-                        )}
-                      </td>
-                      <td className="py-3 px-4">{s.name}</td>
-                      <td className="py-3 px-4">{s.description}</td>
-                      <td className="py-3 px-4 text-right">{s.charges}</td>
-                      <td className="py-3 px-4 text-center">
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                          s.is_visible_to_guest 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-gray-100 text-gray-800'
-                        }`}>
-                          {s.is_visible_to_guest ? 'Visible' : 'Hidden'}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex flex-wrap gap-2 justify-center">
-                          <button
-                            onClick={() => handleToggleVisibility(s.id, s.is_visible_to_guest)}
-                            className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                              s.is_visible_to_guest
-                                ? 'bg-yellow-500 hover:bg-yellow-600 text-white'
-                                : 'bg-green-500 hover:bg-green-600 text-white'
-                            }`}
-                            title={s.is_visible_to_guest ? 'Hide from guests' : 'Show to guests'}
-                          >
-                            {s.is_visible_to_guest ? 'Hide' : 'Show'}
-                          </button>
-                          <button
-                            onClick={() => handleEditService(s)}
-                            className="px-3 py-1 rounded text-sm font-medium bg-blue-500 hover:bg-blue-600 text-white"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDeleteService(s.id)}
-                            className="px-3 py-1 rounded text-sm font-medium bg-red-500 hover:bg-red-600 text-white"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {hasMore && (
-                <div className="text-center mt-4">
-                  <button
-                    onClick={loadMoreAssigned}
-                    disabled={isFetchingMore}
-                    className="bg-indigo-100 text-indigo-700 font-semibold px-6 py-2 rounded-lg hover:bg-indigo-200 transition-colors disabled:bg-gray-200 disabled:text-gray-500"
-                  >
-                    {isFetchingMore ? "Loading..." : "Load More"}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-        </Card>
-
-        {/* Filters & Assigned Services Table */}
+          {/* Assigned Services Table */}
         <Card title="Assigned Services">
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
             <select value={filters.room} onChange={(e) => setFilters({ ...filters, room: e.target.value })} className="border p-2 rounded-lg">
@@ -1063,8 +2345,11 @@ const Services = () => {
                     <th className="py-3 px-4 text-left">Service</th>
                     <th className="py-3 px-4 text-left">Employee</th>
                     <th className="py-3 px-4 text-left">Room</th>
-                    <th className="py-3 px-4 text-left">Status</th>
+                    <th className="py-3 px-4 text-left">In Progress</th>
+                    <th className="py-3 px-4 text-left">Avg. Completion Time</th>
                     <th className="py-3 px-4 text-left">Assigned At</th>
+                    <th className="py-3 px-4 text-left">Status Changed</th>
+                    <th className="py-3 px-4 text-left">Completed Time</th>
                     <th className="py-3 px-4 text-left">Actions</th>
                   </tr>
                 </thead>
@@ -1081,7 +2366,32 @@ const Services = () => {
                           <option value="completed">Completed</option>
                         </select>
                       </td>
+                      <td className="p-3 border-t border-gray-200 text-sm">
+                        {s.service?.average_completion_time ? (
+                          <span className="text-indigo-600 font-medium">{s.service.average_completion_time}</span>
+                        ) : (
+                          <span className="text-gray-400 italic">Not set</span>
+                        )}
+                      </td>
                       <td className="p-3 border-t border-gray-200">{s.assigned_at && new Date(s.assigned_at).toLocaleString()}</td>
+                      <td className="p-3 border-t border-gray-200">
+                        {statusChangeTimes[s.id] ? (
+                          <span className="text-blue-600 font-medium text-sm">
+                            {new Date(statusChangeTimes[s.id]).toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic text-sm">Not changed</span>
+                        )}
+                      </td>
+                      <td className="p-3 border-t border-gray-200">
+                        {s.last_used_at ? (
+                          <span className="text-green-600 font-medium">
+                            {new Date(s.last_used_at).toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400 italic">Never</span>
+                        )}
+                      </td>
                       <td className="p-3 border-t border-gray-200">
                         <div className="flex gap-2">
                           <button
@@ -1106,6 +2416,182 @@ const Services = () => {
           )}
         </Card>
       </div>
+        )}
+
+        {/* Service Requests Tab */}
+        {activeTab === "requests" && (
+          <div className="space-y-6">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card title="Total Requests" className="bg-gradient-to-br from-blue-500 to-blue-700 text-white">
+                <div className="text-3xl font-bold">{serviceRequests.length}</div>
+                <p className="text-sm opacity-90 mt-1">All requests</p>
+              </Card>
+              <Card title="Pending" className="bg-gradient-to-br from-yellow-400 to-yellow-600 text-white">
+                <div className="text-3xl font-bold">{serviceRequests.filter(r => r.status === 'pending').length}</div>
+                <p className="text-sm opacity-90 mt-1">Awaiting action</p>
+              </Card>
+              <Card title="In Progress" className="bg-gradient-to-br from-orange-500 to-orange-700 text-white">
+                <div className="text-3xl font-bold">{serviceRequests.filter(r => r.status === 'in_progress').length}</div>
+                <p className="text-sm opacity-90 mt-1">Being processed</p>
+              </Card>
+              <Card title="Completed" className="bg-gradient-to-br from-green-500 to-green-700 text-white">
+                <div className="text-3xl font-bold">{serviceRequests.filter(r => r.status === 'completed').length}</div>
+                <p className="text-sm opacity-90 mt-1">Finished</p>
+              </Card>
+            </div>
+
+            <Card title="Service Requests">
+          {loading ? (
+            <div className="flex justify-center items-center h-48">
+              <Loader2 size={48} className="animate-spin text-indigo-500" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full border border-gray-200 rounded-lg">
+                <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider">
+                  <tr>
+                    <th className="py-3 px-4 text-left">ID</th>
+                    <th className="py-3 px-4 text-left">Room</th>
+                    <th className="py-3 px-4 text-left">Food Order</th>
+                    <th className="py-3 px-4 text-left">Request Type</th>
+                    <th className="py-3 px-4 text-left">Description</th>
+                    <th className="py-3 px-4 text-left">Employee</th>
+                    <th className="py-3 px-4 text-left">Status</th>
+                    <th className="py-3 px-4 text-left">Avg. Completion Time</th>
+                    <th className="py-3 px-4 text-left">Created At</th>
+                    <th className="py-3 px-4 text-left">Completed At</th>
+                    <th className="py-3 px-4 text-left">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {serviceRequests.length === 0 ? (
+                    <tr>
+                      <td colSpan="10" className="py-8 text-center text-gray-500">
+                        No service requests found
+                      </td>
+                    </tr>
+                  ) : (
+                    serviceRequests.map((request, idx) => (
+                      <tr key={request.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors`}>
+                        <td className="p-3 border-t border-gray-200">#{request.id}</td>
+                        <td className="p-3 border-t border-gray-200">
+                          {request.room_number ? `Room ${request.room_number}` : `Room ID: ${request.room_id}`}
+                        </td>
+                        <td className="p-3 border-t border-gray-200">
+                          <div className="text-sm">
+                            <div>Order #{request.food_order_id}</div>
+                            {request.food_order_amount && (
+                              <div className="text-gray-600">${request.food_order_amount.toFixed(2)}</div>
+                            )}
+                            {request.food_order_status && (
+                              <span className={`px-2 py-1 rounded text-xs ${
+                                request.food_order_status === 'completed' ? 'bg-green-100 text-green-800' :
+                                request.food_order_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {request.food_order_status}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="p-3 border-t border-gray-200">
+                          <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 capitalize">
+                            {request.request_type || 'delivery'}
+                          </span>
+                        </td>
+                        <td className="p-3 border-t border-gray-200">
+                          <div className="max-w-xs truncate" title={request.description}>
+                            {request.description || '-'}
+                          </div>
+                        </td>
+                        <td className="p-3 border-t border-gray-200">
+                          {request.employee_name ? (
+                            <span>{request.employee_name}</span>
+                          ) : (
+                            <select
+                              value={request.employee_id || ""}
+                              onChange={(e) => {
+                                const empId = e.target.value ? parseInt(e.target.value) : null;
+                                handleAssignEmployeeToRequest(request.id, empId);
+                              }}
+                              className="border p-2 rounded-lg bg-white text-sm"
+                            >
+                              <option value="">Assign Employee</option>
+                              {employees.map((emp) => (
+                                <option key={emp.id} value={emp.id}>
+                                  {emp.name}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </td>
+                        <td className="p-3 border-t border-gray-200">
+                          <select
+                            value={request.status}
+                            onChange={(e) => handleUpdateRequestStatus(request.id, e.target.value)}
+                            className={`border p-2 rounded-lg bg-white text-sm ${
+                              request.status === 'completed' ? 'bg-green-50' :
+                              request.status === 'in_progress' ? 'bg-yellow-50' :
+                              request.status === 'cancelled' ? 'bg-red-50' :
+                              'bg-gray-50'
+                            }`}
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                            <option value="cancelled">Cancelled</option>
+                          </select>
+                        </td>
+                        <td className="p-3 border-t border-gray-200 text-sm">
+                          {/* Average completion time would come from assigned service if any */}
+                          {request.service?.average_completion_time ? (
+                            <span className="text-indigo-600 font-medium">{request.service.average_completion_time}</span>
+                          ) : (
+                            <span className="text-gray-400 italic">-</span>
+                          )}
+                        </td>
+                        <td className="p-3 border-t border-gray-200 text-sm">
+                          {request.created_at ? new Date(request.created_at).toLocaleString() : '-'}
+                        </td>
+                        <td className="p-3 border-t border-gray-200 text-sm">
+                          {request.completed_at ? (
+                            <span className="text-green-600">
+                              {new Date(request.completed_at).toLocaleString()}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="p-3 border-t border-gray-200">
+                          <div className="flex gap-2">
+                            {request.status === "pending" && (
+                              <button
+                                onClick={() => handleQuickAssignFromRequest(request)}
+                                className="px-3 py-1 rounded text-sm font-medium bg-green-500 hover:bg-green-600 text-white"
+                                title="Quick assign service to this room"
+                              >
+                                Assign Service
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteRequest(request.id)}
+                              className="px-3 py-1 rounded text-sm font-medium bg-red-500 hover:bg-red-600 text-white"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+          </div>
+        )}
 
       {/* View Assigned Service Modal */}
       {viewingAssignedService && (
@@ -1186,6 +2672,14 @@ const Services = () => {
                         {viewingAssignedService.assigned_at ? new Date(viewingAssignedService.assigned_at).toLocaleString() : 'N/A'}
                       </span>
                     </div>
+                    {viewingAssignedService.last_used_at && (
+                      <div>
+                        <span className="font-medium text-gray-700">Completed Time:</span>
+                        <span className="ml-2 text-gray-900 font-semibold text-green-600">
+                          {new Date(viewingAssignedService.last_used_at).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1245,11 +2739,64 @@ const Services = () => {
                     );
                   }
                 })()}
+
+                {/* Returned Inventory Items */}
+                {returnedItems && returnedItems.length > 0 && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <h3 className="font-semibold text-lg text-gray-800 mb-3">Returned Inventory Items</h3>
+                    <div className="space-y-2">
+                      {returnedItems.map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-white rounded border border-purple-200">
+                          <div className="flex-1">
+                            <span className="font-medium text-gray-800">{item.item?.name || item.item_name || 'Unknown Item'}</span>
+                            {item.item?.item_code && (
+                              <span className="ml-2 text-sm text-gray-600">({item.item.item_code})</span>
+                            )}
+                            {item.status === "returned" && (
+                              <span className="ml-2 px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Fully Returned</span>
+                            )}
+                            {item.status === "partially_returned" && (
+                              <span className="ml-2 px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Partially Returned</span>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm text-gray-600">
+                              <div>Assigned: {item.quantity_assigned} {item.item?.unit || item.unit || 'pcs'}</div>
+                              <div>Used: {item.quantity_used} {item.item?.unit || item.unit || 'pcs'}</div>
+                              <div className="font-semibold text-green-600">
+                                Returned: {item.quantity_returned} {item.item?.unit || item.unit || 'pcs'}
+                              </div>
+                              {item.balance_quantity > 0 && (
+                                <div className="text-orange-600">
+                                  Balance: {item.balance_quantity} {item.item?.unit || item.unit || 'pcs'}
+                                </div>
+                              )}
+                            </div>
+                            {item.returned_at && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                Returned: {new Date(item.returned_at).toLocaleString()}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {(!returnedItems || returnedItems.length === 0) && viewingAssignedService.status === "completed" && (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <p className="text-sm text-gray-600 italic">No inventory items have been returned yet.</p>
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 flex justify-end">
                 <button
-                  onClick={() => setViewingAssignedService(null)}
+                  onClick={() => {
+                    setViewingAssignedService(null);
+                    setReturnedItems([]);
+                  }}
                   className="px-6 py-2 rounded-lg text-sm font-medium bg-gray-500 hover:bg-gray-600 text-white"
                 >
                   Close
@@ -1259,6 +2806,160 @@ const Services = () => {
           </div>
         </div>
       )}
+
+      {/* Return Inventory Modal - When completing service */}
+      {completingServiceId && inventoryAssignments.length > 0 && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Return Inventory Items</h2>
+                <button
+                  onClick={() => {
+                    setCompletingServiceId(null);
+                    setInventoryAssignments([]);
+                    setReturnQuantities({});
+                  }}
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-gray-700 font-semibold mb-2">
+                  ⚠️ Return Only Used Items
+                </p>
+                <p className="text-sm text-gray-600">
+                  Only items that were actually <strong>used</strong> in this service can be returned. 
+                  Return quantity cannot exceed the quantity used. All returns will be tracked with transparent transactions.
+                </p>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                {inventoryAssignments.map((assignment) => {
+                  const balance = assignment.balance_quantity || 0;
+                  const usedQty = assignment.quantity_used || 0;
+                  const maxReturnable = Math.min(balance, usedQty); // Cannot return more than used
+                  return (
+                    <div key={assignment.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-gray-800">{assignment.item?.name || 'Unknown Item'}</h4>
+                          {assignment.item?.item_code && (
+                            <p className="text-sm text-gray-600">Code: {assignment.item.item_code}</p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">
+                            Service: {assignment.assigned_service?.service?.name || 'N/A'}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-600">
+                            Assigned: {assignment.quantity_assigned} {assignment.item?.unit || 'pcs'}
+                          </p>
+                          <p className="text-sm font-semibold text-green-600">
+                            Used: {usedQty} {assignment.item?.unit || 'pcs'}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            Already Returned: {assignment.quantity_returned} {assignment.item?.unit || 'pcs'}
+                          </p>
+                          <p className="text-sm font-semibold text-blue-600">
+                            Max Returnable: {maxReturnable} {assignment.item?.unit || 'pcs'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="mt-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Quantity to Return (from used items only):
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={maxReturnable}
+                          step="0.01"
+                          value={returnQuantities[assignment.id] !== undefined ? returnQuantities[assignment.id] : maxReturnable}
+                          onChange={(e) => {
+                            const inputValue = e.target.value;
+                            // Allow empty string for deletion
+                            if (inputValue === '') {
+                              setReturnQuantities({
+                                ...returnQuantities,
+                                [assignment.id]: ''
+                              });
+                              return;
+                            }
+                            // Parse the value
+                            const val = parseFloat(inputValue);
+                            // Allow NaN temporarily while user is typing (e.g., "0.")
+                            if (isNaN(val)) {
+                              setReturnQuantities({
+                                ...returnQuantities,
+                                [assignment.id]: inputValue
+                              });
+                              return;
+                            }
+                            // Validate: cannot exceed used quantity or balance
+                            const clampedVal = Math.max(0, Math.min(val, maxReturnable));
+                            setReturnQuantities({
+                              ...returnQuantities,
+                              [assignment.id]: clampedVal
+                            });
+                          }}
+                          onBlur={(e) => {
+                            // On blur, ensure we have a valid number
+                            const val = parseFloat(e.target.value);
+                            if (isNaN(val) || val < 0) {
+                              setReturnQuantities({
+                                ...returnQuantities,
+                                [assignment.id]: 0
+                              });
+                            } else {
+                              const clampedVal = Math.min(val, maxReturnable);
+                              setReturnQuantities({
+                                ...returnQuantities,
+                                [assignment.id]: clampedVal
+                              });
+                            }
+                          }}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Maximum returnable: {maxReturnable} {assignment.item?.unit || 'pcs'} (based on used quantity)
+                        </p>
+                        {usedQty === 0 && (
+                          <p className="text-xs text-red-600 mt-1 font-semibold">
+                            ⚠️ No items were used - nothing to return
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setCompletingServiceId(null);
+                    setInventoryAssignments([]);
+                    setReturnQuantities({});
+                  }}
+                  className="px-6 py-2 rounded-lg text-sm font-medium bg-gray-500 hover:bg-gray-600 text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCompleteWithReturns}
+                  className="px-6 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white"
+                >
+                  Complete & Return Items
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
     </DashboardLayout>
   );
 };

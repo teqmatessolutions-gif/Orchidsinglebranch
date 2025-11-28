@@ -24,8 +24,22 @@ from app.api import (
     role,
     room,
     service,
+    service_report,
     user,
 )
+
+# Import recipe router separately to catch any import errors
+recipe_module = None
+try:
+    from app.api import recipe as recipe_module
+    print("[OK] Recipe router imported successfully in app.main")
+    print(f"   Router prefix: {recipe_module.router.prefix}")
+    print(f"   Number of routes: {len(recipe_module.router.routes)}")
+except Exception as e:
+    print(f"[ERROR] ERROR importing recipe router in app.main: {e}")
+    import traceback
+    traceback.print_exc()
+    recipe_module = None
 
 # Import inventory router separately to catch any import errors
 try:
@@ -73,7 +87,36 @@ app.include_router(checkout.router, prefix="/api")
 app.include_router(food_category.router, prefix="/api")
 app.include_router(food_item.router, prefix="/api")
 app.include_router(food_orders.router, prefix="/api")
+# Include recipe router if it was imported successfully
+if recipe_module is not None:
+    try:
+        app.include_router(recipe_module.router, prefix="/api")
+        print(f"[OK] Recipe router registered in app.main with {len(recipe_module.router.routes)} routes")
+        # Print all recipe routes for debugging
+        for route in recipe_module.router.routes:
+            if hasattr(route, 'path') and hasattr(route, 'methods'):
+                methods = ', '.join(route.methods)
+                print(f"   Registered: {methods} /api{route.path}")
+    except Exception as e:
+        print(f"[ERROR] ERROR registering recipe router in app.main: {e}")
+        import traceback
+        traceback.print_exc()
+else:
+    print("[ERROR] Recipe router not imported in app.main, skipping registration")
+    print("   This means there was an import error. Check the error message above.")
+
+# Add a simple test endpoint to verify server is running with latest code
+@app.get("/api/test-server")
+def test_server():
+    """Test endpoint to verify server is running"""
+    return {
+        "message": "Server is running",
+        "recipe_router_loaded": recipe_module is not None,
+        "recipe_routes_count": len(recipe_module.router.routes) if recipe_module else 0
+    }
+
 app.include_router(service.router, prefix="/api")
+app.include_router(service_report.router, prefix="/api")
 app.include_router(expenses.router, prefix="/api")
 app.include_router(payment.router, prefix="/api")
 app.include_router(frontend.router, prefix="/api")

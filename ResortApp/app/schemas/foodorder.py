@@ -10,7 +10,9 @@ class FoodOrderCreate(BaseModel):
     amount: float
     assigned_employee_id: int
     items: List[FoodOrderItemCreate]
-    billing_status: Optional[str] = "unbilled" 
+    billing_status: Optional[str] = "unbilled"
+    order_type: Optional[str] = "dine_in"  # "dine_in" or "room_service"
+    delivery_request: Optional[str] = None  # Delivery request/notes for room service 
 
 class FoodOrderItemOut(BaseModel):
     id: int
@@ -27,6 +29,8 @@ class FoodOrderOut(BaseModel):
     status: str
     assigned_employee_id: int
     billing_status: str 
+    order_type: Optional[str] = "dine_in"
+    delivery_request: Optional[str] = None
     items: List[FoodOrderItemOut]
     guest_name: Optional[str] = None  # Added dynamically by CRUD function
 
@@ -38,4 +42,6 @@ class FoodOrderUpdate(BaseModel):
     assigned_employee_id: Optional[int] = None
     status: Optional[str] = None
     billing_status: Optional[str] = None
+    order_type: Optional[str] = None
+    delivery_request: Optional[str] = None
     items: Optional[List[FoodOrderItemCreate]] = None

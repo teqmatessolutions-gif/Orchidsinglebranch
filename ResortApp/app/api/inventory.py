@@ -936,6 +936,97 @@ def get_location_items(
             items_dict[key]["location_stock"] += qty
             items_dict[key]["stock_value"] = items_dict[key]["location_stock"] * (item.unit_price or 0)
     
+    # Get room usage information (services used, guest info) if this is a guest room
+    room_usage = None
+    if location.location_type == "GUEST_ROOM":
+        try:
+            from app.models.room import Room
+            from app.models.service import AssignedService
+            from app.models.booking import Booking, BookingRoom
+            from app.models.Package import PackageBooking, PackageBookingRoom
+            
+            # Find room by location
+            room = db.query(Room).filter(Room.inventory_location_id == location_id).first()
+            
+            if room:
+                # Get assigned services for this room
+                assigned_services = db.query(AssignedService).options(
+                    joinedload(AssignedService.service),
+                    joinedload(AssignedService.employee)
+                ).filter(AssignedService.room_id == room.id).order_by(AssignedService.assigned_at.desc()).limit(10).all()
+                
+                # Get current guest information
+                current_guest = None
+                booking_info = None
+                
+                # Check regular bookings
+                booking_room = db.query(BookingRoom).join(Booking).filter(
+                    BookingRoom.room_id == room.id,
+                    Booking.status.in_(['checked-in', 'checked_in', 'booked'])
+                ).first()
+                
+                if booking_room and booking_room.booking:
+                    current_guest = booking_room.booking.guest_name
+                    booking_info = {
+                        "guest_name": booking_room.booking.guest_name,
+                        "guest_mobile": booking_room.booking.guest_mobile,
+                        "guest_email": booking_room.booking.guest_email,
+                        "check_in": booking_room.booking.check_in.isoformat() if booking_room.booking.check_in else None,
+                        "check_out": booking_room.booking.check_out.isoformat() if booking_room.booking.check_out else None,
+                        "booking_type": "booking",
+                        "booking_id": booking_room.booking.id
+                    }
+                else:
+                    # Check package bookings
+                    pkg_booking_room = db.query(PackageBookingRoom).join(PackageBooking).filter(
+                        PackageBookingRoom.room_id == room.id,
+                        PackageBooking.status.in_(['checked-in', 'checked_in', 'booked'])
+                    ).first()
+                    
+                    if pkg_booking_room and pkg_booking_room.package_booking:
+                        current_guest = pkg_booking_room.package_booking.guest_name
+                        booking_info = {
+                            "guest_name": pkg_booking_room.package_booking.guest_name,
+                            "guest_mobile": pkg_booking_room.package_booking.guest_mobile,
+                            "guest_email": pkg_booking_room.package_booking.guest_email,
+                            "check_in": pkg_booking_room.package_booking.check_in.isoformat() if pkg_booking_room.package_booking.check_in else None,
+                            "check_out": pkg_booking_room.package_booking.check_out.isoformat() if pkg_booking_room.package_booking.check_out else None,
+                            "booking_type": "package",
+                            "booking_id": pkg_booking_room.package_booking.id
+                        }
+                
+                # Format services
+                services_list = []
+                total_service_charges = 0.0
+                for ass in assigned_services:
+                    if ass.service:
+                        services_list.append({
+                            "service_id": ass.service.id,
+                            "service_name": ass.service.name,
+                            "charges": ass.service.charges,
+                            "status": ass.status.value if hasattr(ass.status, 'value') else str(ass.status),
+                            "billing_status": ass.billing_status,
+                            "assigned_at": ass.assigned_at.isoformat() if ass.assigned_at else None,
+                            "last_used_at": ass.last_used_at.isoformat() if ass.last_used_at else None,
+                            "employee_name": ass.employee.name if ass.employee else None
+                        })
+                        total_service_charges += ass.service.charges or 0
+                
+                room_usage = {
+                    "room_number": room.number,
+                    "room_id": room.id,
+                    "current_guest": current_guest,
+                    "booking_info": booking_info,
+                    "services_used": services_list,
+                    "total_services": len(services_list),
+                    "total_service_charges": total_service_charges
+                }
+        except Exception as e:
+            import traceback
+            print(f"[WARNING] Could not fetch room usage for location {location_id}: {str(e)}")
+            print(traceback.format_exc())
+            room_usage = None
+    
     return {
         "location": {
             "id": location.id,
@@ -948,7 +1039,8 @@ def get_location_items(
         },
         "items": list(items_dict.values()),
         "total_items": len(items_dict),
-        "total_stock_value": sum(item["stock_value"] for item in items_dict.values())
+        "total_stock_value": sum(item["stock_value"] for item in items_dict.values()),
+        "room_usage": room_usage  # Added room usage information
     }
 
 

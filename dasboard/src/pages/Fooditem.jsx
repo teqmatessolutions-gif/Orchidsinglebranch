@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import DashboardLayout from "../layout/DashboardLayout";
 import API from "../services/api";
 import { getMediaBaseUrl } from "../utils/env";
+import { ChefHat, Plus, X, ChevronDown, ChevronUp } from "lucide-react";
 
 // Helper function to construct image URLs
 const getImageUrl = (imagePath) => {
@@ -33,13 +34,31 @@ const FoodItems = () => {
   const [foodItems, setFoodItems] = useState([]);
   const [editingItemId, setEditingItemId] = useState(null);
   const [available, setAvailable] = useState(true);
+  
+  // Recipe/Ingredients state
+  const [showIngredients, setShowIngredients] = useState(false);
+  const [recipeName, setRecipeName] = useState("");
+  const [recipeDescription, setRecipeDescription] = useState("");
+  const [servings, setServings] = useState(1);
+  const [prepTime, setPrepTime] = useState("");
+  const [cookTime, setCookTime] = useState("");
+  const [ingredients, setIngredients] = useState([]);
+  const [inventoryItems, setInventoryItems] = useState([]);
 
   const token = localStorage.getItem("token");
 
   useEffect(() => {
     fetchCategories();
     fetchFoodItems();
+    fetchInventoryItems();
   }, []);
+
+  // Auto-set recipe name when food item name changes (only if recipe name is empty)
+  useEffect(() => {
+    if (name && !recipeName && !editingItemId) {
+      setRecipeName(name);
+    }
+  }, [name]);
 
   const fetchCategories = async () => {
     try {
@@ -60,6 +79,16 @@ const FoodItems = () => {
       setFoodItems(res.data);
     } catch (err) {
       console.error("Failed to fetch items", err);
+    }
+  };
+
+  const fetchInventoryItems = async () => {
+    try {
+      const res = await API.get("/inventory/items?limit=1000");
+      setInventoryItems(res.data || []);
+    } catch (err) {
+      console.error("Failed to fetch inventory items", err);
+      setInventoryItems([]);
     }
   };
 
@@ -84,6 +113,14 @@ const FoodItems = () => {
     setAvailable(item.available);
     setImagePreviews(item.images?.map((img) => getImageUrl(img.image_url)) || []);
     setImages([]);
+    // Reset recipe fields when editing
+    setShowIngredients(false);
+    setRecipeName("");
+    setRecipeDescription("");
+    setServings(1);
+    setPrepTime("");
+    setCookTime("");
+    setIngredients([]);
   };
 
   const resetForm = () => {
@@ -95,6 +132,42 @@ const FoodItems = () => {
     setImagePreviews([]);
     setEditingItemId(null);
     setAvailable(true);
+    // Reset recipe fields
+    setShowIngredients(false);
+    setRecipeName("");
+    setRecipeDescription("");
+    setServings(1);
+    setPrepTime("");
+    setCookTime("");
+    setIngredients([]);
+  };
+
+  const handleAddIngredient = () => {
+    setIngredients([...ingredients, {
+      inventory_item_id: "",
+      quantity: "",
+      unit: "pcs",
+      notes: ""
+    }]);
+  };
+
+  const handleIngredientChange = (index, field, value) => {
+    const updated = [...ingredients];
+    updated[index][field] = value;
+    
+    // Auto-set unit from inventory item if available
+    if (field === "inventory_item_id" && value) {
+      const invItem = inventoryItems.find(item => item.id === parseInt(value));
+      if (invItem && invItem.unit) {
+        updated[index].unit = invItem.unit;
+      }
+    }
+    
+    setIngredients(updated);
+  };
+
+  const handleRemoveIngredient = (index) => {
+    setIngredients(ingredients.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e) => {
@@ -108,19 +181,55 @@ const FoodItems = () => {
     images.forEach((img) => formData.append("images", img));
 
     try {
+      let foodItemId;
       if (editingItemId) {
         await API.put(`/food-items/${editingItemId}/`, formData, {
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
         });
+        foodItemId = editingItemId;
       } else {
-        await API.post("/food-items/", formData, {
+        const response = await API.post("/food-items/", formData, {
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "multipart/form-data" },
         });
+        foodItemId = response.data.id;
       }
+
+      // Create recipe if ingredients are provided
+      if (showIngredients && ingredients.length > 0 && foodItemId) {
+        try {
+          const recipeData = {
+            food_item_id: foodItemId,
+            name: recipeName || name,
+            description: recipeDescription || description,
+            servings: parseInt(servings) || 1,
+            prep_time_minutes: prepTime ? parseInt(prepTime) : null,
+            cook_time_minutes: cookTime ? parseInt(cookTime) : null,
+            ingredients: ingredients
+              .filter(ing => ing.inventory_item_id && ing.quantity)
+              .map(ing => ({
+                inventory_item_id: parseInt(ing.inventory_item_id),
+                quantity: parseFloat(ing.quantity),
+                unit: ing.unit || "pcs",
+                notes: ing.notes || ""
+              }))
+          };
+
+          if (recipeData.ingredients.length > 0) {
+            await API.post("/recipes", recipeData);
+            console.log("Recipe created successfully");
+          }
+        } catch (recipeErr) {
+          console.error("Failed to create recipe:", recipeErr);
+          // Don't block food item creation if recipe fails
+          alert("Food item created, but recipe creation failed. You can add recipe later from Inventory → Recipe section.");
+        }
+      }
+
       fetchFoodItems();
       resetForm();
     } catch (err) {
       console.error("Failed to save food item", err);
+      alert("Failed to save food item. Please try again.");
     }
   };
 
@@ -211,6 +320,185 @@ const FoodItems = () => {
               onChange={handleImageChange}
               className="border rounded-xl px-4 py-2 mb-4"
             />
+
+            {/* Recipe/Ingredients Section */}
+            <div className="border-t pt-4 mt-4">
+              <button
+                type="button"
+                onClick={() => setShowIngredients(!showIngredients)}
+                className="w-full flex items-center justify-between p-3 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-colors"
+              >
+                <span className="flex items-center gap-2 font-semibold text-indigo-700">
+                  <ChefHat size={20} />
+                  Add Recipe & Ingredients {showIngredients ? "(Optional)" : ""}
+                </span>
+                {showIngredients ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+              </button>
+
+              {showIngredients && (
+                <div className="mt-4 space-y-4 p-4 bg-gray-50 rounded-xl">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Recipe Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Recipe name (defaults to food item name)"
+                        className="w-full border rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500"
+                        value={recipeName}
+                        onChange={(e) => setRecipeName(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Servings
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="Number of servings"
+                        className="w-full border rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500"
+                        value={servings}
+                        onChange={(e) => setServings(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Recipe Description
+                    </label>
+                    <textarea
+                      placeholder="Cooking instructions or recipe notes"
+                      className="w-full border rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500"
+                      rows="2"
+                      value={recipeDescription}
+                      onChange={(e) => setRecipeDescription(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Prep Time (minutes)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Optional"
+                        className="w-full border rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500"
+                        value={prepTime}
+                        onChange={(e) => setPrepTime(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Cook Time (minutes)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="Optional"
+                        className="w-full border rounded-xl px-4 py-2 focus:ring-2 focus:ring-indigo-500"
+                        value={cookTime}
+                        onChange={(e) => setCookTime(e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Ingredients List */}
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="block text-sm font-medium text-gray-700">
+                        Ingredients *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleAddIngredient}
+                        className="flex items-center gap-1 px-3 py-1 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors"
+                      >
+                        <Plus size={16} />
+                        Add Ingredient
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {ingredients.map((ingredient, index) => (
+                        <div key={index} className="grid grid-cols-12 gap-2 items-end p-3 bg-white rounded-lg border">
+                          <div className="col-span-5">
+                            <label className="block text-xs text-gray-600 mb-1">Inventory Item</label>
+                            <select
+                              className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                              value={ingredient.inventory_item_id}
+                              onChange={(e) => handleIngredientChange(index, "inventory_item_id", e.target.value)}
+                              required={ingredients.length > 0}
+                            >
+                              <option value="">Select Item</option>
+                              {inventoryItems.map((item) => (
+                                <option key={item.id} value={item.id}>
+                                  {item.name} {item.item_code ? `(${item.item_code})` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="col-span-3">
+                            <label className="block text-xs text-gray-600 mb-1">Quantity</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="0.00"
+                              className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                              value={ingredient.quantity}
+                              onChange={(e) => handleIngredientChange(index, "quantity", e.target.value)}
+                              required={ingredients.length > 0}
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-xs text-gray-600 mb-1">Unit</label>
+                            <input
+                              type="text"
+                              placeholder="kg, pcs, etc"
+                              className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                              value={ingredient.unit}
+                              onChange={(e) => handleIngredientChange(index, "unit", e.target.value)}
+                              required={ingredients.length > 0}
+                            />
+                          </div>
+                          <div className="col-span-2 flex gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveIngredient(index)}
+                              className="w-full px-2 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+                            >
+                              <X size={16} className="mx-auto" />
+                            </button>
+                          </div>
+                          {ingredient.inventory_item_id && (
+                            <div className="col-span-12">
+                              <label className="block text-xs text-gray-600 mb-1">Notes (optional)</label>
+                              <input
+                                type="text"
+                                placeholder="e.g., chopped, diced"
+                                className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
+                                value={ingredient.notes}
+                                onChange={(e) => handleIngredientChange(index, "notes", e.target.value)}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {ingredients.length === 0 && (
+                        <p className="text-sm text-gray-500 text-center py-4">
+                          Click "Add Ingredient" to add inventory items needed for this recipe
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="flex gap-4 flex-wrap mb-4">
               {imagePreviews.map((src, index) => (

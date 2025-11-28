@@ -210,21 +210,13 @@ export default function DashboardLayout({ children }) {
     { label: "Dashboard", icon: <Home size={18} />, to: "/dashboard" },
     { label: "Account", icon: <UserCircle size={18} />, to: "/account", roles: ["admin"] },
     { label: "Bookings", icon: <CalendarCheck2 size={18} />, to: "/bookings" },
-    { label: "Rooms", icon: <BedDouble size={18} />, to: "/rooms" },
     { label: "Services", icon: <ConciergeBell size={18} />, to: "/services" },
-    {
-      label: "Food Orders",
-      icon: <Utensils size={18} />,
-      to: "/food-orders",
-      roles: ["admin", "manager", "fnb"],
-    },
-
     { label: "Role", icon: <ShieldCheck size={18} />, to: "/roles", roles: ["admin"] },
     { label: "Expenses", icon: <PiggyBank size={18} />, to: "/expenses" },
     {
       label: "Food Management",
       icon: <Grid size={18} />,
-      to: "/food-categories",
+      to: "/food-orders",
       roles: ["admin", "manager", "fnb"],
     },
     // {
@@ -243,12 +235,6 @@ export default function DashboardLayout({ children }) {
       label: "WEB Management",
       icon: <Globe size={18} />,
       to: "/Userfrontend_data",
-      roles: ["admin", "manager", "fnb"],
-    },
-    {
-      label: "Packages",
-      icon: <Package size={18} />,
-      to: "/package",
       roles: ["admin", "manager", "fnb"],
     },
     { label: "Reports", icon: <Sun size={18} />, to: "/report", roles: ["admin", "manager", "fnb"] },

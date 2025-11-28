@@ -166,7 +166,7 @@ const ImageModal = ({ imageUrl, onClose }) => {
   );
 };
 
-const Rooms = () => {
+const Rooms = ({ noLayout = false }) => {
   const [rooms, setRooms] = useState([]);
   const [form, setForm] = useState({
     number: "",
@@ -448,8 +448,8 @@ const Rooms = () => {
     return typeMatch && statusMatch;
   });
 
-  return (
-    <DashboardLayout>
+  const content = (
+    <>
       <BannerMessage 
         message={bannerMessage} 
         onClose={closeBannerMessage}
@@ -868,6 +868,16 @@ const Rooms = () => {
           onClose={() => setSelectedImage(null)}
         />
       )}
+    </>
+  );
+
+  if (noLayout) {
+    return content;
+  }
+
+  return (
+    <DashboardLayout>
+      {content}
     </DashboardLayout>
   );
 };

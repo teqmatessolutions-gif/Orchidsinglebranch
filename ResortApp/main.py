@@ -29,14 +29,28 @@ from app.api import (
     role,
     service,
     attendance,
+    service_request,
 )
+
+# Import recipe router separately to catch any import errors
+recipe_module = None
+try:
+    from app.api import recipe as recipe_module
+    print("[OK] Recipe router imported successfully")
+    print(f"   Router prefix: {recipe_module.router.prefix}")
+    print(f"   Number of routes: {len(recipe_module.router.routes)}")
+except Exception as e:
+    print(f"[ERROR] ERROR importing recipe router: {e}")
+    import traceback
+    traceback.print_exc()
+    recipe_module = None
 
 # Import inventory router separately to catch any import errors
 try:
     from app.api import inventory
-    print("✅ Inventory router imported successfully")
+    print("[OK] Inventory router imported successfully")
 except Exception as e:
-    print(f"❌ ERROR importing inventory router: {e}")
+    print(f"[ERROR] ERROR importing inventory router: {e}")
     import traceback
     traceback.print_exc()
     inventory = None
@@ -140,24 +154,43 @@ app.include_router(expenses.router, prefix="/api", tags=["Expenses"])
 app.include_router(food_category.router, prefix="/api", tags=["Food Category"])
 app.include_router(food_item.router, prefix="/api", tags=["Food Items"])
 app.include_router(food_orders.router, prefix="/api", tags=["Food Orders"])
+# Include recipe router if it was imported successfully
+if recipe_module is not None:
+    try:
+        app.include_router(recipe_module.router, prefix="/api", tags=["Recipes"])
+        print(f"[OK] Recipe router registered with {len(recipe_module.router.routes)} routes")
+        # Print all recipe routes for debugging
+        for route in recipe_module.router.routes:
+            if hasattr(route, 'path') and hasattr(route, 'methods'):
+                methods = ', '.join(route.methods)
+                print(f"   Registered: {methods} /api{route.path}")
+    except Exception as e:
+        print(f"[ERROR] ERROR registering recipe router: {e}")
+        import traceback
+        traceback.print_exc()
+else:
+    print("[ERROR] Recipe router not imported, skipping registration")
+    print("   This means there was an import error. Check the error message above.")
+
 app.include_router(payment.router, prefix="/api", tags=["Payment"])
 app.include_router(report.router, prefix="/api", tags=["Report"])
 app.include_router(reports.router, prefix="/api", tags=["Reports"])
 app.include_router(role.router, prefix="/api", tags=["Role"])
 app.include_router(service.router, prefix="/api", tags=["Service"])
+app.include_router(service_request.router, prefix="/api", tags=["Service Requests"])
 app.include_router(attendance.router, prefix="/api", tags=["Attendance"])
 
 # Include inventory router if it was imported successfully
 if inventory is not None:
     try:
         app.include_router(inventory.router, prefix="/api", tags=["Inventory"])
-        print(f"✅ Inventory router registered with {len(inventory.router.routes)} routes")
+        print(f"[OK] Inventory router registered with {len(inventory.router.routes)} routes")
     except Exception as e:
-        print(f"❌ ERROR registering inventory router: {e}")
+        print(f"[ERROR] ERROR registering inventory router: {e}")
         import traceback
         traceback.print_exc()
 else:
-    print("❌ Inventory router not imported, skipping registration")
+    print("[ERROR] Inventory router not imported, skipping registration")
 
 
 # Root route - Landing Page

@@ -9,6 +9,8 @@ import { Pie } from "react-chartjs-2";
 import { useInfiniteScroll } from "./useInfiniteScroll";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import BannerMessage from "../components/BannerMessage";
+import Packages from "./Package";
+import Rooms from "./CreateRooms";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -1301,6 +1303,7 @@ BookingStatusChart.displayName = 'BookingStatusChart';
 
 const Bookings = () => {
   const navigate = useNavigate();
+  const [mainTab, setMainTab] = useState("dashboard"); // "dashboard", "booking", "package", or "room"
   const [formData, setFormData] = useState({
     guestName: "",
     guestMobile: "",
@@ -1364,6 +1367,7 @@ const Bookings = () => {
   const [totalBookings, setTotalBookings] = useState(0);
   const [hasMoreBookings, setHasMoreBookings] = useState(false);
   const [regularBookingsLoaded, setRegularBookingsLoaded] = useState(0);
+  const [bookingTab, setBookingTab] = useState("room"); // "room" or "package"
 
   // Map of roomId -> room for robust display when API omits nested room payloads
   const roomIdToRoom = useMemo(() => {
@@ -2668,14 +2672,413 @@ const Bookings = () => {
       <div className="p-4 sm:p-6 lg:p-8 space-y-8 bg-gray-100 min-h-screen font-sans">
         <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-800 tracking-tight">Booking Management Dashboard</h1>
 
-        {/* KPI Row and Chart */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-          <KPI_Card title="Total Bookings" value={kpis.activeBookings} />
-          <KPI_Card title="Cancelled Bookings" value={kpis.cancelledBookings} />
-          <KPI_Card title="Available Rooms" value={kpis.availableRooms} />
-          <KPI_Card title="Guests Today Check-in" value={kpis.todaysGuestsCheckin} />
-          <KPI_Card title="Guests Today Check-out" value={kpis.todaysGuestsCheckout} />
+        {/* Main Tabs Navigation */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
+          <div className="flex border-b border-gray-200">
+            <button
+              onClick={() => setMainTab("dashboard")}
+              className={`px-6 py-3 font-medium transition-colors ${
+                mainTab === "dashboard"
+                  ? "text-indigo-600 border-b-2 border-indigo-600"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => setMainTab("booking")}
+              className={`px-6 py-3 font-medium transition-colors ${
+                mainTab === "booking"
+                  ? "text-indigo-600 border-b-2 border-indigo-600"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Booking Management
+            </button>
+            <button
+              onClick={() => setMainTab("package")}
+              className={`px-6 py-3 font-medium transition-colors ${
+                mainTab === "package"
+                  ? "text-indigo-600 border-b-2 border-indigo-600"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Package Management
+            </button>
+            <button
+              onClick={() => setMainTab("room")}
+              className={`px-6 py-3 font-medium transition-colors ${
+                mainTab === "room"
+                  ? "text-indigo-600 border-b-2 border-indigo-600"
+                  : "text-gray-600 hover:text-gray-900"
+              }`}
+            >
+              Room Management
+            </button>
+          </div>
         </div>
+
+        {/* Dashboard Tab */}
+        {mainTab === "dashboard" && (
+          <>
+                {/* Enhanced KPI Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+                  <KPI_Card title="Total Bookings" value={kpis.activeBookings} />
+                  <KPI_Card title="Cancelled Bookings" value={kpis.cancelledBookings} />
+                  <KPI_Card title="Available Rooms" value={kpis.availableRooms} />
+                  <KPI_Card title="Guests Today Check-in" value={kpis.todaysGuestsCheckin} />
+                  <KPI_Card title="Guests Today Check-out" value={kpis.todaysGuestsCheckout} />
+                  <KPI_Card title="Total Packages" value={packages.length} />
+                  <KPI_Card title="Active Guests" value={bookings.filter(b => b.status === "checked-in" || b.status === "booked").length} />
+                  <KPI_Card title="Package Bookings" value={bookings.filter(b => b.is_package).length} />
+                </div>
+
+                {/* Charts and Statistics Row */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+                  {/* Booking Status Chart */}
+                  <motion.div
+                    className="bg-white p-6 rounded-2xl shadow-lg"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5 }}
+                  >
+                    <BookingStatusChart data={bookings} />
+                  </motion.div>
+
+                  {/* Package Information */}
+                  <motion.div
+                    className="bg-white p-6 rounded-2xl shadow-lg"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, delay: 0.1 }}
+                  >
+                    <h3 className="text-xl font-bold mb-4 text-gray-800">Available Packages</h3>
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {packages.length > 0 ? (
+                        packages.map((pkg) => (
+                          <div key={pkg.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-start mb-2">
+                              <h4 className="font-semibold text-gray-800">{pkg.title}</h4>
+                              <span className="text-indigo-600 font-bold">{formatCurrency(pkg.price)}</span>
+                            </div>
+                            <p className="text-sm text-gray-600 mb-2 line-clamp-2">{pkg.description}</p>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span className={`px-2 py-1 rounded ${pkg.booking_type === 'whole_property' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                                {pkg.booking_type === 'whole_property' ? 'Whole Property' : 'Selected Rooms'}
+                              </span>
+                              {pkg.room_types && (
+                                <span className="text-gray-600">Types: {pkg.room_types}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-gray-500 text-center py-8">No packages available</p>
+                      )}
+                    </div>
+                  </motion.div>
+                </div>
+
+                {/* All Packages - Detailed View */}
+                <motion.div
+                  className="bg-white p-6 rounded-2xl shadow-lg mb-8"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.2 }}
+                >
+                  <h3 className="text-xl font-bold mb-6 text-gray-800">All Packages - Complete Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {packages.length > 0 ? (
+                      packages.map((pkg) => (
+                        <div key={pkg.id} className="border-2 border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all bg-gradient-to-br from-white to-gray-50">
+                          <div className="flex justify-between items-start mb-3">
+                            <h4 className="font-bold text-lg text-gray-800">{pkg.title}</h4>
+                            <span className="text-indigo-600 font-bold text-xl">{formatCurrency(pkg.price)}</span>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-4 min-h-[3rem]">{pkg.description || 'No description available'}</p>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                                pkg.booking_type === 'whole_property' 
+                                  ? 'bg-purple-100 text-purple-700' 
+                                  : 'bg-blue-100 text-blue-700'
+                              }`}>
+                                {pkg.booking_type === 'whole_property' ? 'Whole Property' : 'Selected Rooms'}
+                              </span>
+                            </div>
+                            {pkg.room_types && (
+                              <div className="text-xs text-gray-600">
+                                <span className="font-semibold">Room Types: </span>
+                                <span>{pkg.room_types}</span>
+                              </div>
+                            )}
+                            {pkg.images && pkg.images.length > 0 && (
+                              <div className="text-xs text-gray-500">
+                                <span className="font-semibold">Images: </span>
+                                <span>{pkg.images.length} photo(s)</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="col-span-full text-center py-12 text-gray-500">
+                        <p className="text-lg">No packages available</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+
+                {/* All Rooms - Detailed View */}
+                <motion.div
+                  className="bg-white p-6 rounded-2xl shadow-lg mb-8"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.3 }}
+                >
+                  <h3 className="text-xl font-bold mb-6 text-gray-800">All Rooms - Complete Details</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {allRooms.length > 0 ? (
+                      allRooms.map((room) => {
+                        const getImageUrl = (imageUrl) => {
+                          if (!imageUrl) return 'https://placehold.co/400x300/e2e8f0/a0aec0?text=No+Image';
+                          if (imageUrl.startsWith('http')) return imageUrl;
+                          const baseUrl = API.defaults.baseURL?.replace(/\/$/, '') || '';
+                          const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+                          return `${baseUrl}${path}`;
+                        };
+                        
+                        return (
+                          <div key={room.id} className="border-2 border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-all bg-white">
+                            {room.image_url && (
+                              <img 
+                                src={getImageUrl(room.image_url)} 
+                                alt={`Room ${room.number}`}
+                                className="w-full h-48 object-cover"
+                              />
+                            )}
+                            <div className="p-4">
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <h4 className="font-bold text-lg text-gray-800">Room {room.number}</h4>
+                                  <p className="text-sm text-gray-600">{room.type}</p>
+                                </div>
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  room.status === 'Available' ? 'bg-green-100 text-green-700' :
+                                  room.status === 'Booked' ? 'bg-red-100 text-red-700' :
+                                  room.status === 'Maintenance' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-gray-100 text-gray-700'
+                                }`}>
+                                  {room.status}
+                                </span>
+                              </div>
+                              <p className="text-indigo-600 font-bold text-lg mb-3">{formatCurrency(room.price)}/night</p>
+                              <p className="text-sm text-gray-600 mb-3">
+                                Capacity: {room.adults || 0} Adults, {room.children || 0} Children
+                              </p>
+                              {(room.air_conditioning || room.wifi || room.bathroom || room.living_area || room.terrace || room.parking || room.kitchen || room.family_room || room.bbq || room.garden || room.dining || room.breakfast) && (
+                                <div className="flex flex-wrap gap-1 mt-3">
+                                  {room.air_conditioning && <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">AC</span>}
+                                  {room.wifi && <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">WiFi</span>}
+                                  {room.bathroom && <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">Bathroom</span>}
+                                  {room.living_area && <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">Living</span>}
+                                  {room.terrace && <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">Terrace</span>}
+                                  {room.parking && <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">Parking</span>}
+                                  {room.kitchen && <span className="px-2 py-1 text-xs bg-pink-100 text-pink-700 rounded-full">Kitchen</span>}
+                                  {room.family_room && <span className="px-2 py-1 text-xs bg-teal-100 text-teal-700 rounded-full">Family</span>}
+                                  {room.bbq && <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">BBQ</span>}
+                                  {room.garden && <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">Garden</span>}
+                                  {room.dining && <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-full">Dining</span>}
+                                  {room.breakfast && <span className="px-2 py-1 text-xs bg-cyan-100 text-cyan-700 rounded-full">Breakfast</span>}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="col-span-full text-center py-12 text-gray-500">
+                        <p className="text-lg">No rooms available</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+
+                {/* Available Rooms Section */}
+                <motion.div
+                  className="bg-white p-6 rounded-2xl shadow-lg mb-8"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.4 }}
+                >
+                  <h3 className="text-xl font-bold mb-6 text-gray-800">Available Rooms ({allRooms.filter(r => r.status === 'Available').length})</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {allRooms.filter(r => r.status === 'Available').length > 0 ? (
+                      allRooms.filter(r => r.status === 'Available').map((room) => {
+                        const getImageUrl = (imageUrl) => {
+                          if (!imageUrl) return 'https://placehold.co/400x300/e2e8f0/a0aec0?text=No+Image';
+                          if (imageUrl.startsWith('http')) return imageUrl;
+                          const baseUrl = API.defaults.baseURL?.replace(/\/$/, '') || '';
+                          const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
+                          return `${baseUrl}${path}`;
+                        };
+                        
+                        return (
+                          <div key={room.id} className="border-2 border-green-200 rounded-xl overflow-hidden hover:shadow-lg transition-all bg-gradient-to-br from-green-50 to-white">
+                            {room.image_url && (
+                              <img 
+                                src={getImageUrl(room.image_url)} 
+                                alt={`Room ${room.number}`}
+                                className="w-full h-48 object-cover"
+                              />
+                            )}
+                            <div className="p-4">
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <h4 className="font-bold text-lg text-gray-800">Room {room.number}</h4>
+                                  <p className="text-sm text-gray-600">{room.type}</p>
+                                </div>
+                                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                                  Available
+                                </span>
+                              </div>
+                              <p className="text-indigo-600 font-bold text-lg mb-3">{formatCurrency(room.price)}/night</p>
+                              <p className="text-sm text-gray-600 mb-3">
+                                Capacity: {room.adults || 0} Adults, {room.children || 0} Children
+                              </p>
+                              {(room.air_conditioning || room.wifi || room.bathroom || room.living_area || room.terrace || room.parking || room.kitchen || room.family_room || room.bbq || room.garden || room.dining || room.breakfast) && (
+                                <div className="flex flex-wrap gap-1 mt-3">
+                                  {room.air_conditioning && <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">AC</span>}
+                                  {room.wifi && <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">WiFi</span>}
+                                  {room.bathroom && <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">Bathroom</span>}
+                                  {room.living_area && <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">Living</span>}
+                                  {room.terrace && <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">Terrace</span>}
+                                  {room.parking && <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">Parking</span>}
+                                  {room.kitchen && <span className="px-2 py-1 text-xs bg-pink-100 text-pink-700 rounded-full">Kitchen</span>}
+                                  {room.family_room && <span className="px-2 py-1 text-xs bg-teal-100 text-teal-700 rounded-full">Family</span>}
+                                  {room.bbq && <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">BBQ</span>}
+                                  {room.garden && <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">Garden</span>}
+                                  {room.dining && <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-full">Dining</span>}
+                                  {room.breakfast && <span className="px-2 py-1 text-xs bg-cyan-100 text-cyan-700 rounded-full">Breakfast</span>}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="col-span-full text-center py-12 text-gray-500">
+                        <p className="text-lg">No available rooms</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+
+                {/* All Bookings with Guest Details */}
+                <motion.div
+                  className="bg-white p-6 rounded-2xl shadow-lg"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.5 }}
+                >
+                  <div className="flex justify-between items-center mb-6">
+                    <h3 className="text-xl font-bold text-gray-800">All Bookings & Guest Details ({bookings.length})</h3>
+                    <button
+                      onClick={() => setBookingView("create")}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+                    >
+                      Create New Booking
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Guest Name</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Contact</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Type</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Rooms</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Check-in</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Check-out</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
+                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Guests</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {bookings.map((booking) => {
+                          const roomInfo = booking.rooms && booking.rooms.length > 0
+                            ? booking.rooms.map(room => {
+                                if (booking.is_package) {
+                                  if (room?.room?.number) return room.room.number;
+                                  if (room?.room_id && roomIdToRoom && roomIdToRoom[room.room_id]) {
+                                    return roomIdToRoom[room.room_id].number;
+                                  }
+                                  return '-';
+                                } else {
+                                  if (room?.number) return room.number;
+                                  if (room?.room_id && roomIdToRoom && roomIdToRoom[room.room_id]) {
+                                    return roomIdToRoom[room.room_id].number;
+                                  }
+                                  return '-';
+                                }
+                              }).filter(Boolean).join(", ") || '-'
+                            : "-";
+                          
+                          return (
+                            <tr key={`${booking.is_package ? 'pkg' : 'reg'}_${booking.id}`} className="hover:bg-gray-50">
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-gray-900">{booking.guest_name}</div>
+                                {booking.guest_email && (
+                                  <div className="text-xs text-gray-500">{booking.guest_email}</div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-gray-700">{booking.guest_mobile || '-'}</td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                  booking.is_package 
+                                    ? 'bg-purple-100 text-purple-700' 
+                                    : 'bg-blue-100 text-blue-700'
+                                }`}>
+                                  {booking.is_package ? 'Package' : 'Room'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-gray-700">{roomInfo}</td>
+                              <td className="px-4 py-3 text-gray-700">{booking.check_in}</td>
+                              <td className="px-4 py-3 text-gray-700">{booking.check_out}</td>
+                              <td className="px-4 py-3">
+                                <BookingStatusBadge status={booking.status} />
+                              </td>
+                              <td className="px-4 py-3 text-gray-700">
+                                {booking.adults || 0}A, {booking.children || 0}C
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {bookings.length === 0 && (
+                          <tr>
+                            <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                              No bookings found
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </motion.div>
+          </>
+        )}
+
+        {/* Booking Management Tab */}
+        {mainTab === "booking" && (
+          <>
+                {/* KPI Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+                  <KPI_Card title="Total Bookings" value={kpis.activeBookings} />
+                  <KPI_Card title="Cancelled Bookings" value={kpis.cancelledBookings} />
+                  <KPI_Card title="Available Rooms" value={kpis.availableRooms} />
+                  <KPI_Card title="Guests Today Check-in" value={kpis.todaysGuestsCheckin} />
+                  <KPI_Card title="Guests Today Check-out" value={kpis.todaysGuestsCheckout} />
+                </div>
 
         {/* Booking Form & Chart Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -2685,7 +3088,34 @@ const Bookings = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            <h2 className="text-2xl font-bold mb-6 text-gray-700">Create Room Booking</h2>
+            {/* Tabs Navigation */}
+            <div className="flex border-b border-gray-200 mb-6">
+              <button
+                onClick={() => setBookingTab("room")}
+                className={`px-6 py-3 font-medium transition-colors ${
+                  bookingTab === "room"
+                    ? "text-indigo-600 border-b-2 border-indigo-600"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Room Booking
+              </button>
+              <button
+                onClick={() => setBookingTab("package")}
+                className={`px-6 py-3 font-medium transition-colors ${
+                  bookingTab === "package"
+                    ? "text-indigo-600 border-b-2 border-indigo-600"
+                    : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                Package Booking
+              </button>
+            </div>
+
+            {/* Room Booking Tab */}
+            {bookingTab === "room" && (
+              <>
+                <h2 className="text-2xl font-bold mb-6 text-gray-700">Create Room Booking</h2>
 
             {feedback.message && (
               <motion.div
@@ -2827,16 +3257,13 @@ const Bookings = () => {
                 {isSubmitting ? "Creating..." : "Create Booking"}
               </button>
             </form>
-          </motion.div>
+              </>
+            )}
 
-          {/* Package Booking Form */}
-          <motion.div
-            className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg flex flex-col"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-          >
-            <h2 className="text-2xl font-bold mb-6 text-gray-700">Book a Package</h2>
+            {/* Package Booking Tab */}
+            {bookingTab === "package" && (
+              <>
+                <h2 className="text-2xl font-bold mb-6 text-gray-700">Book a Package</h2>
             <form onSubmit={handlePackageBookingSubmit} className="flex flex-col h-full">
               <div className="space-y-4 flex-grow">
                 <select name="package_id" value={packageBookingForm.package_id} onChange={handlePackageBookingChange} className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all" required>
@@ -3010,11 +3437,13 @@ const Bookings = () => {
                 {isSubmitting ? "Booking..." : "Book Package ✅"}
               </button>
             </form>
+              </>
+            )}
           </motion.div>
         </div>
 
-        {/* Bookings Table */}
-        <div className="bg-white p-3 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl shadow-lg overflow-x-auto -mx-2 sm:mx-0">
+                {/* Bookings Table */}
+                <div className="bg-white p-3 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl shadow-lg overflow-x-auto -mx-2 sm:mx-0">
           <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-between items-start sm:items-center mb-4 sm:mb-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-700">All Bookings</h2>
@@ -3272,6 +3701,18 @@ const Bookings = () => {
             </div>
           )}
         </div>
+          </>
+        )}
+
+        {/* Package Management Tab */}
+        {mainTab === "package" && (
+          <Packages noLayout={true} />
+        )}
+
+        {/* Room Management Tab */}
+        {mainTab === "room" && (
+          <Rooms noLayout={true} />
+        )}
       </div>
       <AnimatePresence>
         {modalBooking && (

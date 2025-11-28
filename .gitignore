@@ -1,0 +1,23 @@
+# Node modules cache
+dasboard/node_modules/.cache/
+dasboard/node_modules/.cache/**/*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment
+.env
+
+# Logs
+*.log
+

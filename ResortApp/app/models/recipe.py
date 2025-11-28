@@ -1,0 +1,44 @@
+"""
+Recipe model for linking food items to inventory items
+"""
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, Text, DateTime
+from sqlalchemy.orm import relationship
+from datetime import datetime
+from app.database import Base
+
+
+class Recipe(Base):
+    __tablename__ = "recipes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    food_item_id = Column(Integer, ForeignKey("food_items.id"), nullable=False)
+    name = Column(String, nullable=False)  # Recipe name (can be same as food item or custom)
+    description = Column(Text, nullable=True)  # Recipe description/instructions
+    servings = Column(Integer, default=1)  # Number of servings this recipe makes
+    prep_time_minutes = Column(Integer, nullable=True)  # Preparation time in minutes
+    cook_time_minutes = Column(Integer, nullable=True)  # Cooking time in minutes
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    food_item = relationship("FoodItem", back_populates="recipes")
+    ingredients = relationship("RecipeIngredient", back_populates="recipe", cascade="all, delete-orphan")
+
+
+class RecipeIngredient(Base):
+    __tablename__ = "recipe_ingredients"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    recipe_id = Column(Integer, ForeignKey("recipes.id"), nullable=False)
+    inventory_item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=False)
+    quantity = Column(Float, nullable=False)  # Quantity needed
+    unit = Column(String, nullable=False)  # Unit of measurement (kg, liter, pcs, etc.)
+    notes = Column(String, nullable=True)  # Optional notes (e.g., "chopped", "diced")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    recipe = relationship("Recipe", back_populates="ingredients")
+    inventory_item = relationship("InventoryItem")
+
+
+

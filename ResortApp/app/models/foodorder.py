@@ -12,6 +12,8 @@ class FoodOrder(Base):
     assigned_employee_id = Column(Integer, ForeignKey("employees.id"))
     status = Column(String, default="active")
     billing_status = Column(String, default="unbilled")
+    order_type = Column(String, default="dine_in")  # "dine_in" or "room_service"
+    delivery_request = Column(String, nullable=True)  # Delivery request/notes for room service
     created_at = Column(DateTime, default=datetime.utcnow)
 
     items = relationship("FoodOrderItem", back_populates="order", cascade="all, delete-orphan")

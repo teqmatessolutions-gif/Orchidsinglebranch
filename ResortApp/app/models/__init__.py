@@ -9,8 +9,10 @@ from .checkout import Checkout
 from .employee import Employee, Attendance
 from .food_category import FoodCategory
 from .food_item import FoodItem
+from .recipe import Recipe, RecipeIngredient
 from .payment import Payment
 from .suggestion import GuestSuggestion
+from .service_request import ServiceRequest
 from .frontend import (
     HeaderBanner,
     CheckAvailability,

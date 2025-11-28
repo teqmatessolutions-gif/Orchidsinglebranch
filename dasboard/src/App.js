@@ -108,7 +108,7 @@ function App() {
           path="/food-categories"
           element={
             <ProtectedRoute requiredPermission="/food-categories">
-              <FoodCategory />
+              <FoodOrder />
             </ProtectedRoute>
           }
         />
@@ -116,7 +116,7 @@ function App() {
           path="/food-items"
           element={
             <ProtectedRoute requiredPermission="/food-items">
-              <FoodItem />
+              <FoodOrder />
             </ProtectedRoute>
           }
         />

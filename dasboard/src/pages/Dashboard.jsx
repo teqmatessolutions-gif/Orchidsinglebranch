@@ -18,12 +18,18 @@ const Dashboard = () => {
   const [err, setErr] = useState(null);
 
   const [bookings, setBookings] = useState([]);
+  const [packageBookings, setPackageBookings] = useState([]);
   const [rooms, setRooms] = useState([]);
   const [expenses, setExpenses] = useState([]);
   const [foodOrders, setFoodOrders] = useState([]);
+  const [foodItems, setFoodItems] = useState([]);
   const [assignedServices, setAssignedServices] = useState([]);
+  const [services, setServices] = useState([]);
   const [billings, setBillings] = useState([]);
   const [packages, setPackages] = useState([]);
+  const [inventoryItems, setInventoryItems] = useState([]);
+  const [inventoryCategories, setInventoryCategories] = useState([]);
+  const [employees, setEmployees] = useState([]);
 
   // ---------- Fetch Data Function ----------
   const fetchDashboardData = useCallback(async (showLoading = true) => {
@@ -34,18 +40,25 @@ const Dashboard = () => {
         setErr(null); // Clear any previous errors
         
         // Fetch all endpoints with individual error handling to prevent complete failure
-        // Reduced limits for better performance (pagination handles the rest)
+        // Comprehensive data fetching for complete dashboard
         const results = await Promise.allSettled([
-          API.get("/bookings?limit=500").catch(err => ({ error: err, data: { bookings: [] } })),
-          API.get("/rooms?limit=500").catch(err => ({ error: err, data: [] })),
-          API.get("/expenses?limit=500").catch(err => ({ error: err, data: [] })),
-          API.get("/food-orders?limit=500").catch(err => ({ error: err, data: [] })),
-          API.get("/services/assigned?limit=500").catch(err => ({ error: err, data: [] })),
-          API.get("/bill/checkouts?limit=500").catch(err => ({ error: err, data: [] })),
-          API.get("/packages?limit=500").catch(err => ({ error: err, data: [] })),
+          API.get("/bookings?limit=1000").catch(err => ({ error: err, data: { bookings: [] } })),
+          API.get("/packages/bookingsall?limit=1000").catch(err => ({ error: err, data: [] })),
+          API.get("/rooms?limit=1000").catch(err => ({ error: err, data: [] })),
+          API.get("/expenses?limit=1000").catch(err => ({ error: err, data: [] })),
+          API.get("/food-orders?limit=1000").catch(err => ({ error: err, data: [] })),
+          API.get("/food-items?limit=1000").catch(err => ({ error: err, data: [] })),
+          API.get("/services/assigned?limit=1000").catch(err => ({ error: err, data: [] })),
+          API.get("/services?limit=1000").catch(err => ({ error: err, data: [] })),
+          API.get("/bill/checkouts?limit=1000").catch(err => ({ error: err, data: [] })),
+          API.get("/packages?limit=1000").catch(err => ({ error: err, data: [] })),
+          API.get("/inventory/items?limit=1000").catch(err => ({ error: err, data: [] })),
+          API.get("/inventory/categories?limit=1000").catch(err => ({ error: err, data: [] })),
+          API.get("/employees?limit=1000").catch(err => ({ error: err, data: [] })),
         ]);
         
         // Process results individually - allow partial failures
+        // Bookings
         if (results[0].status === 'fulfilled' && !results[0].value.error) {
           setBookings(Array.isArray(results[0].value.data?.bookings) ? results[0].value.data.bookings : []);
         } else {
@@ -53,46 +66,100 @@ const Dashboard = () => {
           setBookings([]);
         }
         
+        // Package Bookings
         if (results[1].status === 'fulfilled' && !results[1].value.error) {
-          setRooms(Array.isArray(results[1].value.data) ? results[1].value.data : []);
+          setPackageBookings(Array.isArray(results[1].value.data) ? results[1].value.data : []);
         } else {
-          console.error("Failed to load rooms:", results[1].value?.error || results[1].reason);
+          console.error("Failed to load package bookings:", results[1].value?.error || results[1].reason);
+          setPackageBookings([]);
+        }
+        
+        // Rooms
+        if (results[2].status === 'fulfilled' && !results[2].value.error) {
+          setRooms(Array.isArray(results[2].value.data) ? results[2].value.data : []);
+        } else {
+          console.error("Failed to load rooms:", results[2].value?.error || results[2].reason);
           setRooms([]);
         }
         
-        if (results[2].status === 'fulfilled' && !results[2].value.error) {
-          setExpenses(Array.isArray(results[2].value.data) ? results[2].value.data : []);
+        // Expenses
+        if (results[3].status === 'fulfilled' && !results[3].value.error) {
+          setExpenses(Array.isArray(results[3].value.data) ? results[3].value.data : []);
         } else {
-          console.error("Failed to load expenses:", results[2].value?.error || results[2].reason);
+          console.error("Failed to load expenses:", results[3].value?.error || results[3].reason);
           setExpenses([]);
         }
         
-        if (results[3].status === 'fulfilled' && !results[3].value.error) {
-          setFoodOrders(Array.isArray(results[3].value.data) ? results[3].value.data : []);
+        // Food Orders
+        if (results[4].status === 'fulfilled' && !results[4].value.error) {
+          setFoodOrders(Array.isArray(results[4].value.data) ? results[4].value.data : []);
         } else {
-          console.error("Failed to load food orders:", results[3].value?.error || results[3].reason);
+          console.error("Failed to load food orders:", results[4].value?.error || results[4].reason);
           setFoodOrders([]);
         }
         
-        if (results[4].status === 'fulfilled' && !results[4].value.error) {
-          setAssignedServices(Array.isArray(results[4].value.data) ? results[4].value.data : []);
+        // Food Items
+        if (results[5].status === 'fulfilled' && !results[5].value.error) {
+          setFoodItems(Array.isArray(results[5].value.data) ? results[5].value.data : []);
         } else {
-          console.error("Failed to load services:", results[4].value?.error || results[4].reason);
+          console.error("Failed to load food items:", results[5].value?.error || results[5].reason);
+          setFoodItems([]);
+        }
+        
+        // Assigned Services
+        if (results[6].status === 'fulfilled' && !results[6].value.error) {
+          setAssignedServices(Array.isArray(results[6].value.data) ? results[6].value.data : []);
+        } else {
+          console.error("Failed to load assigned services:", results[6].value?.error || results[6].reason);
           setAssignedServices([]);
         }
         
-        if (results[5].status === 'fulfilled' && !results[5].value.error) {
-          setBillings(Array.isArray(results[5].value.data) ? results[5].value.data : []);
+        // Services
+        if (results[7].status === 'fulfilled' && !results[7].value.error) {
+          setServices(Array.isArray(results[7].value.data) ? results[7].value.data : []);
         } else {
-          console.error("Failed to load billings:", results[5].value?.error || results[5].reason);
+          console.error("Failed to load services:", results[7].value?.error || results[7].reason);
+          setServices([]);
+        }
+        
+        // Billings
+        if (results[8].status === 'fulfilled' && !results[8].value.error) {
+          setBillings(Array.isArray(results[8].value.data) ? results[8].value.data : []);
+        } else {
+          console.error("Failed to load billings:", results[8].value?.error || results[8].reason);
           setBillings([]);
         }
         
-        if (results[6].status === 'fulfilled' && !results[6].value.error) {
-          setPackages(Array.isArray(results[6].value.data) ? results[6].value.data : []);
+        // Packages
+        if (results[9].status === 'fulfilled' && !results[9].value.error) {
+          setPackages(Array.isArray(results[9].value.data) ? results[9].value.data : []);
         } else {
-          console.error("Failed to load packages:", results[6].value?.error || results[6].reason);
+          console.error("Failed to load packages:", results[9].value?.error || results[9].reason);
           setPackages([]);
+        }
+        
+        // Inventory Items
+        if (results[10].status === 'fulfilled' && !results[10].value.error) {
+          setInventoryItems(Array.isArray(results[10].value.data) ? results[10].value.data : []);
+        } else {
+          console.error("Failed to load inventory items:", results[10].value?.error || results[10].reason);
+          setInventoryItems([]);
+        }
+        
+        // Inventory Categories
+        if (results[11].status === 'fulfilled' && !results[11].value.error) {
+          setInventoryCategories(Array.isArray(results[11].value.data) ? results[11].value.data : []);
+        } else {
+          console.error("Failed to load inventory categories:", results[11].value?.error || results[11].reason);
+          setInventoryCategories([]);
+        }
+        
+        // Employees
+        if (results[12].status === 'fulfilled' && !results[12].value.error) {
+          setEmployees(Array.isArray(results[12].value.data) ? results[12].value.data : []);
+        } else {
+          console.error("Failed to load employees:", results[12].value?.error || results[12].reason);
+          setEmployees([]);
         }
         
         // Set error message only if all requests failed
@@ -291,6 +358,210 @@ const Dashboard = () => {
       .slice(0, 8);
   }, [packages]);
 
+  // ---------- New Comprehensive Calculations ----------
+  
+  // Food Orders Revenue & Metrics
+  const foodOrdersMetrics = useMemo(() => {
+    const completed = foodOrders.filter(o => (o.status || "").toLowerCase().includes("completed") || (o.status || "").toLowerCase().includes("done"));
+    const totalRevenue = completed.reduce((sum, o) => sum + Number(o.amount || o.total || 0), 0);
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const todayRevenue = completed.filter(o => {
+      const d = safeDate(o.created_at);
+      return d && d.toISOString().slice(0, 10) === todayStr;
+    }).reduce((sum, o) => sum + Number(o.amount || o.total || 0), 0);
+    return {
+      total: foodOrders.length,
+      completed: completed.length,
+      totalRevenue,
+      todayRevenue,
+      averageOrderValue: completed.length > 0 ? totalRevenue / completed.length : 0
+    };
+  }, [foodOrders]);
+
+  // Inventory Metrics
+  const inventoryMetrics = useMemo(() => {
+    const totalValue = inventoryItems.reduce((sum, item) => {
+      return sum + (Number(item.current_stock || 0) * Number(item.unit_price || 0));
+    }, 0);
+    const lowStock = inventoryItems.filter(item => {
+      const stock = Number(item.current_stock || 0);
+      const minLevel = Number(item.min_stock_level || 0);
+      return stock <= minLevel && stock > 0;
+    }).length;
+    const outOfStock = inventoryItems.filter(item => Number(item.current_stock || 0) <= 0).length;
+    const sellableItems = inventoryItems.filter(item => item.is_sellable_to_guest || item.is_sellable).length;
+    const totalSellingValue = inventoryItems
+      .filter(item => item.is_sellable_to_guest || item.is_sellable)
+      .reduce((sum, item) => sum + (Number(item.current_stock || 0) * Number(item.selling_price || item.unit_price || 0)), 0);
+    
+    return {
+      totalItems: inventoryItems.length,
+      totalValue,
+      lowStock,
+      outOfStock,
+      sellableItems,
+      totalSellingValue,
+      categories: inventoryCategories.length
+    };
+  }, [inventoryItems, inventoryCategories]);
+
+  // Services Metrics
+  const servicesMetrics = useMemo(() => {
+    const totalRevenue = assignedServices
+      .filter(s => (s.status || "").toLowerCase().includes("completed") || (s.status || "").toLowerCase().includes("done"))
+      .reduce((sum, s) => sum + Number(s.charges || s.service?.charges || 0), 0);
+    const completed = assignedServices.filter(s => 
+      (s.status || "").toLowerCase().includes("completed") || 
+      (s.status || "").toLowerCase().includes("done")
+    ).length;
+    return {
+      totalServices: services.length,
+      totalAssigned: assignedServices.length,
+      completed,
+      totalRevenue,
+      averageServiceValue: completed > 0 ? totalRevenue / completed : 0
+    };
+  }, [services, assignedServices]);
+
+  // Employee Metrics
+  const employeeMetrics = useMemo(() => {
+    const active = employees.filter(e => e.is_active !== false).length;
+    return {
+      total: employees.length,
+      active,
+      inactive: employees.length - active
+    };
+  }, [employees]);
+
+  // Package Bookings Metrics
+  const packageBookingsMetrics = useMemo(() => {
+    const totalRevenue = packageBookings.reduce((sum, pb) => {
+      return sum + Number(pb.total_amount || pb.package?.price || 0);
+    }, 0);
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const todayRevenue = packageBookings.filter(pb => {
+      const d = safeDate(pb.created_at || pb.booking_date);
+      return d && d.toISOString().slice(0, 10) === todayStr;
+    }).reduce((sum, pb) => sum + Number(pb.total_amount || pb.package?.price || 0), 0);
+    return {
+      total: packageBookings.length,
+      totalRevenue,
+      todayRevenue,
+      averagePackageValue: packageBookings.length > 0 ? totalRevenue / packageBookings.length : 0
+    };
+  }, [packageBookings]);
+
+  // Category-wise Expense Breakdown
+  const expensesByCategory = useMemo(() => {
+    const map = new Map();
+    expenses.forEach(e => {
+      const category = e.category || e.type || "Uncategorized";
+      const amount = Number(e.amount || e.charges || 0);
+      map.set(category, (map.get(category) || 0) + amount);
+    });
+    return Array.from(map, ([category, amount]) => ({ category, amount }))
+      .sort((a, b) => b.amount - a.amount);
+  }, [expenses]);
+
+  // Inventory by Category
+  const inventoryByCategory = useMemo(() => {
+    const map = new Map();
+    inventoryItems.forEach(item => {
+      const catName = item.category_name || item.category?.name || "Uncategorized";
+      const value = Number(item.current_stock || 0) * Number(item.unit_price || 0);
+      map.set(catName, (map.get(catName) || 0) + value);
+    });
+    return Array.from(map, ([category, value]) => ({ category, value }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 10);
+  }, [inventoryItems]);
+
+  // Food Orders Revenue by Date (Last 14 days)
+  const foodOrdersRevenueSeries = useMemo(() => {
+    const map = new Map();
+    const completed = foodOrders.filter(o => 
+      (o.status || "").toLowerCase().includes("completed") || 
+      (o.status || "").toLowerCase().includes("done")
+    );
+    completed.forEach(o => {
+      const d = safeDate(o.created_at);
+      if (!d) return;
+      const key = d.toISOString().slice(0, 10);
+      map.set(key, (map.get(key) || 0) + Number(o.amount || o.total || 0));
+    });
+    const arr = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      arr.push({ date: key.slice(5), revenue: map.get(key) || 0 });
+    }
+    return arr;
+  }, [foodOrders]);
+
+  // Services Revenue by Date (Last 14 days)
+  const servicesRevenueSeries = useMemo(() => {
+    const map = new Map();
+    const completed = assignedServices.filter(s => 
+      (s.status || "").toLowerCase().includes("completed") || 
+      (s.status || "").toLowerCase().includes("done")
+    );
+    completed.forEach(s => {
+      const d = safeDate(s.created_at || s.assigned_date);
+      if (!d) return;
+      const key = d.toISOString().slice(0, 10);
+      map.set(key, (map.get(key) || 0) + Number(s.charges || s.service?.charges || 0));
+    });
+    const arr = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      arr.push({ date: key.slice(5), revenue: map.get(key) || 0 });
+    }
+    return arr;
+  }, [assignedServices]);
+
+  // Top Selling Inventory Items
+  const topSellingInventory = useMemo(() => {
+    return inventoryItems
+      .filter(item => item.is_sellable_to_guest || item.is_sellable)
+      .map(item => ({
+        name: item.name,
+        stock: Number(item.current_stock || 0),
+        unitPrice: Number(item.unit_price || 0),
+        sellingPrice: Number(item.selling_price || item.unit_price || 0),
+        totalValue: Number(item.current_stock || 0) * Number(item.selling_price || item.unit_price || 0),
+        profitMargin: item.selling_price && item.unit_price 
+          ? ((item.selling_price - item.unit_price) / item.selling_price * 100) 
+          : 0
+      }))
+      .sort((a, b) => b.totalValue - a.totalValue)
+      .slice(0, 10);
+  }, [inventoryItems]);
+
+  // Food Items by Category
+  const foodItemsByCategory = useMemo(() => {
+    const map = new Map();
+    foodItems.forEach(item => {
+      const catName = item.category_name || item.category?.name || "Uncategorized";
+      map.set(catName, (map.get(catName) || 0) + 1);
+    });
+    return Array.from(map, ([category, count]) => ({ category, count }));
+  }, [foodItems]);
+
+  // Net Profit Calculation
+  const netProfit = useMemo(() => {
+    const totalRevenue = revenue.total + foodOrdersMetrics.totalRevenue + servicesMetrics.totalRevenue + packageBookingsMetrics.totalRevenue;
+    const totalExpenses = expenseAgg.total;
+    return {
+      total: totalRevenue - totalExpenses,
+      margin: totalRevenue > 0 ? ((totalRevenue - totalExpenses) / totalRevenue * 100) : 0
+    };
+  }, [revenue, foodOrdersMetrics, servicesMetrics, packageBookingsMetrics, expenseAgg]);
+
   // ---------- UI ----------
   if (loading) {
     return (
@@ -357,15 +628,44 @@ const Dashboard = () => {
           </div>
         </header>
 
-        {/* KPI Cards */}
+        {/* KPI Cards - Row 1: Financial Overview */}
         <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4">
-          <KPICard label="Total Revenue" value={fmtCurrency(revenue.total)} sub="All time" />
-          <KPICard label="Today Revenue" value={fmtCurrency(revenue.today)} sub="Today" />
+          <KPICard label="Total Revenue" value={fmtCurrency(revenue.total + foodOrdersMetrics.totalRevenue + servicesMetrics.totalRevenue + packageBookingsMetrics.totalRevenue)} sub="All time" />
+          <KPICard label="Today Revenue" value={fmtCurrency(revenue.today + foodOrdersMetrics.todayRevenue + packageBookingsMetrics.todayRevenue)} sub="Today" />
           <KPICard label="This Month Revenue" value={fmtCurrency(revenue.month)} sub="Month" />
+          <KPICard label="Net Profit" value={fmtCurrency(netProfit.total)} sub={`Margin: ${netProfit.margin.toFixed(1)}%`} />
           <KPICard label="Total Expenses" value={fmtCurrency(expenseAgg.total)} sub="All time" />
+          <KPICard label="This Month Expenses" value={fmtCurrency(expenseAgg.month)} sub="Month" />
+        </section>
+
+        {/* KPI Cards - Row 2: Bookings & Rooms */}
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4">
           <KPICard label="Bookings (Active)" value={`${bookingCounts.active}`} sub={`Cancelled: ${bookingCounts.cancelled}`} />
-          <KPICard label="Total Packages" value={packages.length} sub="All time" />
+          <KPICard label="Package Bookings" value={packageBookingsMetrics.total} sub={fmtCurrency(packageBookingsMetrics.totalRevenue)} />
+          <KPICard label="Total Packages" value={packages.length} sub="Available" />
           <KPICard label="Rooms" value={`${roomCounts.occupied}/${roomCounts.total}`} sub="Occupied / Total" />
+          <KPICard label="Available Rooms" value={roomCounts.available} sub="Ready" />
+          <KPICard label="Maintenance Rooms" value={roomCounts.maintenance} sub="Under repair" />
+        </section>
+
+        {/* KPI Cards - Row 3: Food & Services */}
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4">
+          <KPICard label="Food Orders" value={foodOrdersMetrics.total} sub={`Completed: ${foodOrdersMetrics.completed}`} />
+          <KPICard label="Food Revenue" value={fmtCurrency(foodOrdersMetrics.totalRevenue)} sub={`Avg: ${fmtCurrency(foodOrdersMetrics.averageOrderValue)}`} />
+          <KPICard label="Food Items" value={foodItems.length} sub="Menu items" />
+          <KPICard label="Services" value={servicesMetrics.totalServices} sub="Available" />
+          <KPICard label="Assigned Services" value={servicesMetrics.totalAssigned} sub={`Completed: ${servicesMetrics.completed}`} />
+          <KPICard label="Service Revenue" value={fmtCurrency(servicesMetrics.totalRevenue)} sub={`Avg: ${fmtCurrency(servicesMetrics.averageServiceValue)}`} />
+        </section>
+
+        {/* KPI Cards - Row 4: Inventory & Employees */}
+        <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-4">
+          <KPICard label="Inventory Items" value={inventoryMetrics.totalItems} sub={`Categories: ${inventoryMetrics.categories}`} />
+          <KPICard label="Inventory Value" value={fmtCurrency(inventoryMetrics.totalValue)} sub="Total stock value" />
+          <KPICard label="Sellable Items" value={inventoryMetrics.sellableItems} sub={fmtCurrency(inventoryMetrics.totalSellingValue)} />
+          <KPICard label="Low Stock Items" value={inventoryMetrics.lowStock} sub="Needs attention" />
+          <KPICard label="Out of Stock" value={inventoryMetrics.outOfStock} sub="Critical" />
+          <KPICard label="Employees" value={employeeMetrics.total} sub={`Active: ${employeeMetrics.active}`} />
         </section>
 
         {/* Charts Row 1 */}
@@ -472,8 +772,36 @@ const Dashboard = () => {
           </Card>
         </section>
 
-        {/* Charts Row 3 (New) */}
-        <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Charts Row 3: Revenue Trends */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <Card title="Food Orders Revenue (Last 14 days)">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={foodOrdersRevenueSeries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="revenue" stroke="#F59E0B" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Services Revenue (Last 14 days)">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={servicesRevenueSeries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="date" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="revenue" stroke="#10B981" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
           <Card title="Packages by Booking">
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
@@ -484,6 +812,53 @@ const Dashboard = () => {
                   <Tooltip />
                   <Bar dataKey="count" fill="#A78BFA" radius={[8, 8, 0, 0]} />
                 </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+        </section>
+
+        {/* Charts Row 4: Category Breakdowns */}
+        <section className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <Card title="Expenses by Category">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={expensesByCategory.slice(0, 8)} margin={{ top: 10, right: 10, left: 0, bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="category" angle={-45} textAnchor="end" height={80} />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="amount" fill="#EF4444" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Inventory Value by Category">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={inventoryByCategory} margin={{ top: 10, right: 10, left: 0, bottom: 60 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="category" angle={-45} textAnchor="end" height={80} />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="value" fill="#06B6D4" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
+
+          <Card title="Food Items by Category">
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={foodItemsByCategory} dataKey="count" nameKey="category" outerRadius={90} label>
+                    {foodItemsByCategory.map((_, i) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
               </ResponsiveContainer>
             </div>
           </Card>

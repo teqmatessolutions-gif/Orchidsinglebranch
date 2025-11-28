@@ -15,6 +15,7 @@ class FoodItem(Base):
 
     images = relationship("FoodItemImage", back_populates="food_item", cascade="all, delete-orphan")
     category = relationship("FoodCategory", lazy="joined")
+    recipes = relationship("Recipe", back_populates="food_item", cascade="all, delete-orphan")
 
 
 class FoodItemImage(Base):

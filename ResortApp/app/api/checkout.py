@@ -840,7 +840,14 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
             
             # Update only this room's related records
             db.query(FoodOrder).filter(FoodOrder.room_id == room.id, FoodOrder.billing_status == "unbilled").update({"billing_status": "billed"})
-            db.query(AssignedService).filter(AssignedService.room_id == room.id, AssignedService.billing_status == "unbilled").update({"billing_status": "billed"})
+            # Mark assigned services as billed and set last_used_at timestamp
+            db.query(AssignedService).filter(
+                AssignedService.room_id == room.id, 
+                AssignedService.billing_status == "unbilled"
+            ).update({
+                "billing_status": "billed",
+                "last_used_at": datetime.utcnow()
+            })
             
             # Update room status only (don't change booking status)
             room.status = "Available"
@@ -946,7 +953,14 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
 
             # Atomically update all related records
             db.query(FoodOrder).filter(FoodOrder.room_id.in_(room_ids), FoodOrder.billing_status == "unbilled").update({"billing_status": "billed"})
-            db.query(AssignedService).filter(AssignedService.room_id.in_(room_ids), AssignedService.billing_status == "unbilled").update({"billing_status": "billed"})
+            # Mark assigned services as billed and set last_used_at timestamp
+            db.query(AssignedService).filter(
+                AssignedService.room_id.in_(room_ids), 
+                AssignedService.billing_status == "unbilled"
+            ).update({
+                "billing_status": "billed",
+                "last_used_at": datetime.utcnow()
+            })
             
             booking.status = "checked_out"
             db.query(Room).filter(Room.id.in_(room_ids)).update({"status": "Available"})

@@ -18,3 +18,5 @@ DELETE FROM services;
 -- Show confirmation
 SELECT 'All services and assigned services have been deleted.' AS status;
 
+
+
