@@ -1,6 +1,6 @@
 # Node modules cache
-dasboard/node_modules/.cache/
-dasboard/node_modules/.cache/**/*
+dasboard/node_modules/
+node_modules/
 
 # Python
 __pycache__/
@@ -20,5 +20,3 @@ venv/
 
 # Logs
 *.log
-
-
