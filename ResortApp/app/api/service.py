@@ -80,6 +80,7 @@ def _serialize_service(service: Service, db: Session):
         "description": str(service.description) if service.description else None,
         "charges": float(service.charges),
         "is_visible_to_guest": bool(getattr(service, "is_visible_to_guest", False)),
+        "average_completion_time": str(service.average_completion_time) if getattr(service, "average_completion_time", None) else None,
         "created_at": service.created_at,
         "images": [
             {"id": int(img.id), "image_url": str(img.image_url)}
@@ -113,6 +114,7 @@ async def create_service(
     images: List[UploadFile] = File([]),
     inventory_items: Optional[str] = Form(None),  # JSON string of inventory items
     is_visible_to_guest: str = Form("false"),  # Accept as string, convert to bool
+    average_completion_time: Optional[str] = Form(None),  # e.g., "30 minutes", "1 hour"
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -189,6 +191,7 @@ async def create_service(
                 image_urls,
                 inventory_items_list,
                 is_visible_bool,
+                average_completion_time,
             )
         except Exception as db_error:
             error_detail = f"Failed to create service in database: {str(db_error)}\n{traceback.format_exc()}"
@@ -221,6 +224,7 @@ async def update_service_endpoint(
     inventory_items: Optional[str] = Form(None),
     remove_image_ids: Optional[str] = Form(None),
     is_visible_to_guest: str = Form("false"),
+    average_completion_time: Optional[str] = Form(None),  # e.g., "30 minutes", "1 hour"
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -307,6 +311,7 @@ async def update_service_endpoint(
             remove_image_ids_list,
             inventory_items_list,
             is_visible_bool,
+            average_completion_time,
         )
     except ValueError as ve:
         for url in new_image_urls:
@@ -640,6 +645,12 @@ def assign_service(
 @router.get("/assigned", response_model=List[service_schema.AssignedServiceOut])
 def get_all_assigned_services(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
     try:
+        # Cap limit to prevent performance issues
+        # Optimized for low network
+        if limit > 50:
+            limit = 50
+        if limit < 1:
+            limit = 20
         assigned_services = service_crud.get_assigned_services(db, skip=skip, limit=limit)
         
         # Manually construct response to ensure proper serialization

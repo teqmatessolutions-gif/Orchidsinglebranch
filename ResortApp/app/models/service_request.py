@@ -7,7 +7,7 @@ class ServiceRequest(Base):
     __tablename__ = "service_requests"
     
     id = Column(Integer, primary_key=True, index=True)
-    food_order_id = Column(Integer, ForeignKey("food_orders.id"), nullable=False)
+    food_order_id = Column(Integer, ForeignKey("food_orders.id"), nullable=True)  # Nullable for cleaning/other non-food requests
     room_id = Column(Integer, ForeignKey("rooms.id"), nullable=False)
     employee_id = Column(Integer, ForeignKey("employees.id"), nullable=True)
     request_type = Column(String, default="delivery")  # "delivery" or other types

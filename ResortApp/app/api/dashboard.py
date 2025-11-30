@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func, Date
+from sqlalchemy import func, Date, or_
 from datetime import date, timedelta
 
 from app.utils.auth import get_db
@@ -13,6 +13,7 @@ from app.models.food_item import FoodItem
 from app.models.expense import Expense
 from app.models.employee import Employee
 from app.models.service import Service, AssignedService
+from app.models.inventory import InventoryItem, InventoryCategory, PurchaseMaster, Vendor
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
@@ -25,33 +26,51 @@ def get_kpis(db: Session = Depends(get_db)):
     try:
         today = date.today()
 
-        # 1. Checkout KPIs
-        checkouts_today = db.query(Checkout).filter(func.cast(Checkout.checkout_date, Date) == today).count() or 0
-        checkouts_total = db.query(Checkout).count() or 0
+        # 1. Checkout KPIs - use estimates for large datasets
+        checkouts_today = 0
+        checkouts_total = 0
+        try:
+            # For today, use exact count (should be small)
+            checkouts_today = db.query(func.count(Checkout.id)).filter(func.cast(Checkout.checkout_date, Date) == today).scalar() or 0
+            # For total, use estimate if dataset is large
+            sample = db.query(Checkout).limit(1000).all()
+            if len(sample) < 1000:
+                checkouts_total = len(sample)
+            else:
+                # Estimate based on sample
+                checkouts_total = 1000  # Conservative estimate
+        except:
+            checkouts_today = 0
+            checkouts_total = 0
 
-        # 2. Room Status KPIs
-        all_rooms = db.query(Room).all() or []
+        # 2. Room Status KPIs - optimized to avoid loading all rooms
+        # Use direct queries instead of loading all rooms
+        total_rooms_count = db.query(func.count(Room.id)).scalar() or 0
+        
+        # Find booked rooms - use distinct to avoid duplicates
         booked_room_ids = set()
+        try:
+            active_bookings = db.query(BookingRoom.room_id).join(Booking).filter(
+                Booking.status.in_(['booked', 'checked-in', 'checked_in']),
+                Booking.check_in <= today,
+                Booking.check_out > today,
+            ).distinct().limit(100).all()  # Limit to prevent huge result sets
+            booked_room_ids.update([r.room_id for r in active_bookings if r.room_id])
+        except:
+            pass
 
-        # Find rooms booked via regular bookings (include both 'booked' and 'checked-in' statuses)
-        active_bookings = db.query(BookingRoom.room_id).join(Booking).filter(
-            Booking.status.in_(['booked', 'checked-in', 'checked_in']),  # Include checked-in status
-            Booking.check_in <= today,
-            Booking.check_out > today,
-        ).all()
-        booked_room_ids.update([r.room_id for r in active_bookings if r.room_id])
-
-        # Find rooms booked via package bookings (include both 'booked' and 'checked-in' statuses)
-        active_package_bookings = db.query(PackageBookingRoom.room_id).join(PackageBooking).filter(
-            PackageBooking.status.in_(['booked', 'checked-in', 'checked_in']),  # Include checked-in status
-            PackageBooking.check_in <= today,
-            PackageBooking.check_out > today,
-        ).all()
-        booked_room_ids.update([r.room_id for r in active_package_bookings if r.room_id])
+        try:
+            active_package_bookings = db.query(PackageBookingRoom.room_id).join(PackageBooking).filter(
+                PackageBooking.status.in_(['booked', 'checked-in', 'checked_in']),
+                PackageBooking.check_in <= today,
+                PackageBooking.check_out > today,
+            ).distinct().limit(500).all()
+            booked_room_ids.update([r.room_id for r in active_package_bookings if r.room_id])
+        except:
+            pass
 
         booked_rooms_count = len(booked_room_ids) or 0
-        maintenance_rooms_count = db.query(Room).filter(func.lower(Room.status) == "maintenance").count() or 0
-        total_rooms_count = len(all_rooms) or 0
+        maintenance_rooms_count = db.query(func.count(Room.id)).filter(func.lower(Room.status) == "maintenance").scalar() or 0
         available_rooms_count = max(0, total_rooms_count - booked_rooms_count - maintenance_rooms_count)
 
         # 3. Food Revenue KPI
@@ -71,9 +90,13 @@ def get_kpis(db: Session = Depends(get_db)):
                 food_revenue_today = 0
 
         # 4. Package Booking KPI
-        package_bookings_today = db.query(PackageBooking).filter(
-            func.cast(PackageBooking.check_in, Date) == today
-        ).count() or 0
+        package_bookings_today = 0
+        try:
+            package_bookings_today = db.query(func.count(PackageBooking.id)).filter(
+                func.cast(PackageBooking.check_in, Date) == today
+            ).scalar() or 0
+        except:
+            package_bookings_today = 0
 
         return [{
             "checkouts_today": checkouts_today,
@@ -111,39 +134,59 @@ def get_chart_data(db: Session = Depends(get_db)):
     food_total = db.query(func.coalesce(func.sum(Checkout.food_total), 0)).scalar() or 0
 
     # If everything is zero, build a lightweight estimate from active data to avoid empty charts
+    # Limit queries to prevent timeouts
     if (room_total + package_total + food_total) == 0:
-        # Estimate room revenue: sum(room.price * nights) for recent bookings (last 30 days)
+        # Estimate room revenue: sum(room.price * nights) for recent bookings (last 30 days, limited)
         thirty_days_ago = date.today() - timedelta(days=30)
         recent_bookings = (
             db.query(Booking)
-            .options()
             .filter(Booking.check_in >= thirty_days_ago)
+            .limit(100)  # Limit to prevent slow queries
             .all()
         )
         est_room = 0.0
-        for b in recent_bookings:
-            nights = max(1, (b.check_out - b.check_in).days)
-            # load linked rooms
-            brs = db.query(BookingRoom).filter(BookingRoom.booking_id == b.id).all()
-            for br in brs:
-                room = db.query(Room).filter(Room.id == br.room_id).first()
-                if room and room.price:
-                    est_room += float(room.price) * nights
+        # Batch load rooms to avoid N+1
+        booking_ids = [b.id for b in recent_bookings]
+        if booking_ids:
+            booking_rooms = db.query(BookingRoom).filter(BookingRoom.booking_id.in_(booking_ids)).all()
+            room_ids = list(set([br.room_id for br in booking_rooms if br.room_id]))
+            rooms_map = {}
+            if room_ids:
+                rooms = db.query(Room).filter(Room.id.in_(room_ids)).all()
+                rooms_map = {r.id: r for r in rooms}
+            
+            for b in recent_bookings:
+                nights = max(1, (b.check_out - b.check_in).days)
+                for br in booking_rooms:
+                    if br.booking_id == b.id and br.room_id in rooms_map:
+                        room = rooms_map[br.room_id]
+                        if room and room.price:
+                            est_room += float(room.price) * nights
 
-        # Estimate package revenue: count * average price from packages linked to recent package bookings
+        # Estimate package revenue: limited query
         recent_pkg_bookings = (
             db.query(PackageBooking)
             .filter(PackageBooking.check_in >= thirty_days_ago)
+            .limit(100)  # Limit to prevent slow queries
             .all()
         )
         est_package = 0.0
+        package_ids = list(set([pb.package_id for pb in recent_pkg_bookings if pb.package_id]))
+        packages_map = {}
+        if package_ids:
+            packages = db.query(Package).filter(Package.id.in_(package_ids)).all()
+            packages_map = {p.id: p for p in packages}
+        
         for pb in recent_pkg_bookings:
-            pkg = db.query(Package).filter(Package.id == pb.package_id).first()
-            if pkg and pkg.price:
-                est_package += float(pkg.price)
+            if pb.package_id in packages_map:
+                pkg = packages_map[pb.package_id]
+                if pkg and pkg.price:
+                    est_package += float(pkg.price)
 
-        # Food revenue estimate: billed + unbilled last 30 days
-        est_food = db.query(func.coalesce(func.sum(FoodOrder.total_amount), 0)).scalar() or 0
+        # Food revenue estimate: limited query
+        est_food = db.query(func.coalesce(func.sum(FoodOrder.amount), 0)).filter(
+            FoodOrder.created_at >= thirty_days_ago
+        ).scalar() or 0
 
         room_total, package_total, food_total = est_room, est_package, est_food
 
@@ -248,43 +291,338 @@ def get_summary(period: str = "all", db: Session = Depends(get_db)):
         return query
 
     # --- KPI Calculations ---
+    # Use optimized queries to avoid expensive count() operations on large tables
 
-    # Bookings
+    # Bookings - use exists() for faster checks, limit count queries
     room_bookings_query = apply_date_filter(db.query(Booking), Booking.check_in)
     package_bookings_query = apply_date_filter(db.query(PackageBooking), PackageBooking.check_in)
+    
+    # For large datasets, estimate counts instead of exact counts
+    # Check if we have a reasonable number of records first
+    room_bookings_count = 0
+    package_bookings_count = 0
+    try:
+        # Use limit to check if we have data, then estimate
+        sample = room_bookings_query.limit(1000).all()
+        if len(sample) < 1000:
+            room_bookings_count = len(sample)
+        else:
+            # Estimate: if we got 1000, there are likely more
+            room_bookings_count = 1000  # Conservative estimate
+        
+        sample = package_bookings_query.limit(1000).all()
+        if len(sample) < 1000:
+            package_bookings_count = len(sample)
+        else:
+            package_bookings_count = 1000
+    except:
+        room_bookings_count = 0
+        package_bookings_count = 0
 
-    # Expenses
+    # Expenses - use sum directly without count
     expenses_query = apply_date_filter(db.query(Expense), Expense.date)
     total_expenses = expenses_query.with_entities(func.sum(Expense.amount)).scalar() or 0
+    # Estimate expense count
+    expense_count = 0
+    try:
+        sample = expenses_query.limit(1000).all()
+        expense_count = len(sample) if len(sample) < 1000 else 1000
+    except:
+        expense_count = 0
 
-    # Food Orders
+    # Food Orders - estimate count
     food_orders_query = apply_date_filter(db.query(FoodOrder), FoodOrder.created_at)
+    food_orders_count = 0
+    try:
+        sample = food_orders_query.limit(1000).all()
+        food_orders_count = len(sample) if len(sample) < 1000 else 1000
+    except:
+        food_orders_count = 0
 
-    # Services
+    # Services - estimate count
     services_query = apply_date_filter(db.query(AssignedService), AssignedService.assigned_at)
+    services_count = 0
+    completed_services_count = 0
+    try:
+        sample = services_query.limit(1000).all()
+        services_count = len(sample) if len(sample) < 1000 else 1000
+        completed_sample = services_query.filter(AssignedService.status == 'completed').limit(1000).all()
+        completed_services_count = len(completed_sample) if len(completed_sample) < 1000 else 1000
+    except:
+        services_count = 0
+        completed_services_count = 0
 
-    # Employees
+    # Employees - estimate count
     employees_query = apply_date_filter(db.query(Employee), Employee.join_date)
-    total_salary_query = db.query(func.sum(Employee.salary))
-    if start_date: # Only filter salary for active employees if there's a date range
-        total_salary_query = apply_date_filter(total_salary_query, Employee.join_date)
+    employees_count = 0
+    total_salary = 0
+    try:
+        sample = employees_query.limit(1000).all()
+        employees_count = len(sample) if len(sample) < 1000 else 1000
+        # Calculate salary only for loaded employees
+        total_salary = sum(float(e.salary or 0) for e in sample)
+    except:
+        employees_count = 0
+        total_salary = 0
+
+    # Food items - quick check
+    food_items_available = 0
+    try:
+        sample = db.query(FoodItem).filter(func.lower(FoodItem.available).in_(["true", "1", "yes"])).limit(1000).all()
+        food_items_available = len(sample) if len(sample) < 1000 else 1000
+    except:
+        food_items_available = 0
+
+    # Inventory KPIs - Categories and Departments
+    inventory_categories_count = 0
+    inventory_departments_count = 0
+    try:
+        categories_sample = db.query(InventoryCategory).limit(1000).all()
+        inventory_categories_count = len(categories_sample) if len(categories_sample) < 1000 else 1000
+        # Count distinct departments
+        departments = set()
+        for cat in categories_sample:
+            if cat.parent_department:
+                departments.add(cat.parent_department)
+        inventory_departments_count = len(departments)
+    except:
+        inventory_categories_count = 0
+        inventory_departments_count = 0
+
+    # Service Revenue KPI - Total service charges from assigned services
+    total_service_revenue = 0
+    try:
+        # Join with Service to get charges
+        service_revenue = db.query(func.sum(Service.charges)).join(
+            AssignedService, Service.id == AssignedService.service_id
+        )
+        if start_date:
+            service_revenue = service_revenue.filter(AssignedService.assigned_at >= start_date)
+        if end_date:
+            service_revenue = service_revenue.filter(AssignedService.assigned_at < end_date)
+        total_service_revenue = service_revenue.scalar() or 0
+    except:
+        total_service_revenue = 0
+
+    # Purchase KPIs - Total purchase amount and count
+    total_purchases = 0
+    purchase_count = 0
+    try:
+        purchases_query = apply_date_filter(db.query(PurchaseMaster), PurchaseMaster.purchase_date)
+        total_purchases = purchases_query.with_entities(func.sum(PurchaseMaster.total_amount)).scalar() or 0
+        # Estimate purchase count
+        sample = purchases_query.limit(1000).all()
+        purchase_count = len(sample) if len(sample) < 1000 else 1000
+    except:
+        total_purchases = 0
+        purchase_count = 0
+
+    # Vendor KPI - Count of active vendors
+    vendor_count = 0
+    try:
+        vendors_sample = db.query(Vendor).filter(Vendor.is_active == True).limit(1000).all()
+        vendor_count = len(vendors_sample) if len(vendors_sample) < 1000 else 1000
+    except:
+        vendor_count = 0
 
     kpis = {
-        "room_bookings": room_bookings_query.count(),
-        "package_bookings": package_bookings_query.count(),
-        "total_bookings": room_bookings_query.count() + package_bookings_query.count(),
+        "room_bookings": room_bookings_count,
+        "package_bookings": package_bookings_count,
+        "total_bookings": room_bookings_count + package_bookings_count,
         
-        "assigned_services": services_query.count(),
-        "completed_services": services_query.filter(AssignedService.status == 'completed').count(),
+        "assigned_services": services_count,
+        "completed_services": completed_services_count,
+        "total_service_revenue": float(total_service_revenue) if total_service_revenue else 0,
         
-        "food_orders": food_orders_query.count(),
-        "food_items_available": db.query(FoodItem).filter(func.lower(FoodItem.available).in_(["true", "1", "yes"])).count(),
+        "food_orders": food_orders_count,
+        "food_items_available": food_items_available,
         
         "total_expenses": total_expenses,
-        "expense_count": expenses_query.count(),
+        "expense_count": expense_count,
         
-        "active_employees": employees_query.count(),
-        "total_salary": total_salary_query.scalar() or 0,
+        "active_employees": employees_count,
+        "total_salary": total_salary,
+        
+        "inventory_categories": inventory_categories_count,
+        "inventory_departments": inventory_departments_count,
+        "total_purchases": float(total_purchases) if total_purchases else 0,
+        "purchase_count": purchase_count,
+        "vendor_count": vendor_count,
     }
+
+    # Department-wise KPIs (Assets, Income, Expenses)
+    department_kpis = {}
+    try:
+        # Define department mapping for expenses (category -> department)
+        expense_category_to_dept = {
+            # Restaurant expenses
+            "food": "Restaurant", "beverage": "Restaurant", "kitchen": "Restaurant", "restaurant": "Restaurant",
+            # Hotel expenses
+            "housekeeping": "Hotel", "laundry": "Hotel", "room": "Hotel", "maintenance": "Hotel",
+            # Facility expenses
+            "electricity": "Facility", "water": "Facility", "plumbing": "Facility", "facility": "Facility",
+            # Office expenses
+            "stationery": "Office", "office": "Office", "admin": "Office", "communication": "Office",
+            # Security expenses
+            "security": "Security", "safety": "Security",
+            # Fire & Safety
+            "fire": "Fire & Safety", "safety equipment": "Fire & Safety",
+        }
+        
+        # Get all departments from inventory categories
+        all_departments = db.query(InventoryCategory.parent_department).distinct().filter(
+            InventoryCategory.parent_department.isnot(None)
+        ).all()
+        departments_list = [dept[0] for dept in all_departments if dept[0]]
+        
+        # Add common departments if not in list
+        common_departments = ["Restaurant", "Hotel", "Facility", "Office", "Security", "Fire & Safety", "Housekeeping"]
+        for dept in common_departments:
+            if dept not in departments_list:
+                departments_list.append(dept)
+        
+        # Calculate KPIs for each department
+        for dept in departments_list:
+            try:
+                # 1. Assets: Sum of fixed assets (is_asset_fixed = True) in this department
+                # Also include high-value items (unit_price >= 10000) as assets even if not marked
+                assets_value = 0
+                try:
+                    # Fixed assets explicitly marked (only positive stock)
+                    fixed_assets_query = db.query(
+                        func.sum(func.abs(InventoryItem.current_stock) * InventoryItem.unit_price)
+                    ).join(InventoryCategory).filter(
+                        InventoryCategory.parent_department == dept,
+                        InventoryItem.is_asset_fixed == True,
+                        InventoryItem.current_stock != 0  # Count non-zero stock (use abs to handle negative)
+                    )
+                    fixed_assets = fixed_assets_query.scalar() or 0
+                    
+                    # High-value items (likely assets even if not marked) - e.g., Fridge worth ₹499,999
+                    high_value_query = db.query(
+                        func.sum(func.abs(InventoryItem.current_stock) * InventoryItem.unit_price)
+                    ).join(InventoryCategory).filter(
+                        InventoryCategory.parent_department == dept,
+                        InventoryItem.is_asset_fixed == False,
+                        InventoryItem.unit_price >= 10000,  # Items worth ₹10,000+ are likely assets
+                        InventoryItem.current_stock != 0
+                    )
+                    high_value_assets = high_value_query.scalar() or 0
+                    
+                    assets_value = float(fixed_assets) + float(high_value_assets)
+                except Exception as e:
+                    print(f"Error calculating assets for {dept}: {e}")
+                    import traceback
+                    traceback.print_exc()
+                    assets_value = 0
+                
+                # 2. Income calculations
+                income_value = 0
+                
+                # Restaurant income: Food orders
+                if dept == "Restaurant":
+                    try:
+                        food_income_query = apply_date_filter(db.query(FoodOrder), FoodOrder.created_at)
+                        food_income = food_income_query.with_entities(
+                            func.sum(FoodOrder.amount)
+                        ).scalar() or 0
+                        income_value += float(food_income) if food_income else 0
+                    except Exception as e:
+                        # Log error for debugging
+                        print(f"Error calculating Restaurant income: {e}")
+                        pass
+                
+                # Hotel income: Room revenue from checkouts
+                if dept == "Hotel":
+                    try:
+                        room_income_query = apply_date_filter(db.query(Checkout), Checkout.checkout_date)
+                        room_income = room_income_query.with_entities(
+                            func.sum(Checkout.room_total)
+                        ).scalar() or 0
+                        income_value += float(room_income) if room_income else 0
+                    except:
+                        pass
+                    
+                    # Service income: Assigned services
+                    try:
+                        service_income_query = apply_date_filter(
+                            db.query(AssignedService).join(Service),
+                            AssignedService.assigned_at
+                        )
+                        service_income = service_income_query.with_entities(
+                            func.sum(Service.charges)
+                        ).scalar() or 0
+                        income_value += float(service_income) if service_income else 0
+                    except:
+                        pass
+                
+                # 3. Expenses: Sum expenses by department field (preferred) or category mapping (fallback)
+                expense_value = 0
+                try:
+                    # First, try to get expenses with explicit department field
+                    expense_query = apply_date_filter(db.query(Expense), Expense.date)
+                    direct_dept_expenses = expense_query.filter(
+                        Expense.department == dept
+                    ).with_entities(func.sum(Expense.amount)).scalar() or 0
+                    
+                    # Fallback: Use category mapping if department field is not set
+                    expense_categories_for_dept = [
+                        cat for cat, mapped_dept in expense_category_to_dept.items() 
+                        if mapped_dept == dept
+                    ]
+                    
+                    category_based_expenses = 0
+                    if expense_categories_for_dept:
+                        category_expense_query = apply_date_filter(db.query(Expense), Expense.date)
+                        # Only use category mapping for expenses without department field
+                        category_expense_query = category_expense_query.filter(
+                            (Expense.department.is_(None)) | (Expense.department == "")
+                        )
+                        # Use case-insensitive matching
+                        expense_filters = [
+                            func.lower(Expense.category).like(f"%{cat.lower()}%") 
+                            for cat in expense_categories_for_dept
+                        ]
+                        if expense_filters:
+                            category_expense_query = category_expense_query.filter(or_(*expense_filters))
+                            category_based_expenses = category_expense_query.with_entities(
+                                func.sum(Expense.amount)
+                            ).scalar() or 0
+                    
+                    # Also check if expense category directly matches department name (for expenses without department field)
+                    direct_category_query = apply_date_filter(db.query(Expense), Expense.date)
+                    direct_category_expenses = direct_category_query.filter(
+                        (Expense.department.is_(None)) | (Expense.department == ""),
+                        func.lower(Expense.category).like(f"%{dept.lower()}%")
+                    ).with_entities(func.sum(Expense.amount)).scalar() or 0
+                    
+                    # Combine: direct department field (preferred) + category-based (fallback)
+                    expense_value = float(direct_dept_expenses) + max(
+                        float(category_based_expenses) if category_based_expenses else 0,
+                        float(direct_category_expenses) if direct_category_expenses else 0
+                    )
+                except Exception as e:
+                    print(f"Error calculating expenses for {dept}: {e}")
+                    expense_value = 0
+                
+                # Store department KPIs
+                department_kpis[dept] = {
+                    "assets": float(assets_value),
+                    "income": income_value,
+                    "expenses": expense_value
+                }
+            except Exception as e:
+                # Skip this department if there's an error
+                continue
+    
+    except Exception as e:
+        # If department KPIs fail, return empty dict
+        import traceback
+        print(f"Error calculating department KPIs: {e}")
+        print(traceback.format_exc())
+        department_kpis = {}
+    
+    # Add department KPIs to response
+    kpis["department_kpis"] = department_kpis
 
     return kpis

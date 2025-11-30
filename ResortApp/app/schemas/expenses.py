@@ -8,6 +8,15 @@ class ExpenseBase(BaseModel):
     date: date
     description: Optional[str] = None
     employee_id: int
+    department: Optional[str] = None  # Restaurant, Facility, Hotel, Office, Security, Fire & Safety, Housekeeping
+    # RCM fields
+    rcm_applicable: Optional[bool] = False
+    rcm_tax_rate: Optional[float] = None
+    nature_of_supply: Optional[str] = None  # GTA, Legal Services, Import of Service, Security Services
+    original_bill_no: Optional[str] = None
+    vendor_id: Optional[int] = None
+    rcm_liability_date: Optional[date] = None
+    itc_eligible: Optional[bool] = True
 
 class ExpenseCreate(ExpenseBase):
     pass
@@ -18,6 +27,7 @@ class ExpenseUpdate(BaseModel):
     date: Optional[date]
     description: Optional[str]
     employee_id: Optional[int]
+    department: Optional[str]
 
 class ExpenseOut(BaseModel):
     id: int
@@ -27,6 +37,7 @@ class ExpenseOut(BaseModel):
     description: Optional[str]
     employee_id: int
     image: Optional[str]
+    department: Optional[str]
     employee_name: str
     created_at: datetime
 

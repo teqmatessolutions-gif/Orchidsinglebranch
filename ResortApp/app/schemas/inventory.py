@@ -245,6 +245,7 @@ class InventoryItemOut(InventoryItemBase):
     id: int
     current_stock: float
     category_name: Optional[str] = None
+    department: Optional[str] = None  # Department from category's parent_department
     created_at: datetime
     updated_at: datetime
     is_low_stock: bool = False

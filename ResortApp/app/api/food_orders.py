@@ -4,6 +4,7 @@ from app.schemas.foodorder import FoodOrderCreate, FoodOrderOut, FoodOrderUpdate
 from app.curd import foodorder as crud  # ✅ Correct import
 from app.utils.auth import get_db, get_current_user
 from app.models.user import User
+from app.utils.api_optimization import optimize_limit, MAX_LIMIT_LOW_NETWORK
 from typing import List
 
 router = APIRouter(prefix="/food-orders", tags=["Food Orders"])
@@ -21,7 +22,8 @@ def create_order_slash(order: FoodOrderCreate, db: Session = Depends(get_db), cu
     return _create_order_impl(order, db, current_user)
 
 def _get_orders_impl(db: Session, skip: int = 0, limit: int = 20):
-    """Helper function for get_orders"""
+    """Helper function for get_orders - optimized for low network"""
+    limit = optimize_limit(limit, MAX_LIMIT_LOW_NETWORK)
     return crud.get_food_orders(db, skip=skip, limit=limit)
 
 @router.get("", response_model=List[FoodOrderOut])

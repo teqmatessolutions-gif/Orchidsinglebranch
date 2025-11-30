@@ -3,6 +3,7 @@ import DashboardLayout from "../layout/DashboardLayout";
 import API from "../services/api";
 import { formatCurrency } from '../utils/currency';
 import { getApiBaseUrl } from "../utils/env";
+import { formatDateIST, formatDateTimeIST, getCurrentDateIST, getCurrentDateTimeIST } from "../utils/dateUtils";
 import { 
   Package, 
   Plus, 
@@ -186,12 +187,12 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
                     )}
                     {locationData.room_usage.booking_info.check_in && (
                       <div>
-                        <span className="font-medium">Check-in:</span> {new Date(locationData.room_usage.booking_info.check_in).toLocaleDateString()}
+                        <span className="font-medium">Check-in:</span> {formatDateIST(locationData.room_usage.booking_info.check_in)}
                       </div>
                     )}
                     {locationData.room_usage.booking_info.check_out && (
                       <div>
-                        <span className="font-medium">Check-out:</span> {new Date(locationData.room_usage.booking_info.check_out).toLocaleDateString()}
+                        <span className="font-medium">Check-out:</span> {formatDateIST(locationData.room_usage.booking_info.check_out)}
                       </div>
                     )}
                   </div>
@@ -235,12 +236,12 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
                               </span>
                             </td>
                             <td className="px-2 py-1 text-gray-600 text-xs">
-                              {service.assigned_at ? new Date(service.assigned_at).toLocaleString() : "N/A"}
+                              {service.assigned_at ? formatDateTimeIST(service.assigned_at) : "N/A"}
                             </td>
                             <td className="px-2 py-1 text-gray-600 text-xs">
                               {service.last_used_at ? (
                                 <span className="text-green-600 font-medium">
-                                  {new Date(service.last_used_at).toLocaleString()}
+                                  {formatDateTimeIST(service.last_used_at)}
                                 </span>
                               ) : (
                                 <span className="text-gray-400 italic">Never</span>
@@ -518,7 +519,7 @@ const Inventory = () => {
   const [purchaseForm, setPurchaseForm] = useState({
     purchase_number: "",
     vendor_id: "",
-    purchase_date: new Date().toISOString().split('T')[0],
+    purchase_date: getCurrentDateIST(),
     expected_delivery_date: "",
     invoice_number: "",
     invoice_date: "",
@@ -946,7 +947,7 @@ const Inventory = () => {
       setPurchaseForm({
         purchase_number: "",
         vendor_id: "",
-        purchase_date: new Date().toISOString().split('T')[0],
+        purchase_date: getCurrentDateIST(),
         expected_delivery_date: "",
         invoice_number: "",
         invoice_date: "",
@@ -1099,7 +1100,7 @@ const Inventory = () => {
     requisition_id: "",
     source_location_id: "",
     destination_location_id: "",
-    issue_date: new Date().toISOString().split('T')[0],
+    issue_date: getCurrentDateIST(),
     notes: "",
     details: [{
       item_id: "",
@@ -1179,7 +1180,7 @@ const Inventory = () => {
         requisition_id: "",
         source_location_id: "",
         destination_location_id: "",
-        issue_date: new Date().toISOString().split('T')[0],
+        issue_date: getCurrentDateIST(),
         notes: "",
         details: [{
           item_id: "",
@@ -1239,7 +1240,7 @@ const Inventory = () => {
         requisition_id: requisitionId,
         source_location_id: mainWarehouse.id,
         destination_location_id: destinationLocation.id,
-        issue_date: new Date().toISOString(),
+        issue_date: getCurrentDateTimeIST(),
         notes: `Auto-issued from requisition ${requisition.requisition_number}`,
         details: issueDetails
       });
@@ -1262,7 +1263,7 @@ const Inventory = () => {
     reason_code: "",
     action_taken: "",
     location_id: "",
-    waste_date: new Date().toISOString().split('T')[0],
+    waste_date: getCurrentDateIST(),
     notes: "",
     photo: null
   });
@@ -1298,7 +1299,7 @@ const Inventory = () => {
         reason_code: "",
         action_taken: "",
         location_id: "",
-        waste_date: new Date().toISOString().split('T')[0],
+        waste_date: getCurrentDateIST(),
         notes: "",
         photo: null
       });
@@ -1766,7 +1767,7 @@ const Inventory = () => {
                               </p>
                               <p><span className="font-medium">Items:</span> {req.details?.length || 0}</p>
                               {req.date_needed && (
-                                <p><span className="font-medium">Date Needed:</span> {new Date(req.date_needed).toLocaleDateString()}</p>
+                                <p><span className="font-medium">Date Needed:</span> {formatDateIST(req.date_needed)}</p>
                               )}
                             </div>
                             {req.status === "pending" && (
@@ -1817,7 +1818,7 @@ const Inventory = () => {
                             >
                               <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">{req.requisition_number}</td>
                               <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{req.destination_department}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">{req.date_needed ? new Date(req.date_needed).toLocaleDateString() : "-"}</td>
+                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">{req.date_needed ? formatDateIST(req.date_needed) : "-"}</td>
                               <td className="px-2 sm:px-4 py-3">
                                 <span className={`px-2 py-1 text-xs rounded-full ${
                                   req.priority === "urgent" ? "bg-red-100 text-red-800" :
@@ -1875,7 +1876,7 @@ const Inventory = () => {
                           >
                             <div className="flex justify-between items-start mb-2">
                               <h3 className="font-semibold text-gray-900">{issue.issue_number}</h3>
-                              <span className="text-xs text-gray-500">{new Date(issue.issue_date || issue.created_at).toLocaleDateString()}</span>
+                              <span className="text-xs text-gray-500">{formatDateIST(issue.issue_date || issue.created_at)}</span>
                             </div>
                             <div className="space-y-1 text-sm text-gray-600">
                               <p><span className="font-medium">From:</span> {issue.source_location_name || "Main Store"}</p>
@@ -1918,7 +1919,7 @@ const Inventory = () => {
                               <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">{issue.issue_number}</td>
                               <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{issue.source_location_name || "Main Store"}</td>
                               <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{issue.destination_location_name || "-"}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{new Date(issue.issue_date || issue.created_at).toLocaleDateString()}</td>
+                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{formatDateIST(issue.issue_date || issue.created_at)}</td>
                               <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{issue.details?.length || 0} items</td>
                             </tr>
                           ))
@@ -1948,7 +1949,7 @@ const Inventory = () => {
                           >
                             <div className="flex justify-between items-start mb-2">
                               <h3 className="font-semibold text-gray-900">{log.log_number || `WL-${log.id}`}</h3>
-                              <span className="text-xs text-gray-500">{new Date(log.waste_date || log.created_at).toLocaleDateString()}</span>
+                              <span className="text-xs text-gray-500">{formatDateIST(log.waste_date || log.created_at)}</span>
                             </div>
                             <div className="space-y-1 text-sm text-gray-600">
                               <p><span className="font-medium">Item:</span> {log.item_name || "N/A"}</p>
@@ -1996,7 +1997,7 @@ const Inventory = () => {
                               <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{log.item_name || "N/A"}</td>
                               <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{log.quantity} {log.unit}</td>
                               <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">{log.reason_code || log.reason || "N/A"}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{new Date(log.waste_date || log.created_at).toLocaleDateString()}</td>
+                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{formatDateIST(log.waste_date || log.created_at)}</td>
                               <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">{log.location_name || "-"}</td>
                             </tr>
                           ))
@@ -2110,7 +2111,7 @@ const Inventory = () => {
                           >
                             <div className="flex justify-between items-start mb-2">
                               <h3 className="font-semibold text-gray-900">{mapping.item_name || "N/A"}</h3>
-                              <span className="text-xs text-gray-500">{new Date(mapping.assigned_date || mapping.created_at).toLocaleDateString()}</span>
+                              <span className="text-xs text-gray-500">{formatDateIST(mapping.assigned_date || mapping.created_at)}</span>
                             </div>
                             <div className="space-y-1 text-sm text-gray-600">
                               <p><span className="font-medium">Location:</span> {mapping.location_name || "-"}</p>
@@ -2163,7 +2164,7 @@ const Inventory = () => {
                               <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">{mapping.item_name || "N/A"}</td>
                               <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{mapping.location_name || "-"}</td>
                               <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">{mapping.serial_number || "-"}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{new Date(mapping.assigned_date || mapping.created_at).toLocaleDateString()}</td>
+                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{formatDateIST(mapping.assigned_date || mapping.created_at)}</td>
                               <td className="px-2 sm:px-4 py-3" onClick={(e) => e.stopPropagation()}>
                                 <button
                                   onClick={() => handleUnassignAsset(mapping.id)}
@@ -2607,7 +2608,7 @@ const Inventory = () => {
             setPurchaseForm({
               purchase_number: "",
               vendor_id: "",
-              purchase_date: new Date().toISOString().split('T')[0],
+              purchase_date: getCurrentDateIST(),
               expected_delivery_date: "",
               invoice_number: "",
               invoice_date: "",
@@ -2679,7 +2680,7 @@ const Inventory = () => {
               requisition_id: "",
               source_location_id: "",
               destination_location_id: "",
-              issue_date: new Date().toISOString().split('T')[0],
+              issue_date: getCurrentDateIST(),
               notes: "",
               details: [{
                 item_id: "",
@@ -2713,7 +2714,7 @@ const Inventory = () => {
               reason_code: "",
               action_taken: "",
               location_id: "",
-              waste_date: new Date().toISOString().split('T')[0],
+              waste_date: getCurrentDateIST(),
               notes: "",
               photo: null
             });
@@ -2920,6 +2921,7 @@ const ItemsTable = ({ items, categories, onDelete }) => {
           <tr>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Min Level</th>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
@@ -2931,7 +2933,7 @@ const ItemsTable = ({ items, categories, onDelete }) => {
         <tbody className="bg-white divide-y divide-gray-200">
           {items.length === 0 ? (
             <tr>
-              <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+              <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
                 No items found
               </td>
             </tr>
@@ -2940,6 +2942,15 @@ const ItemsTable = ({ items, categories, onDelete }) => {
               <tr key={item.id} className="hover:bg-gray-50">
                 <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.name}</td>
                 <td className="px-4 py-3 text-sm text-gray-600">{item.category_name || "-"}</td>
+                <td className="px-4 py-3 text-sm">
+                  {item.department ? (
+                    <span className="px-2 py-1 text-xs font-semibold text-indigo-800 bg-indigo-100 rounded-full">
+                      {item.department}
+                    </span>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
                   <span className={item.is_low_stock ? "text-red-600 font-semibold" : ""}>
                     {item.current_stock} {item.unit}
@@ -3003,7 +3014,7 @@ const CategoriesTable = ({ categories }) => {
                 <td className="px-4 py-3 text-sm font-medium text-gray-900">{cat.name}</td>
                 <td className="px-4 py-3 text-sm text-gray-600">{cat.description || "-"}</td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  {new Date(cat.created_at).toLocaleDateString()}
+                  {formatDateIST(cat.created_at)}
                 </td>
               </tr>
             ))
@@ -3096,7 +3107,7 @@ const PurchasesTable = ({ purchases, onPurchaseClick }) => {
                 <td className="px-4 py-3 text-sm font-medium text-gray-900">{purchase.purchase_number}</td>
                 <td className="px-4 py-3 text-sm text-gray-600">{purchase.vendor_name || "-"}</td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  {new Date(purchase.purchase_date).toLocaleDateString()}
+                  {formatDateIST(purchase.purchase_date)}
                 </td>
                 <td className="px-4 py-3 text-sm">
                   <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -3462,7 +3473,7 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
                       
                       {/* Date */}
                       <td className="px-4 py-3 text-sm text-gray-600">
-                        {new Date(trans.created_at).toLocaleDateString()}
+                        {formatDateIST(trans.created_at)}
                       </td>
                       
                       {/* Item Details */}
@@ -5686,7 +5697,7 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
               <div>
                 <label className="text-xs font-medium text-gray-500">Expected Delivery</label>
                 <p className="text-sm text-gray-900 mt-1">
-                  {new Date(purchase.expected_delivery_date).toLocaleDateString()}
+                  {formatDateIST(purchase.expected_delivery_date)}
                 </p>
               </div>
             )}

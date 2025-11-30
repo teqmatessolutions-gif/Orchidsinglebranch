@@ -16,7 +16,16 @@ def create_expense(db: Session, data, image_path: str = None):
         date=expense_data.date,
         description=expense_data.description,
         employee_id=expense_data.employee_id,
-        image=image_path
+        image=image_path,
+        department=getattr(expense_data, 'department', None),
+        # RCM fields
+        rcm_applicable=getattr(expense_data, 'rcm_applicable', False),
+        rcm_tax_rate=getattr(expense_data, 'rcm_tax_rate', None),
+        nature_of_supply=getattr(expense_data, 'nature_of_supply', None),
+        original_bill_no=getattr(expense_data, 'original_bill_no', None),
+        vendor_id=getattr(expense_data, 'vendor_id', None),
+        rcm_liability_date=getattr(expense_data, 'rcm_liability_date', None),
+        itc_eligible=getattr(expense_data, 'itc_eligible', True)
     )
     db.add(new_expense)
     db.commit()

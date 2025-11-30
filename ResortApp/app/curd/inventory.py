@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import func
 from decimal import Decimal
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from app.models.inventory import (
     InventoryCategory, InventoryItem, Vendor, PurchaseMaster, PurchaseDetail, InventoryTransaction,
     StockRequisition, StockRequisitionDetail, StockIssue, StockIssueDetail, WasteLog, Location, AssetMapping
@@ -89,6 +89,12 @@ def get_all_vendors(db: Session, skip: int = 0, limit: int = 100, active_only: b
 
 def get_vendor_by_id(db: Session, vendor_id: int):
     return db.query(Vendor).filter(Vendor.id == vendor_id).first()
+
+def get_vendors_by_ids(db: Session, vendor_ids: List[int]):
+    """Batch load vendors by IDs to avoid N+1 queries"""
+    if not vendor_ids:
+        return []
+    return db.query(Vendor).filter(Vendor.id.in_(vendor_ids)).all()
 
 
 # Purchase Master CRUD

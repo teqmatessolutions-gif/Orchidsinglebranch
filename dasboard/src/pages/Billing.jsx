@@ -298,6 +298,8 @@ const Billing = () => {
   const [selectedCheckout, setSelectedCheckout] = useState(null);
   const [hasMoreCheckouts, setHasMoreCheckouts] = useState(true);
   const [isFetchingMore, setIsFetchingMore] = useState(false);
+  const [checkoutRequest, setCheckoutRequest] = useState(null);
+  const [checkingInventory, setCheckingInventory] = useState(false);
   
   // Filter and search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -546,11 +548,95 @@ const Billing = () => {
     }
   };
 
+  // Fetch checkout request status when room number changes
+  useEffect(() => {
+    const fetchCheckoutRequest = async () => {
+      if (!roomNumber) {
+        setCheckoutRequest(null);
+        return;
+      }
+      
+      try {
+        const actualRoomNumber = roomNumber.includes('-') ? roomNumber.split('-')[1] : roomNumber;
+        const res = await api.get(`/bill/checkout-request/${actualRoomNumber}`);
+        if (res.data && res.data.exists) {
+          setCheckoutRequest(res.data);
+        } else {
+          setCheckoutRequest(null);
+        }
+      } catch (error) {
+        console.error("Error fetching checkout request:", error);
+        setCheckoutRequest(null);
+      }
+    };
+    
+    fetchCheckoutRequest();
+  }, [roomNumber]);
+
+  const handleRequestCheckout = async () => {
+    if (!roomNumber) {
+      showBannerMessage("error", "Please select a booking to checkout.");
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const actualRoomNumber = roomNumber.includes('-') ? roomNumber.split('-')[1] : roomNumber;
+      const res = await api.post(`/bill/checkout-request?room_number=${actualRoomNumber}&checkout_mode=${checkoutMode}`);
+      showBannerMessage("success", res.data.message || "Checkout request created successfully. Please verify room inventory.");
+      // Refresh checkout request status
+      const requestRes = await api.get(`/bill/checkout-request/${actualRoomNumber}`);
+      if (requestRes.data && requestRes.data.exists) {
+        setCheckoutRequest(requestRes.data);
+      }
+    } catch (error) {
+      const errorMsg = error.response?.data?.detail;
+      const message = typeof errorMsg === 'string' ? errorMsg : (error.message || 'Unknown error');
+      showBannerMessage("error", `Error: ${message}`);
+      console.error("Error creating checkout request:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCheckInventory = async () => {
+    if (!checkoutRequest || !checkoutRequest.request_id) {
+      showBannerMessage("error", "No checkout request found.");
+      return;
+    }
+    
+    setCheckingInventory(true);
+    try {
+      const res = await api.post(`/bill/checkout-request/${checkoutRequest.request_id}/check-inventory`);
+      showBannerMessage("success", res.data.message || "Inventory checked successfully.");
+      // Refresh checkout request status
+      const actualRoomNumber = roomNumber.includes('-') ? roomNumber.split('-')[1] : roomNumber;
+      const requestRes = await api.get(`/bill/checkout-request/${actualRoomNumber}`);
+      if (requestRes.data && requestRes.data.exists) {
+        setCheckoutRequest(requestRes.data);
+      }
+    } catch (error) {
+      const errorMsg = error.response?.data?.detail;
+      const message = typeof errorMsg === 'string' ? errorMsg : (error.message || 'Unknown error');
+      showBannerMessage("error", `Error: ${message}`);
+      console.error("Error checking inventory:", error);
+    } finally {
+      setCheckingInventory(false);
+    }
+  };
+
   const handleGetBill = async () => {
     if (!roomNumber) {
       showBannerMessage("error", "Please select a booking to checkout.");
       return;
     }
+    
+    // Check if checkout request exists and is completed
+    if (checkoutRequest && checkoutRequest.exists && checkoutRequest.status !== "completed") {
+      showBannerMessage("error", "Please complete the checkout request (verify inventory) before getting the bill.");
+      return;
+    }
+    
     setLoading(true);
     setBillData(null);
     setDiscount(0); // Reset discount when fetching a new bill
@@ -586,6 +672,13 @@ const Billing = () => {
       showBannerMessage("error", "No booking selected for checkout.");
       return;
     }
+    
+    // Check if checkout request exists and is completed
+    if (checkoutRequest && checkoutRequest.exists && checkoutRequest.status !== "completed") {
+      showBannerMessage("error", "Please complete the checkout request (verify inventory) before completing checkout.");
+      return;
+    }
+    
     // Validate discount amount
     const discountAmount = parseFloat(discount) || 0;
     if (discountAmount < 0) {
@@ -681,7 +774,11 @@ const Billing = () => {
 
     // 3. Itemized Charges Table
     const chargesBody = [];
-    if (billData.charges.room_charges > 0) chargesBody.push(['Room Charges', `Stay for ${billData.stay_nights} nights`, formatCurrency(billData.charges.room_charges)]);
+    if (billData.charges.room_charges > 0) {
+      const numRooms = billData.room_numbers?.length || 1;
+      const dailyRatePerRoom = billData.charges.room_charges / (billData.stay_nights * numRooms);
+      chargesBody.push(['Room Charges', `${formatCurrency(dailyRatePerRoom)}/day × ${billData.stay_nights} ${billData.stay_nights === 1 ? 'night' : 'nights'} × ${numRooms} ${numRooms === 1 ? 'room' : 'rooms'}`, formatCurrency(billData.charges.room_charges)]);
+    }
     if (billData.charges.package_charges > 0) chargesBody.push(['Package Charges', `Package for ${billData.stay_nights} nights`, formatCurrency(billData.charges.package_charges)]);
     billData.charges.food_items.forEach(item => chargesBody.push([`Food: ${item.item_name}`, `Quantity: ${item.quantity}`, formatCurrency(item.amount)]));
     billData.charges.service_items.forEach(item => chargesBody.push([`Service: ${item.service_name}`, '', formatCurrency(item.charges)]));
@@ -757,7 +854,11 @@ const Billing = () => {
     text += `Check-out: ${new Date(billData.check_out).toLocaleDateString()}\n`;
     text += `${line}\n`;
     text += `${bold('Itemized Charges:')}\n`;
-    if (billData.charges.room_charges > 0) text += `Room Charges: ${formatCurrency(billData.charges.room_charges)}\n`;
+    if (billData.charges.room_charges > 0) {
+      const numRooms = billData.room_numbers?.length || 1;
+      const dailyRatePerRoom = billData.charges.room_charges / (billData.stay_nights * numRooms);
+      text += `Room Charges: ${formatCurrency(billData.charges.room_charges)} (${formatCurrency(dailyRatePerRoom)}/day × ${billData.stay_nights} ${billData.stay_nights === 1 ? 'night' : 'nights'} × ${numRooms} ${numRooms === 1 ? 'room' : 'rooms'})\n`;
+    }
     if (billData.charges.package_charges > 0) text += `Package Charges: ${formatCurrency(billData.charges.package_charges)}\n`;
 
     if (billData.charges.food_items.length > 0) {
@@ -965,15 +1066,91 @@ const Billing = () => {
               );
             })()}
           </div>
+          
+          {/* Checkout Request Status */}
+          {checkoutRequest && checkoutRequest.exists && (
+            <div className={`mb-4 p-3 rounded-lg ${
+              checkoutRequest.status === 'completed' ? 'bg-green-50 border border-green-200' : 
+              checkoutRequest.status === 'in_progress' ? 'bg-blue-50 border border-blue-200' :
+              'bg-yellow-50 border border-yellow-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`font-semibold ${
+                    checkoutRequest.status === 'completed' ? 'text-green-800' : 
+                    checkoutRequest.status === 'in_progress' ? 'text-blue-800' :
+                    'text-yellow-800'
+                  }`}>
+                    {checkoutRequest.status === 'completed' ? '✓ Checkout Request Completed' : 
+                     checkoutRequest.status === 'in_progress' ? '🔄 Checkout Request In Progress' :
+                     '⚠ Checkout Request Pending'}
+                  </p>
+                  {checkoutRequest.employee_name && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      Assigned to: {checkoutRequest.employee_name}
+                    </p>
+                  )}
+                  {checkoutRequest.inventory_checked_by && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      Verified by: {checkoutRequest.inventory_checked_by} 
+                      {checkoutRequest.inventory_checked_at && ` on ${new Date(checkoutRequest.inventory_checked_at).toLocaleString()}`}
+                    </p>
+                  )}
+                  {checkoutRequest.status !== 'completed' && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      Please complete the checkout request in the Service Requests section before getting the bill.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+          
+          {/* Request Checkout Button */}
+          {(!checkoutRequest || !checkoutRequest.exists) && (
+            <button
+              onClick={handleRequestCheckout}
+              className="w-full bg-yellow-600 text-white py-2.5 rounded-lg font-semibold hover:bg-yellow-700 transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 mb-4"
+              disabled={loading}
+            >
+              {loading ? "Creating Request..." : "Request Checkout (Verify Inventory First)"}
+            </button>
+          )}
+          
+          {/* Get Bill Button - Only enabled if checkout request is completed or no request exists */}
           <button
             onClick={handleGetBill}
-            className="w-full bg-indigo-600 text-white py-2.5 rounded-lg font-semibold hover:bg-indigo-700 transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 mb-4"
-            disabled={loading}
+            className={`w-full py-2.5 rounded-lg font-semibold transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-offset-2 mb-4 ${
+              (checkoutRequest && checkoutRequest.exists && checkoutRequest.status !== 'completed')
+                ? 'bg-gray-400 text-gray-600 cursor-not-allowed'
+                : 'bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500'
+            }`}
+            disabled={loading || (checkoutRequest && checkoutRequest.exists && checkoutRequest.status !== 'completed')}
           >
             {loading ? "Fetching Bill..." : checkoutMode === "single" ? "Get Bill for Single Room" : "Get Bill for Entire Booking"}
           </button>
 
-          {billData && (
+          {billData && (() => {
+            // Calculate food charges - use food_charges if available, otherwise calculate from food_items (only unpaid items)
+            const foodCharges = billData.charges.food_charges || 
+              (billData.charges.food_items && billData.charges.food_items.length > 0 
+                ? billData.charges.food_items
+                    .filter(item => !item.is_paid) // Only count unpaid items
+                    .reduce((sum, item) => sum + (item.amount || 0), 0)
+                : 0);
+            
+            // Check if there are any food items (paid or unpaid)
+            const hasFoodItems = billData.charges.food_items && billData.charges.food_items.length > 0;
+            
+            // Calculate room charge breakdown
+            const numRooms = billData.room_numbers?.length || 1;
+            const stayNights = billData.stay_nights || 1;
+            const totalRoomCharges = billData.charges.room_charges || 0;
+            const dailyRatePerRoom = totalRoomCharges > 0 && stayNights > 0 && numRooms > 0 
+              ? totalRoomCharges / (stayNights * numRooms) 
+              : 0;
+            
+            return (
             <div id="bill-details" className="bg-gray-50 border border-gray-200 p-4 rounded-xl mb-6 animate-fade-in">
               <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">Detailed Bill</h2>
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 mb-4 text-sm">
@@ -988,15 +1165,28 @@ const Billing = () => {
               <div className="mt-4 pt-4 border-t">
                 <h3 className="font-bold text-gray-700 mb-2">Itemized Charges:</h3>
                 <ul className="list-disc list-inside space-y-1 text-gray-600">
-                  {billData.charges.room_charges > 0 && <li>Room Charges: {formatCurrency(billData.charges.room_charges)}</li>}
+                  {billData.charges.room_charges > 0 && (
+                    <li>
+                      Room Charges: {formatCurrency(billData.charges.room_charges)}
+                      <span className="text-xs text-gray-500 ml-2">
+                        ({formatCurrency(dailyRatePerRoom)}/day × {stayNights} {stayNights === 1 ? 'night' : 'nights'} × {numRooms} {numRooms === 1 ? 'room' : 'rooms'})
+                      </span>
+                    </li>
+                  )}
                   {billData.charges.package_charges > 0 && <li>Package Charges: {formatCurrency(billData.charges.package_charges)}</li>}
+                  {hasFoodItems && <li>Food Charges: {formatCurrency(foodCharges)} {foodCharges === 0 && billData.charges.food_items.some(item => item.is_paid) && <span className="text-xs text-gray-500">(All paid)</span>}</li>}
                 </ul>
 
                 {billData.charges.food_items.length > 0 && (
                   <div className="mt-3">
-                    <h4 className="font-semibold text-gray-600">Food & Beverage:</h4>
+                    <h4 className="font-semibold text-gray-600">Food & Beverage Details:</h4>
                     <ul className="list-decimal list-inside ml-4 text-xs text-gray-500">
-                      {billData.charges.food_items.map((item, i) => <li key={i}>{item.item_name} (x{item.quantity}) - {formatCurrency(item.amount)}</li>)}
+                      {billData.charges.food_items.map((item, i) => (
+                        <li key={i} className={item.is_paid ? "text-gray-400 line-through" : ""}>
+                          {item.item_name} (x{item.quantity}) - {formatCurrency(item.amount)}
+                          {item.is_paid && <span className="ml-2 text-green-600 text-xs">(Paid)</span>}
+                        </li>
+                      ))}
                     </ul>
                   </div>
                 )}
@@ -1038,7 +1228,8 @@ const Billing = () => {
                 </div>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {billData && (
             <>

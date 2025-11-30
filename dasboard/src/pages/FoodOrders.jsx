@@ -8,6 +8,7 @@ import "chart.js/auto";
 import { ChefHat, X, Package, Home, UtensilsCrossed, Truck } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { getMediaBaseUrl } from "../utils/env";
+import { formatDateTimeIST, formatDateIST } from "../utils/dateUtils";
 
 export default function FoodOrders() {
   const location = useLocation();
@@ -2175,13 +2176,7 @@ export default function FoodOrders() {
                               Room {roomData?.number || roomData?.room_number || order.room_id}
                             </h4>
                             <p className="text-xs text-gray-500 mt-1">
-                              {order.created_at ? new Date(order.created_at).toLocaleDateString('en-IN', { 
-                                day: 'numeric', 
-                                month: 'short', 
-                                year: 'numeric',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                              }) : 'N/A'}
+                              {order.created_at ? formatDateTimeIST(order.created_at) : 'N/A'}
                             </p>
                           </div>
                           <div className="flex flex-col gap-2 items-end">

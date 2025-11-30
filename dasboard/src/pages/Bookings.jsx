@@ -11,6 +11,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 import BannerMessage from "../components/BannerMessage";
 import Packages from "./Package";
 import Rooms from "./CreateRooms";
+import { getCurrentDateIST, getCurrentDateTimeIST } from "../utils/dateUtils";
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -185,6 +186,7 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
       item_id: "",
       quantity: 1,
       is_payable: false,
+      manual_override: false, // When true, use is_payable directly instead of auto-calculation
       notes: ""
     }
   ]);
@@ -193,6 +195,18 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
   const [loadingCurrentItems, setLoadingCurrentItems] = useState(false);
   const [activeTab, setActiveTab] = useState("current"); // "current" or "add"
   const [paidStatusMap, setPaidStatusMap] = useState({}); // Track paid status by item_id
+
+  // Generate unique booking ID for notes
+  const generateBookingId = (booking) => {
+    // Use display_id from API response if available (backend will provide BK-000001 or PK-000001)
+    if (booking.display_id) {
+      return booking.display_id;
+    }
+    // Fallback: generate it client-side if not provided
+    const prefix = booking.is_package ? "PK" : "BK";
+    const paddedId = String(booking.id).padStart(6, '0');
+    return `${prefix}-${paddedId}`;
+  };
 
   if (!booking) return null;
 
@@ -310,6 +324,7 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
         item_id: "",
         quantity: 1,
         is_payable: false,
+        manual_override: false,
         notes: ""
       }
     ]);
@@ -375,20 +390,87 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
         return;
       }
 
-      // Build issue details from all items
-      const issueDetails = validItems.map(item => {
+      // Calculate total quantities per item already allocated (to track complimentary limit usage)
+      const itemQuantityMap = {}; // item_id -> total quantity already allocated
+      currentRoomItems.forEach(roomItem => {
+        const itemId = roomItem.item_id;
+        if (!itemQuantityMap[itemId]) {
+          itemQuantityMap[itemId] = 0;
+        }
+        itemQuantityMap[itemId] += parseFloat(roomItem.location_stock || 0);
+      });
+
+      // Build issue details with automatic complimentary/payable split or manual override
+      const issueDetails = [];
+      let totalPayableQty = 0;
+      let totalComplimentaryQty = 0;
+
+      validItems.forEach(item => {
         const selectedItem = inventoryItems.find(it => it.id === parseInt(item.item_id));
-        if (!selectedItem) return null;
+        if (!selectedItem) return;
         
-        return {
-          item_id: parseInt(item.item_id),
-          issued_quantity: parseFloat(item.quantity),
+        const itemId = parseInt(item.item_id);
+        const requestedQty = parseFloat(item.quantity);
+        
+        // If manual override is enabled, use the is_payable flag directly
+        if (item.manual_override) {
+          issueDetails.push({
+            item_id: itemId,
+            issued_quantity: requestedQty,
           unit: selectedItem.unit || "pcs",
           batch_lot_number: null,
           cost: null,
-          notes: item.is_payable ? "Payable item" : "Complimentary item" + (item.notes ? ` - ${item.notes}` : "")
-        };
-      }).filter(Boolean);
+            is_payable: item.is_payable,
+            notes: (item.is_payable ? "Payable" : "Complimentary") + ` item (${requestedQty} ${selectedItem.unit || "pcs"})` + (item.notes ? ` - ${item.notes}` : "")
+          });
+          if (item.is_payable) {
+            totalPayableQty += requestedQty;
+          } else {
+            totalComplimentaryQty += requestedQty;
+          }
+          return;
+        }
+        
+        // Automatic calculation based on complimentary limit
+        const complimentaryLimit = selectedItem.complimentary_limit || 0;
+        
+        // Calculate how many complimentary items are already used
+        const alreadyAllocatedQty = itemQuantityMap[itemId] || 0;
+        const complimentaryUsed = Math.min(alreadyAllocatedQty, complimentaryLimit);
+        const complimentaryRemaining = Math.max(0, complimentaryLimit - complimentaryUsed);
+        
+        // Split requested quantity into complimentary and payable
+        const complimentaryQty = Math.min(requestedQty, complimentaryRemaining);
+        const payableQty = Math.max(0, requestedQty - complimentaryQty);
+        
+        // Create issue detail for complimentary items (if any)
+        if (complimentaryQty > 0) {
+          issueDetails.push({
+            item_id: itemId,
+            issued_quantity: complimentaryQty,
+            unit: selectedItem.unit || "pcs",
+            batch_lot_number: null,
+            cost: null,
+            is_payable: false,
+            notes: `Complimentary item (${complimentaryQty} ${selectedItem.unit || "pcs"})` + (item.notes ? ` - ${item.notes}` : "")
+          });
+          totalComplimentaryQty += complimentaryQty;
+        }
+        
+        // Create issue detail for payable items (if any)
+        if (payableQty > 0) {
+          issueDetails.push({
+            item_id: itemId,
+            issued_quantity: payableQty,
+            unit: selectedItem.unit || "pcs",
+            batch_lot_number: null,
+            cost: null,
+            is_payable: true,
+            notes: `Payable item (${payableQty} ${selectedItem.unit || "pcs"})` + (item.notes ? ` - ${item.notes}` : "")
+          });
+          totalPayableQty += payableQty;
+        }
+      });
 
       if (issueDetails.length === 0) {
         alert("No valid items to add");
@@ -396,17 +478,17 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
         return;
       }
 
-      // Count payable vs complimentary
-      const payableCount = validItems.filter(item => item.is_payable).length;
-      const complimentaryCount = validItems.length - payableCount;
+      // Count payable vs complimentary items
+      const payableCount = issueDetails.filter(d => d.is_payable).length;
+      const complimentaryCount = issueDetails.filter(d => !d.is_payable).length;
 
       // Create stock issue
       const issueData = {
         requisition_id: null,
         source_location_id: mainWarehouse.id,
         destination_location_id: destinationLocation.id,
-        issue_date: new Date().toISOString(),
-        notes: `Extra allocation for booking ${generateBookingId(booking)} (${validItems.length} items: ${payableCount} payable, ${complimentaryCount} complimentary)`,
+        issue_date: getCurrentDateTimeIST(),
+        notes: `Extra allocation for booking ${generateBookingId(booking)} (${totalPayableQty} payable qty, ${totalComplimentaryQty} complimentary qty)`,
         details: issueDetails
       };
 
@@ -417,6 +499,7 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
         item_id: "",
         quantity: 1,
         is_payable: false,
+        manual_override: false,
         notes: ""
       }]);
       
@@ -637,18 +720,40 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total Qty</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Complimentary</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Payable</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Payable</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Paid</th>
                       <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {currentRoomItems.map((item, index) => {
-                      const isPayable = item.is_payable || false;
                       const paidStatus = item.is_paid || paidStatusMap[item.item_id] || false;
+                      const totalQty = parseFloat(item.location_stock || 0);
+                      
+                      // Find the inventory item to get complimentary limit (always needed for display)
+                      const inventoryItem = inventoryItems.find(it => it.id === item.item_id);
+                      const complimentaryLimit = inventoryItem?.complimentary_limit || 0;
+                      
+                      // Use actual stored quantities if available, otherwise calculate
+                      const complimentaryQty = parseFloat(item.complimentary_qty || 0);
+                      const payableQty = parseFloat(item.payable_qty || 0);
+                      
+                      // Fallback: If quantities not stored, calculate based on complimentary limit
+                      let calculatedComplimentaryQty = complimentaryQty;
+                      let calculatedPayableQty = payableQty;
+                      
+                      if (complimentaryQty === 0 && payableQty === 0 && totalQty > 0) {
+                        // Calculate based on limit
+                        calculatedComplimentaryQty = Math.min(totalQty, complimentaryLimit);
+                        calculatedPayableQty = Math.max(0, totalQty - complimentaryLimit);
+                      } else {
+                        calculatedComplimentaryQty = complimentaryQty;
+                        calculatedPayableQty = payableQty;
+                      }
                       
                       return (
                         <tr key={index} className="hover:bg-gray-50">
@@ -657,24 +762,33 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
                             {item.item_code && (
                               <div className="text-xs text-gray-500">{item.item_code}</div>
                             )}
+                            {complimentaryLimit > 0 && (
+                              <div className="text-xs text-blue-600 mt-1">Limit: {complimentaryLimit} free</div>
+                            )}
                           </td>
-                          <td className="px-3 py-2 text-sm text-gray-600">{item.location_stock || 0} {item.unit}</td>
+                          <td className="px-3 py-2 text-sm text-gray-600 font-medium">{totalQty} {item.unit}</td>
+                          <td className="px-3 py-2 text-sm">
+                            <span className="text-green-700 font-medium">{calculatedComplimentaryQty} {item.unit}</span>
+                            {calculatedComplimentaryQty > 0 && (
+                              <div className="text-xs text-gray-500">(Free)</div>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-sm">
+                            {calculatedPayableQty > 0 ? (
+                              <>
+                                <span className="text-orange-700 font-medium">{calculatedPayableQty} {item.unit}</span>
+                                <div className="text-xs text-gray-500">(Payable)</div>
+                              </>
+                            ) : (
+                              <span className="text-gray-400 text-xs">-</span>
+                            )}
+                          </td>
                           <td className="px-3 py-2 text-sm text-gray-600">{formatCurrency(item.unit_price || 0)}</td>
-                          <td className="px-3 py-2 text-sm font-semibold text-gray-900">{formatCurrency(item.stock_value || 0)}</td>
-                          <td className="px-3 py-2">
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={isPayable}
-                                onChange={(e) => updateItemPayableStatus(item, e.target.checked)}
-                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                              />
-                              <span className="text-xs text-gray-700">
-                                {isPayable ? "Payable" : "Complimentary"}
-                              </span>
-                            </label>
+                          <td className="px-3 py-2 text-sm font-semibold text-gray-900">
+                            {calculatedPayableQty > 0 ? formatCurrency((item.unit_price || 0) * calculatedPayableQty) : formatCurrency(0)}
                           </td>
                           <td className="px-3 py-2">
+                            {calculatedPayableQty > 0 && (
                             <label className="flex items-center gap-2 cursor-pointer">
                               <input
                                 type="checkbox"
@@ -684,21 +798,24 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
                                   updateItemPaidStatus(item, e.target.checked);
                                 }}
                                 className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                                disabled={!isPayable}
                               />
                               <span className={`text-xs ${paidStatus ? "text-green-600 font-medium" : "text-gray-500"}`}>
                                 {paidStatus ? "Paid" : "Unpaid"}
                               </span>
                             </label>
+                            )}
+                            {calculatedPayableQty === 0 && (
+                              <span className="text-xs text-gray-400">N/A</span>
+                            )}
                           </td>
                           <td className="px-3 py-2">
-                            {isPayable && !paidStatus && (
+                            {calculatedPayableQty > 0 && !paidStatus && (
                               <span className="text-xs text-orange-600 font-medium">Payment Pending</span>
                             )}
-                            {isPayable && paidStatus && (
+                            {calculatedPayableQty > 0 && paidStatus && (
                               <span className="text-xs text-green-600 font-medium">✓ Paid</span>
                             )}
-                            {!isPayable && (
+                            {calculatedPayableQty === 0 && (
                               <span className="text-xs text-gray-400">Complimentary</span>
                             )}
                           </td>
@@ -756,12 +873,13 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
                       {inventoryItems.filter(it => it.is_active !== false).map((invItem) => (
                         <option key={invItem.id} value={invItem.id}>
                           {invItem.name} {invItem.item_code ? `(${invItem.item_code})` : ""} - Stock: {invItem.current_stock} {invItem.unit}
+                          {invItem.complimentary_limit ? ` (First ${invItem.complimentary_limit} free)` : ""}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Quantity</label>
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Total Quantity</label>
                     <input
                       type="number"
                       min="0.01"
@@ -775,15 +893,70 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
                 <div className="mt-3 flex items-center gap-2">
                   <input
                     type="checkbox"
+                    id={`manual_override_${index}`}
+                    checked={item.manual_override || false}
+                    onChange={(e) => updateAllocationItem(index, "manual_override", e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                  />
+                  <label htmlFor={`manual_override_${index}`} className="text-xs font-medium text-gray-700 cursor-pointer">
+                    Manual Override (ignore automatic calculation)
+                  </label>
+                </div>
+                {item.manual_override ? (
+                  <div className="mt-3 flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <input
+                    type="checkbox"
                     id={`is_payable_${index}`}
                     checked={item.is_payable}
                     onChange={(e) => updateAllocationItem(index, "is_payable", e.target.checked)}
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                   />
                   <label htmlFor={`is_payable_${index}`} className="text-xs font-medium text-gray-700 cursor-pointer">
-                    Payable to Guest
+                      Mark entire quantity as <span className={item.is_payable ? "text-orange-700 font-semibold" : "text-green-700 font-semibold"}>{item.is_payable ? "Payable" : "Complimentary"}</span>
                   </label>
                 </div>
+                ) : (
+                  (() => {
+                    const selectedItem = inventoryItems.find(it => it.id === parseInt(item.item_id));
+                    if (!selectedItem || !item.item_id || !item.quantity) return null;
+                    
+                    // Get already allocated quantity for this item
+                    const alreadyAllocatedQty = (currentRoomItems
+                      .filter(roomItem => roomItem.item_id === selectedItem.id)
+                      .reduce((sum, roomItem) => sum + parseFloat(roomItem.location_stock || 0), 0));
+                    
+                    const complimentaryLimit = selectedItem.complimentary_limit || 0;
+                    const complimentaryUsed = Math.min(alreadyAllocatedQty, complimentaryLimit);
+                    const complimentaryRemaining = Math.max(0, complimentaryLimit - complimentaryUsed);
+                    const requestedQty = parseFloat(item.quantity) || 0;
+                    const complimentaryQty = Math.min(requestedQty, complimentaryRemaining);
+                    const payableQty = Math.max(0, requestedQty - complimentaryQty);
+                    
+                    return (
+                      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <div className="text-xs font-semibold text-gray-700 mb-2">Automatic Quantity Breakdown:</div>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-green-700 font-medium">Complimentary: {complimentaryQty} {selectedItem.unit}</span>
+                            {complimentaryLimit > 0 && (
+                              <div className="text-gray-500 mt-1">
+                                ({complimentaryRemaining} remaining from {complimentaryLimit} limit)
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-orange-700 font-medium">Payable: {payableQty} {selectedItem.unit}</span>
+                            {payableQty > 0 && (
+                              <div className="text-gray-500 mt-1">
+                                @ {formatCurrency(selectedItem.selling_price || selectedItem.unit_price || 0)} each
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()
+                )}
                 <div className="mt-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Notes (Optional)</label>
                   <input
@@ -1315,7 +1488,7 @@ const Bookings = () => {
     adults: 1,
     children: 0,
   });
-  const today = new Date().toISOString().split("T")[0];
+  const today = getCurrentDateIST();
 
   const [packages, setPackages] = useState([]);
   const [packageBookingForm, setPackageBookingForm] = useState({
@@ -1403,7 +1576,7 @@ const Bookings = () => {
       const packageBookings = packageBookingsRes.data || [];
       const rawItems = itemsRes.data || [];
       const allLocations = locationsRes.data || [];
-      const todaysDate = new Date().toISOString().split("T")[0];
+      const todaysDate = getCurrentDateIST();
 
       // Only allow items that are marked sellable to guests (used as rentable / chargeable items)
       const sellableItems = (rawItems || []).filter(
@@ -2498,7 +2671,7 @@ const Bookings = () => {
                       requisition_id: null,
                       source_location_id: mainWarehouse.id,
                       destination_location_id: destinationLocation.id,
-                      issue_date: new Date().toISOString(),
+                      issue_date: getCurrentDateTimeIST(),
                       notes: `Auto amenity allocation for booking ${generateBookingId(booking || bookingToCheckIn)}`,
                       details: issueDetails,
                     },
@@ -3073,12 +3246,12 @@ const Bookings = () => {
           <>
                 {/* KPI Row */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
-                  <KPI_Card title="Total Bookings" value={kpis.activeBookings} />
-                  <KPI_Card title="Cancelled Bookings" value={kpis.cancelledBookings} />
-                  <KPI_Card title="Available Rooms" value={kpis.availableRooms} />
-                  <KPI_Card title="Guests Today Check-in" value={kpis.todaysGuestsCheckin} />
-                  <KPI_Card title="Guests Today Check-out" value={kpis.todaysGuestsCheckout} />
-                </div>
+          <KPI_Card title="Total Bookings" value={kpis.activeBookings} />
+          <KPI_Card title="Cancelled Bookings" value={kpis.cancelledBookings} />
+          <KPI_Card title="Available Rooms" value={kpis.availableRooms} />
+          <KPI_Card title="Guests Today Check-in" value={kpis.todaysGuestsCheckin} />
+          <KPI_Card title="Guests Today Check-out" value={kpis.todaysGuestsCheckout} />
+        </div>
 
         {/* Booking Form & Chart Section */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -3115,7 +3288,7 @@ const Bookings = () => {
             {/* Room Booking Tab */}
             {bookingTab === "room" && (
               <>
-                <h2 className="text-2xl font-bold mb-6 text-gray-700">Create Room Booking</h2>
+            <h2 className="text-2xl font-bold mb-6 text-gray-700">Create Room Booking</h2>
 
             {feedback.message && (
               <motion.div
@@ -3263,7 +3436,7 @@ const Bookings = () => {
             {/* Package Booking Tab */}
             {bookingTab === "package" && (
               <>
-                <h2 className="text-2xl font-bold mb-6 text-gray-700">Book a Package</h2>
+            <h2 className="text-2xl font-bold mb-6 text-gray-700">Book a Package</h2>
             <form onSubmit={handlePackageBookingSubmit} className="flex flex-col h-full">
               <div className="space-y-4 flex-grow">
                 <select name="package_id" value={packageBookingForm.package_id} onChange={handlePackageBookingChange} className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all" required>
@@ -3442,8 +3615,8 @@ const Bookings = () => {
           </motion.div>
         </div>
 
-                {/* Bookings Table */}
-                <div className="bg-white p-3 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl shadow-lg overflow-x-auto -mx-2 sm:mx-0">
+        {/* Bookings Table */}
+        <div className="bg-white p-3 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl shadow-lg overflow-x-auto -mx-2 sm:mx-0">
           <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-between items-start sm:items-center mb-4 sm:mb-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
               <h2 className="text-xl sm:text-2xl font-bold text-gray-700">All Bookings</h2>

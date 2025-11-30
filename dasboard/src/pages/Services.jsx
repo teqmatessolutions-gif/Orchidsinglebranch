@@ -72,6 +72,7 @@ const Services = () => {
   const [returnQuantities, setReturnQuantities] = useState({});
   const [returnedItems, setReturnedItems] = useState([]);
   const [showServiceReport, setShowServiceReport] = useState(false);
+  const [quickAssignModal, setQuickAssignModal] = useState(null); // { request, serviceId, employeeId }
   const [serviceReport, setServiceReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
   const [reportFilters, setReportFilters] = useState({
@@ -87,7 +88,7 @@ const Services = () => {
   // Fetch service requests
   const fetchServiceRequests = async () => {
     try {
-      const res = await api.get("/service-requests?limit=1000");
+      const res = await api.get("/service-requests?limit=50");
       setServiceRequests(res.data || []);
     } catch (error) {
       console.error("Failed to fetch service requests:", error);
@@ -99,22 +100,24 @@ const Services = () => {
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const [sRes, aRes, rRes, eRes, bRes, pbRes, invRes] = await Promise.all([
-        api.get("/services?limit=1000").catch(() => ({ data: [] })),
-        api.get("/services/assigned?skip=0&limit=20").catch(() => ({ data: [] })),
-        api.get("/rooms?limit=1000").catch(() => ({ data: [] })),
-        api.get("/employees").catch(() => ({ data: [] })),
-        api.get("/bookings?limit=1000").catch(() => ({ data: { bookings: [] } })),
-        api.get("/packages/bookingsall?limit=1000").catch(() => ({ data: [] })),
-        api.get("/inventory/items?limit=1000").catch(() => ({ data: [] })),
+      const [sRes, aRes, rRes, eRes, bRes, pbRes, invRes, srRes] = await Promise.all([
+        api.get("/services?limit=50").catch(() => ({ data: [] })),
+        api.get("/services/assigned?skip=0&limit=50").catch(() => ({ data: [] })),
+        api.get("/rooms?limit=50").catch(() => ({ data: [] })),
+        api.get("/employees?limit=50").catch(() => ({ data: [] })),
+        api.get("/bookings?limit=50").catch(() => ({ data: { bookings: [] } })),
+        api.get("/packages/bookingsall?limit=50").catch(() => ({ data: [] })),
+        api.get("/inventory/items?limit=50").catch(() => ({ data: [] })),
+        api.get("/service-requests?limit=50").catch(() => ({ data: [] })),
       ]);
       setServices(sRes?.data || []);
       setAssignedServices(aRes?.data || []);
       setAllRooms(rRes?.data || []);
       setEmployees(eRes?.data || []);
       setInventoryItems(invRes?.data || []);
+      setServiceRequests(srRes?.data || []);
       
-      // Fetch service requests if on requests tab
+      // Fetch service requests if on requests tab (refresh)
       if (activeTab === "requests") {
         fetchServiceRequests();
       }
@@ -437,7 +440,7 @@ const Services = () => {
         setSelectedServiceDetails(cachedService);
       } else {
         // Fetch all services and find the one we need (to get fresh inventory data)
-        const response = await api.get(`/services?limit=1000`);
+        const response = await api.get(`/services?limit=50`);
         const allServices = response.data || [];
         const foundService = allServices.find(s => s.id === parseInt(serviceId));
         if (foundService) {
@@ -567,19 +570,19 @@ const Services = () => {
           if (assignedService && assignedService.employee) {
             const empInvRes = await api.get(`/services/employee-inventory/${assignedService.employee.id}?status=assigned,in_use,completed`);
             const allAssignments = empInvRes.data || [];
-            // Filter assignments for this specific service - only items that were actually used
+            // Filter assignments for this specific service - show all items with balance (unused items)
             const serviceAssignments = allAssignments.filter(
-              a => a.assigned_service_id === id && a.quantity_used > 0 && a.balance_quantity > 0
+              a => a.assigned_service_id === id && a.balance_quantity > 0
             );
             
             if (serviceAssignments.length > 0) {
               // Show return inventory modal
               setInventoryAssignments(serviceAssignments);
               setCompletingServiceId(id);
-              // Initialize return quantities with balance
+              // Initialize return quantities with 0 (user can choose to return items)
               const initialReturns = {};
               serviceAssignments.forEach(a => {
-                initialReturns[a.id] = a.balance_quantity; // Default to return all
+                initialReturns[a.id] = 0; // Default to 0 - user can choose to return
               });
               setReturnQuantities(initialReturns);
               return; // Don't update status yet, wait for user to confirm returns
@@ -604,43 +607,48 @@ const Services = () => {
     if (!completingServiceId) return;
     
     try {
-      // Build inventory returns array - only from used items
+      // Build inventory returns array - return balance (unused) items
       const inventory_returns = inventoryAssignments
         .filter(a => {
           const qty = returnQuantities[a.id];
           const numQty = parseFloat(qty);
-          const usedQty = a.quantity_used || 0;
-          // Only allow returns if item was used and return quantity is valid
-          return !isNaN(numQty) && numQty > 0 && usedQty > 0 && numQty <= usedQty;
+          const balanceQty = a.balance_quantity || 0;
+          // Allow returns if return quantity is valid and doesn't exceed balance
+          return !isNaN(numQty) && numQty > 0 && balanceQty > 0 && numQty <= balanceQty;
         })
         .map(a => {
           const qty = returnQuantities[a.id];
           const numQty = parseFloat(qty);
+          const balanceQty = a.balance_quantity || 0;
           const usedQty = a.quantity_used || 0;
-          // Ensure return doesn't exceed used quantity
-          const returnQty = Math.min(numQty, usedQty);
+          // Ensure return doesn't exceed balance quantity
+          const returnQty = Math.min(numQty, balanceQty);
           return {
             assignment_id: a.id,
             quantity_returned: returnQty,
-            notes: `Returned on service completion - Transparent transaction for ${a.item?.name || 'item'} (Used: ${usedQty}, Returned: ${returnQty})`
+            notes: `Returned balance inventory on service completion - ${a.item?.name || 'item'} (Assigned: ${a.quantity_assigned || 0}, Used: ${usedQty}, Balance: ${balanceQty}, Returned: ${returnQty})`
           };
         });
       
-      // Validate that all returns are from used items
+      // Validate that all returns are within balance
       const invalidReturns = inventory_returns.filter(ret => {
         const assignment = inventoryAssignments.find(a => a.id === ret.assignment_id);
-        return !assignment || (assignment.quantity_used || 0) === 0;
+        const balanceQty = assignment?.balance_quantity || 0;
+        return !assignment || balanceQty <= 0 || ret.quantity_returned > balanceQty;
       });
       
       if (invalidReturns.length > 0) {
-        alert("Error: Cannot return items that were not used in the service. Please check your return quantities.");
+        alert("Error: Return quantities cannot exceed balance quantity. Please check your return quantities.");
         return;
       }
       
-      // Update status with inventory returns
+      // Allow completing with 0 returns - user can skip returning items
+      // No validation needed here, empty returns array is acceptable
+      
+      // Update status with inventory returns (can be empty array if no returns)
       await api.patch(`/services/assigned/${completingServiceId}`, {
         status: "completed",
-        inventory_returns: inventory_returns.length > 0 ? inventory_returns : null
+        inventory_returns: inventory_returns.length > 0 ? inventory_returns : []
       });
       
       // Close modal and refresh
@@ -648,7 +656,12 @@ const Services = () => {
       setInventoryAssignments([]);
       setReturnQuantities({});
       fetchAll();
-      alert("Service marked as completed and inventory items returned successfully!");
+      
+      if (inventory_returns.length > 0) {
+        alert(`Service marked as completed and ${inventory_returns.length} item(s) returned successfully!`);
+      } else {
+        alert("Service marked as completed. No items were returned.");
+      }
     } catch (error) {
       console.error("Failed to complete service with returns:", error);
       alert(`Failed to complete service: ${error.response?.data?.detail || error.message}`);
@@ -662,9 +675,10 @@ const Services = () => {
       console.log("[DEBUG] Inventory items in assigned service:", assignedService.service?.inventory_items);
       
       // Always fetch fresh service details to ensure we have inventory items
-      const serviceResponse = await api.get(`/services?limit=1000`);
+      const serviceResponse = await api.get(`/services?limit=50`);
       const allServices = serviceResponse.data || [];
-      const service = allServices.find(s => s.id === assignedService.service_id);
+      const serviceId = assignedService.service_id || assignedService.service?.id;
+      const service = allServices.find(s => s.id === serviceId);
       
       console.log("[DEBUG] Found service from API:", service);
       console.log("[DEBUG] Service inventory items from API:", service?.inventory_items);
@@ -763,7 +777,7 @@ const Services = () => {
   const getDashboardData = () => {
     // Service-wise statistics
     const serviceStats = services.map(service => {
-      const assigned = assignedServices.filter(a => a.service_id === service.id);
+      const assigned = assignedServices.filter(a => (a.service_id || a.service?.id) === service.id);
       const completed = assigned.filter(a => a.status === 'completed').length;
       const pending = assigned.filter(a => a.status === 'pending').length;
       const inProgress = assigned.filter(a => a.status === 'in_progress').length;
@@ -815,7 +829,7 @@ const Services = () => {
     // Overall inventory usage
     const overallInventoryUsage = {};
     assignedServices.forEach(assignment => {
-      const serviceId = assignment.service_id;
+      const serviceId = assignment.service_id || assignment.service?.id;
       // Find the service in services array to get inventory items
       const serviceData = services.find(s => s.id === serviceId);
       const items = serviceData?.inventory_items || assignment.service?.inventory_items || [];
@@ -889,9 +903,10 @@ const Services = () => {
         if (assignment.status === 'completed') {
           roomStats[roomId].total_revenue += assignment.service?.charges || 0;
         }
-        if (!roomStats[roomId].services.find(s => s.id === assignment.service_id)) {
+        const serviceId = assignment.service_id || assignment.service?.id;
+        if (!roomStats[roomId].services.find(s => s.id === serviceId)) {
           roomStats[roomId].services.push({
-            id: assignment.service_id,
+            id: serviceId,
             name: assignment.service?.name
           });
         }
@@ -924,7 +939,7 @@ const Services = () => {
   // Bar chart for service assignments
   const barData = services.map(s => ({
     name: s.name,
-    assigned: assignedServices.filter(a => a.service_id === s.id).length,
+    assigned: assignedServices.filter(a => (a.service_id || a.service?.id) === s.id).length,
   }));
 
   const fetchServiceReport = async () => {
@@ -961,12 +976,47 @@ const Services = () => {
 
   const handleAssignEmployeeToRequest = async (requestId, employeeId) => {
     try {
-      await api.put(`/service-requests/${requestId}`, { employee_id: employeeId });
+      // Check if this is a checkout request (ID > 1000000)
+      if (requestId > 1000000) {
+        const checkoutRequestId = requestId - 1000000;
+        await api.put(`/bill/checkout-request/${checkoutRequestId}/assign?employee_id=${employeeId}`);
+      } else {
+        await api.put(`/service-requests/${requestId}`, { employee_id: employeeId });
+      }
       fetchServiceRequests();
     } catch (error) {
       console.error("Failed to assign employee:", error);
       const msg = error.response?.data?.detail || error.message || "Unknown error";
       alert(`Failed to assign employee: ${msg}`);
+    }
+  };
+  
+  const [checkoutInventoryModal, setCheckoutInventoryModal] = useState(null);
+  const [checkoutInventoryDetails, setCheckoutInventoryDetails] = useState(null);
+  
+  const handleViewCheckoutInventory = async (checkoutRequestId) => {
+    try {
+      const res = await api.get(`/bill/checkout-request/${checkoutRequestId}/inventory-details`);
+      setCheckoutInventoryDetails(res.data);
+      setCheckoutInventoryModal(checkoutRequestId);
+    } catch (error) {
+      console.error("Failed to fetch inventory details:", error);
+      alert(`Failed to load inventory details: ${error.response?.data?.detail || error.message}`);
+    }
+  };
+  
+  const handleCompleteCheckoutRequest = async (checkoutRequestId, notes) => {
+    try {
+      await api.post(`/bill/checkout-request/${checkoutRequestId}/check-inventory`, null, {
+        params: { inventory_notes: notes || "" }
+      });
+      alert("Checkout request completed successfully!");
+      setCheckoutInventoryModal(null);
+      setCheckoutInventoryDetails(null);
+      fetchServiceRequests();
+    } catch (error) {
+      console.error("Failed to complete checkout request:", error);
+      alert(`Failed to complete checkout request: ${error.response?.data?.detail || error.message}`);
     }
   };
 
@@ -991,34 +1041,63 @@ const Services = () => {
       return;
     }
     
-    // Show service selection dialog
-    const serviceOptions = services.map(s => `${s.id}: ${s.name}`).join('\n');
-    const selectedServiceId = window.prompt(
-      `Select a service to assign to Room ${request.room_number || request.room_id}:\n\n${serviceOptions}\n\nEnter service ID:`
-    );
-    
-    if (!selectedServiceId) return;
-    
-    const serviceId = parseInt(selectedServiceId);
-    const selectedService = services.find(s => s.id === serviceId);
-    
-    if (!selectedService) {
-      alert("Invalid service ID");
+    if (employees.length === 0) {
+      alert("No employees available. Please add employees first.");
       return;
     }
-
-    // Auto-fill assign form
-    setAssignForm({
-      service_id: serviceId.toString(),
-      employee_id: request.employee_id ? request.employee_id.toString() : "",
-      room_id: request.room_id.toString(),
-      status: "pending",
-    });
-    setSelectedServiceDetails(selectedService);
-    setActiveTab("assign");
     
-    // Scroll to top
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    // Automatically find and select "delivery" service
+    const deliveryService = services.find(s => 
+      s.name.toLowerCase().includes("delivery") || s.name.toLowerCase() === "delivery"
+    );
+    
+    // Open modal with only employee selection (delivery service is auto-selected)
+    setQuickAssignModal({
+      request: request,
+      employeeId: request.employee_id ? request.employee_id.toString() : "",
+    });
+  };
+
+  const handleQuickAssignSubmit = async () => {
+    if (!quickAssignModal) return;
+    
+    if (!quickAssignModal.employeeId) {
+      alert("Please select an employee");
+      return;
+    }
+    
+    // Automatically find delivery service
+    const deliveryService = services.find(s => 
+      s.name.toLowerCase().includes("delivery") || s.name.toLowerCase() === "delivery"
+    );
+    
+    if (!deliveryService) {
+      alert("Delivery service not found. Please create a delivery service first.");
+      return;
+    }
+    
+    try {
+      const payload = {
+        service_id: deliveryService.id,
+        employee_id: parseInt(quickAssignModal.employeeId),
+        room_id: parseInt(quickAssignModal.request.room_id),
+      };
+
+      const response = await api.post("/services/assign", payload);
+      alert("Service assigned successfully!");
+      setQuickAssignModal(null);
+      fetchServiceRequests();
+      fetchAll();
+    } catch (err) {
+      console.error("Failed to assign service", err);
+      let errorMsg = "Failed to assign service. ";
+      if (err.response?.data?.detail) {
+        errorMsg = err.response.data.detail;
+      } else if (err.message) {
+        errorMsg += err.message;
+      }
+      alert(`Error: ${errorMsg}`);
+    }
   };
 
   return (
@@ -1414,6 +1493,242 @@ const Services = () => {
                 </div>
               </Card>
             </div>
+
+            {/* Service Requests Section */}
+            <Card title={`Service Requests (${serviceRequests.length})`}>
+              <div className="mb-4 flex justify-between items-center">
+                <div className="flex gap-2">
+                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800">
+                    Pending: {serviceRequests.filter(r => r.status === 'pending').length}
+                  </span>
+                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                    In Progress: {serviceRequests.filter(r => r.status === 'in_progress').length}
+                  </span>
+                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800">
+                    Inventory Checked: {serviceRequests.filter(r => r.status === 'inventory_checked').length}
+                  </span>
+                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                    Completed: {serviceRequests.filter(r => r.status === 'completed').length}
+                  </span>
+                  <span className="px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800">
+                    Checkout Requests: {serviceRequests.filter(r => r.is_checkout_request || r.id > 1000000).length}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setActiveTab("requests")}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-medium"
+                >
+                  View All Requests
+                </button>
+              </div>
+              {loading ? (
+                <div className="flex justify-center items-center h-48">
+                  <Loader2 size={48} className="animate-spin text-indigo-500" />
+                </div>
+              ) : serviceRequests.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No service requests found
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-gray-200 rounded-lg">
+                    <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider">
+                      <tr>
+                        <th className="py-3 px-4 text-left">ID</th>
+                        <th className="py-3 px-4 text-left">Room</th>
+                        <th className="py-3 px-4 text-left">Food Order</th>
+                        <th className="py-3 px-4 text-left">Request Type</th>
+                        <th className="py-3 px-4 text-left">Description</th>
+                        <th className="py-3 px-4 text-left">Employee</th>
+                        <th className="py-3 px-4 text-left">Status</th>
+                        <th className="py-3 px-4 text-left">Avg. Completion Time</th>
+                        <th className="py-3 px-4 text-left">Created At</th>
+                        <th className="py-3 px-4 text-left">Completed At</th>
+                        <th className="py-3 px-4 text-left">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {serviceRequests.sort((a, b) => {
+                        // Sort: pending first, then in_progress, then others
+                        const statusOrder = { 'pending': 0, 'in_progress': 1, 'inventory_checked': 2, 'completed': 3, 'cancelled': 4 };
+                        const aOrder = statusOrder[a.status] ?? 5;
+                        const bOrder = statusOrder[b.status] ?? 5;
+                        if (aOrder !== bOrder) return aOrder - bOrder;
+                        // If same status, sort by created_at (newest first)
+                        return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+                      }).map((request, idx) => {
+                        const isCheckoutRequest = request.is_checkout_request || request.id > 1000000;
+                        const checkoutRequestId = isCheckoutRequest ? (request.checkout_request_id || request.id - 1000000) : null;
+                        
+                        return (
+                        <tr key={request.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors ${isCheckoutRequest ? 'bg-yellow-50' : ''}`}>
+                          <td className="p-3 border-t border-gray-200">
+                            #{isCheckoutRequest ? checkoutRequestId : request.id}
+                            {isCheckoutRequest && <span className="ml-2 text-xs text-yellow-600">(Checkout)</span>}
+                          </td>
+                          <td className="p-3 border-t border-gray-200">
+                            {request.room_number ? `Room ${request.room_number}` : `Room ID: ${request.room_id}`}
+                            {isCheckoutRequest && request.guest_name && (
+                              <div className="text-xs text-gray-600 mt-1">Guest: {request.guest_name}</div>
+                            )}
+                          </td>
+                          <td className="p-3 border-t border-gray-200">
+                            {request.request_type === "cleaning" ? (
+                              <span className="text-sm text-orange-600 font-medium">🧹 Cleaning Service</span>
+                            ) : request.request_type === "refill" ? (
+                              <span className="text-sm text-purple-600 font-medium">🔄 Refill Service</span>
+                            ) : isCheckoutRequest ? (
+                              <span className="text-sm text-gray-600">Checkout Verification</span>
+                            ) : (
+                              <div className="text-sm">
+                                {request.food_order_id ? (
+                                  <>
+                                    <div>Order #{request.food_order_id}</div>
+                                    {request.food_order_amount && (
+                                      <div className="text-gray-600">₹{request.food_order_amount.toFixed(2)}</div>
+                                    )}
+                                    {request.food_order_status && (
+                                      <span className={`px-2 py-1 rounded text-xs ${
+                                        request.food_order_status === 'completed' ? 'bg-green-100 text-green-800' :
+                                        request.food_order_status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                        'bg-gray-100 text-gray-800'
+                                      }`}>
+                                        {request.food_order_status}
+                                      </span>
+                                    )}
+                                  </>
+                                ) : (
+                                  <span className="text-gray-400 text-xs">No food order</span>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3 border-t border-gray-200">
+                            <span className={`px-2 py-1 rounded text-xs capitalize ${
+                              request.request_type === "cleaning" ? 'bg-orange-100 text-orange-800' :
+                              request.request_type === "refill" ? 'bg-purple-100 text-purple-800' :
+                              isCheckoutRequest ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {request.request_type === "cleaning" ? "🧹 cleaning" :
+                               request.request_type === "refill" ? "🔄 refill" :
+                               isCheckoutRequest ? 'checkout_verification' : (request.request_type || 'delivery')}
+                            </span>
+                          </td>
+                          <td className="p-3 border-t border-gray-200">
+                            <div className="max-w-xs truncate" title={request.description}>
+                              {request.description || '-'}
+                            </div>
+                          </td>
+                          <td className="p-3 border-t border-gray-200">
+                            {request.employee_name || request.employee_id ? (
+                              <span className="text-sm">{request.employee_name || `Employee #${request.employee_id}`}</span>
+                            ) : (
+                              <span className="text-gray-400 text-sm">Not assigned</span>
+                            )}
+                          </td>
+                          <td className="p-3 border-t border-gray-200">
+                            {isCheckoutRequest ? (
+                              <span className={`px-2 py-1 rounded text-xs font-medium ${
+                                request.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {request.status || 'pending'}
+                              </span>
+                            ) : (
+                              <select
+                                value={request.status}
+                                onChange={(e) => handleUpdateRequestStatus(request.id, e.target.value)}
+                                className={`border p-2 rounded-lg bg-white text-sm ${
+                                  request.status === 'completed' ? 'bg-green-50' :
+                                  request.status === 'in_progress' ? 'bg-yellow-50' :
+                                  request.status === 'cancelled' ? 'bg-red-50' :
+                                  'bg-gray-50'
+                                }`}
+                              >
+                                <option value="pending">Pending</option>
+                                <option value="in_progress">In Progress</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                              </select>
+                            )}
+                          </td>
+                          <td className="p-3 border-t border-gray-200 text-sm">
+                            {request.service?.average_completion_time ? (
+                              <span className="text-indigo-600 font-medium">{request.service.average_completion_time}</span>
+                            ) : (
+                              <span className="text-gray-400 italic">-</span>
+                            )}
+                          </td>
+                          <td className="p-3 border-t border-gray-200 text-sm">
+                            {request.created_at ? new Date(request.created_at).toLocaleString() : '-'}
+                          </td>
+                          <td className="p-3 border-t border-gray-200 text-sm">
+                            {request.completed_at ? (
+                              <span className="text-green-600">
+                                {new Date(request.completed_at).toLocaleString()}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="p-3 border-t border-gray-200">
+                            <div className="flex gap-2">
+                              {isCheckoutRequest ? (
+                                <>
+                                  {(request.status === "pending" || request.status === "in_progress" || request.status === "inventory_checked") ? (
+                                    <button
+                                      onClick={() => handleViewCheckoutInventory(checkoutRequestId)}
+                                      className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                                      title="View inventory details and verify"
+                                    >
+                                      ✓ Verify Inventory
+                                    </button>
+                                  ) : request.status === "completed" ? (
+                                    <span className="px-3 py-1 rounded text-sm font-medium bg-green-100 text-green-800">
+                                      ✓ Completed
+                                    </span>
+                                  ) : null}
+                                </>
+                              ) : (
+                                <>
+                                  {request.status === "pending" && !request.employee_id && !request.employee_name && (
+                                    <button
+                                      onClick={() => handleQuickAssignFromRequest(request)}
+                                      className="px-3 py-1 rounded text-sm font-medium bg-green-500 hover:bg-green-600 text-white"
+                                      title="Quick assign service to this room"
+                                    >
+                                      Assign Service
+                                    </button>
+                                  )}
+                                  {request.employee_id || request.employee_name ? (
+                                    <span className="text-sm text-gray-600">
+                                      {request.employee_name || `Employee #${request.employee_id}`}
+                                    </span>
+                                  ) : null}
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                      })}
+                    </tbody>
+                  </table>
+                  {serviceRequests.length > 10 && (
+                    <div className="mt-4 text-center">
+                      <button
+                        onClick={() => setActiveTab("requests")}
+                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-medium"
+                      >
+                        View All {serviceRequests.length} Requests →
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </Card>
           </div>
         )}
 
@@ -2467,37 +2782,75 @@ const Services = () => {
                 <tbody>
                   {serviceRequests.length === 0 ? (
                     <tr>
-                      <td colSpan="10" className="py-8 text-center text-gray-500">
+                      <td colSpan="11" className="py-8 text-center text-gray-500">
                         No service requests found
                       </td>
                     </tr>
                   ) : (
-                    serviceRequests.map((request, idx) => (
-                      <tr key={request.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors`}>
-                        <td className="p-3 border-t border-gray-200">#{request.id}</td>
+                    serviceRequests.sort((a, b) => {
+                      // Sort: pending first, then in_progress, then others
+                      const statusOrder = { 'pending': 0, 'in_progress': 1, 'inventory_checked': 2, 'completed': 3, 'cancelled': 4 };
+                      const aOrder = statusOrder[a.status] ?? 5;
+                      const bOrder = statusOrder[b.status] ?? 5;
+                      if (aOrder !== bOrder) return aOrder - bOrder;
+                      // If same status, sort by created_at (newest first)
+                      return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+                    }).map((request, idx) => {
+                      const isCheckoutRequest = request.is_checkout_request || request.id > 1000000;
+                      const checkoutRequestId = isCheckoutRequest ? (request.checkout_request_id || request.id - 1000000) : null;
+                      
+                      return (
+                      <tr key={request.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors ${isCheckoutRequest ? 'bg-yellow-50' : ''}`}>
+                        <td className="p-3 border-t border-gray-200">
+                          #{isCheckoutRequest ? checkoutRequestId : request.id}
+                          {isCheckoutRequest && <span className="ml-2 text-xs text-yellow-600">(Checkout)</span>}
+                        </td>
                         <td className="p-3 border-t border-gray-200">
                           {request.room_number ? `Room ${request.room_number}` : `Room ID: ${request.room_id}`}
+                          {isCheckoutRequest && request.guest_name && (
+                            <div className="text-xs text-gray-600 mt-1">Guest: {request.guest_name}</div>
+                          )}
                         </td>
                         <td className="p-3 border-t border-gray-200">
-                          <div className="text-sm">
-                            <div>Order #{request.food_order_id}</div>
-                            {request.food_order_amount && (
-                              <div className="text-gray-600">${request.food_order_amount.toFixed(2)}</div>
-                            )}
-                            {request.food_order_status && (
-                              <span className={`px-2 py-1 rounded text-xs ${
-                                request.food_order_status === 'completed' ? 'bg-green-100 text-green-800' :
-                                request.food_order_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
-                                {request.food_order_status}
-                              </span>
-                            )}
-                          </div>
+                          {request.request_type === "cleaning" ? (
+                            <span className="text-sm text-orange-600 font-medium">🧹 Cleaning Service</span>
+                          ) : request.request_type === "refill" ? (
+                            <span className="text-sm text-purple-600 font-medium">🔄 Refill Service</span>
+                          ) : isCheckoutRequest ? (
+                            <span className="text-sm text-gray-600">Checkout Verification</span>
+                          ) : (
+                            <div className="text-sm">
+                              {request.food_order_id ? (
+                                <>
+                                  <div>Order #{request.food_order_id}</div>
+                                  {request.food_order_amount && (
+                                    <div className="text-gray-600">₹{request.food_order_amount.toFixed(2)}</div>
+                                  )}
+                                  {request.food_order_status && (
+                                    <span className={`px-2 py-1 rounded text-xs ${
+                                      request.food_order_status === 'completed' ? 'bg-green-100 text-green-800' :
+                                      request.food_order_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {request.food_order_status}
+                                    </span>
+                                  )}
+                                </>
+                              ) : (
+                                <span className="text-gray-400 text-xs">No food order</span>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="p-3 border-t border-gray-200">
-                          <span className="px-2 py-1 rounded text-xs bg-blue-100 text-blue-800 capitalize">
-                            {request.request_type || 'delivery'}
+                          <span className={`px-2 py-1 rounded text-xs capitalize ${
+                            request.request_type === "cleaning" ? 'bg-orange-100 text-orange-800' :
+                            request.request_type === "refill" ? 'bg-purple-100 text-purple-800' :
+                            isCheckoutRequest ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {request.request_type === "cleaning" ? "🧹 cleaning" :
+                             request.request_type === "refill" ? "🔄 refill" :
+                             isCheckoutRequest ? 'checkout_verification' : (request.request_type || 'delivery')}
                           </span>
                         </td>
                         <td className="p-3 border-t border-gray-200">
@@ -2506,42 +2859,39 @@ const Services = () => {
                           </div>
                         </td>
                         <td className="p-3 border-t border-gray-200">
-                          {request.employee_name ? (
-                            <span>{request.employee_name}</span>
+                          {request.employee_name || request.employee_id ? (
+                            <span className="text-sm">{request.employee_name || `Employee #${request.employee_id}`}</span>
                           ) : (
-                            <select
-                              value={request.employee_id || ""}
-                              onChange={(e) => {
-                                const empId = e.target.value ? parseInt(e.target.value) : null;
-                                handleAssignEmployeeToRequest(request.id, empId);
-                              }}
-                              className="border p-2 rounded-lg bg-white text-sm"
-                            >
-                              <option value="">Assign Employee</option>
-                              {employees.map((emp) => (
-                                <option key={emp.id} value={emp.id}>
-                                  {emp.name}
-                                </option>
-                              ))}
-                            </select>
+                            <span className="text-gray-400 text-sm">Not assigned</span>
                           )}
                         </td>
                         <td className="p-3 border-t border-gray-200">
-                          <select
-                            value={request.status}
-                            onChange={(e) => handleUpdateRequestStatus(request.id, e.target.value)}
-                            className={`border p-2 rounded-lg bg-white text-sm ${
-                              request.status === 'completed' ? 'bg-green-50' :
-                              request.status === 'in_progress' ? 'bg-yellow-50' :
-                              request.status === 'cancelled' ? 'bg-red-50' :
-                              'bg-gray-50'
-                            }`}
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
+                          {isCheckoutRequest ? (
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              request.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                              request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {request.status || 'pending'}
+                            </span>
+                          ) : (
+                            <select
+                              value={request.status}
+                              onChange={(e) => handleUpdateRequestStatus(request.id, e.target.value)}
+                              className={`border p-2 rounded-lg bg-white text-sm ${
+                                request.status === 'completed' ? 'bg-green-50' :
+                                request.status === 'in_progress' ? 'bg-yellow-50' :
+                                request.status === 'cancelled' ? 'bg-red-50' :
+                                'bg-gray-50'
+                              }`}
+                            >
+                              <option value="pending">Pending</option>
+                              <option value="in_progress">In Progress</option>
+                              <option value="completed">Completed</option>
+                              <option value="cancelled">Cancelled</option>
+                            </select>
+                          )}
                         </td>
                         <td className="p-3 border-t border-gray-200 text-sm">
                           {/* Average completion time would come from assigned service if any */}
@@ -2565,25 +2915,46 @@ const Services = () => {
                         </td>
                         <td className="p-3 border-t border-gray-200">
                           <div className="flex gap-2">
-                            {request.status === "pending" && (
-                              <button
-                                onClick={() => handleQuickAssignFromRequest(request)}
-                                className="px-3 py-1 rounded text-sm font-medium bg-green-500 hover:bg-green-600 text-white"
-                                title="Quick assign service to this room"
-                              >
-                                Assign Service
-                              </button>
+                            {isCheckoutRequest ? (
+                              <>
+                                {(request.status === "pending" || request.status === "in_progress" || request.status === "inventory_checked") ? (
+                                  <button
+                                    onClick={() => handleViewCheckoutInventory(checkoutRequestId)}
+                                    className="px-4 py-2 rounded-lg text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-200"
+                                    title="View inventory details and verify"
+                                  >
+                                    ✓ Verify Inventory
+                                  </button>
+                                ) : request.status === "completed" ? (
+                                  <span className="px-3 py-1 rounded text-sm font-medium bg-green-100 text-green-800">
+                                    ✓ Completed
+                                  </span>
+                                ) : null}
+                              </>
+                            ) : (
+                              <>
+                                {request.status === "pending" && (
+                                  <button
+                                    onClick={() => handleQuickAssignFromRequest(request)}
+                                    className="px-3 py-1 rounded text-sm font-medium bg-green-500 hover:bg-green-600 text-white"
+                                    title="Quick assign service to this room"
+                                  >
+                                    Assign Service
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => handleDeleteRequest(request.id)}
+                                  className="px-3 py-1 rounded text-sm font-medium bg-red-500 hover:bg-red-600 text-white"
+                                >
+                                  Delete
+                                </button>
+                              </>
                             )}
-                            <button
-                              onClick={() => handleDeleteRequest(request.id)}
-                              className="px-3 py-1 rounded text-sm font-medium bg-red-500 hover:bg-red-600 text-white"
-                            >
-                              Delete
-                            </button>
                           </div>
                         </td>
                       </tr>
-                    ))
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -2592,6 +2963,84 @@ const Services = () => {
         </Card>
           </div>
         )}
+
+      {/* Quick Assign Service Modal */}
+      {quickAssignModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-2xl font-bold text-gray-800">Assign Service</h2>
+                <button
+                  onClick={() => setQuickAssignModal(null)}
+                  className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
+                >
+                  ×
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Room
+                  </label>
+                  <input
+                    type="text"
+                    value={`Room ${quickAssignModal.request.room_number || quickAssignModal.request.room_id}`}
+                    disabled
+                    className="w-full border p-3 rounded-lg bg-gray-100 text-gray-600"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Service
+                  </label>
+                  <input
+                    type="text"
+                    value="Delivery"
+                    disabled
+                    className="w-full border p-3 rounded-lg bg-gray-100 text-gray-600"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Select Employee <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={quickAssignModal.employeeId}
+                    onChange={(e) => setQuickAssignModal({ ...quickAssignModal, employeeId: e.target.value })}
+                    className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-indigo-400"
+                  >
+                    <option value="">-- Select Employee --</option>
+                    {employees.map((employee) => (
+                      <option key={employee.id} value={employee.id}>
+                        {employee.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  onClick={() => setQuickAssignModal(null)}
+                  className="px-6 py-2 rounded-lg text-sm font-medium bg-gray-200 hover:bg-gray-300 text-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleQuickAssignSubmit}
+                  className="px-6 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white"
+                >
+                  Assign Service
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* View Assigned Service Modal */}
       {viewingAssignedService && (
@@ -2828,19 +3277,21 @@ const Services = () => {
 
               <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                 <p className="text-gray-700 font-semibold mb-2">
-                  ⚠️ Return Only Used Items
+                  📦 Return Balance Inventory Items
                 </p>
                 <p className="text-sm text-gray-600">
-                  Only items that were actually <strong>used</strong> in this service can be returned. 
-                  Return quantity cannot exceed the quantity used. All returns will be tracked with transparent transactions.
+                  Return unused inventory items (balance) that were assigned but not used in this service. 
+                  Return quantity cannot exceed the balance quantity. All returns will be added back to inventory stock.
                 </p>
               </div>
 
               <div className="space-y-4 mb-6">
                 {inventoryAssignments.map((assignment) => {
                   const balance = assignment.balance_quantity || 0;
+                  const assignedQty = assignment.quantity_assigned || 0;
                   const usedQty = assignment.quantity_used || 0;
-                  const maxReturnable = Math.min(balance, usedQty); // Cannot return more than used
+                  const alreadyReturned = assignment.quantity_returned || 0;
+                  const maxReturnable = balance; // Can return all balance (unused) items
                   return (
                     <div key={assignment.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                       <div className="flex justify-between items-start mb-2">
@@ -2855,29 +3306,32 @@ const Services = () => {
                         </div>
                         <div className="text-right">
                           <p className="text-sm text-gray-600">
-                            Assigned: {assignment.quantity_assigned} {assignment.item?.unit || 'pcs'}
+                            Assigned: {assignedQty} {assignment.item?.unit || 'pcs'}
                           </p>
                           <p className="text-sm font-semibold text-green-600">
                             Used: {usedQty} {assignment.item?.unit || 'pcs'}
                           </p>
                           <p className="text-sm text-gray-600">
-                            Already Returned: {assignment.quantity_returned} {assignment.item?.unit || 'pcs'}
+                            Already Returned: {alreadyReturned} {assignment.item?.unit || 'pcs'}
                           </p>
-                          <p className="text-sm font-semibold text-blue-600">
+                          <p className="text-sm font-semibold text-orange-600">
+                            Balance (Unused): {balance} {assignment.item?.unit || 'pcs'}
+                          </p>
+                          <p className="text-sm font-semibold text-blue-600 mt-1">
                             Max Returnable: {maxReturnable} {assignment.item?.unit || 'pcs'}
                           </p>
                         </div>
                       </div>
                       <div className="mt-3">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Quantity to Return (from used items only):
+                          Quantity to Return (balance/unused items):
                         </label>
                         <input
                           type="number"
                           min="0"
                           max={maxReturnable}
                           step="0.01"
-                          value={returnQuantities[assignment.id] !== undefined ? returnQuantities[assignment.id] : maxReturnable}
+                          value={returnQuantities[assignment.id] !== undefined ? returnQuantities[assignment.id] : 0}
                           onChange={(e) => {
                             const inputValue = e.target.value;
                             // Allow empty string for deletion
@@ -2898,7 +3352,7 @@ const Services = () => {
                               });
                               return;
                             }
-                            // Validate: cannot exceed used quantity or balance
+                            // Validate: cannot exceed balance quantity
                             const clampedVal = Math.max(0, Math.min(val, maxReturnable));
                             setReturnQuantities({
                               ...returnQuantities,
@@ -2924,11 +3378,16 @@ const Services = () => {
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          Maximum returnable: {maxReturnable} {assignment.item?.unit || 'pcs'} (based on used quantity)
+                          Maximum returnable: {maxReturnable} {assignment.item?.unit || 'pcs'} (based on balance/unused quantity)
                         </p>
-                        {usedQty === 0 && (
-                          <p className="text-xs text-red-600 mt-1 font-semibold">
-                            ⚠️ No items were used - nothing to return
+                        {balance > 0 && (
+                          <p className="text-xs text-blue-600 mt-1 font-semibold">
+                            ✓ {balance} {assignment.item?.unit || 'pcs'} available to return (unused items)
+                          </p>
+                        )}
+                        {balance === 0 && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            No balance items to return (all items were used or already returned)
                           </p>
                         )}
                       </div>
@@ -2949,6 +3408,29 @@ const Services = () => {
                   Cancel
                 </button>
                 <button
+                  onClick={async () => {
+                    // Complete without returns
+                    if (!completingServiceId) return;
+                    try {
+                      await api.patch(`/services/assigned/${completingServiceId}`, {
+                        status: "completed",
+                        inventory_returns: null
+                      });
+                      setCompletingServiceId(null);
+                      setInventoryAssignments([]);
+                      setReturnQuantities({});
+                      fetchAll();
+                      alert("Service marked as completed without returning inventory items.");
+                    } catch (error) {
+                      console.error("Failed to complete service:", error);
+                      alert(`Failed to complete service: ${error.response?.data?.detail || error.message}`);
+                    }
+                  }}
+                  className="px-6 py-2 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  Complete Without Returns
+                </button>
+                <button
                   onClick={handleCompleteWithReturns}
                   className="px-6 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white"
                 >
@@ -2960,6 +3442,86 @@ const Services = () => {
         </div>
       )}
       </div>
+      {/* Checkout Inventory Verification Modal */}
+      {checkoutInventoryModal && checkoutInventoryDetails && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <h2 className="text-2xl font-bold mb-4">Checkout Inventory Verification</h2>
+            <div className="mb-4">
+              <p><strong>Room:</strong> {checkoutInventoryDetails.room_number}</p>
+              <p><strong>Guest:</strong> {checkoutInventoryDetails.guest_name}</p>
+              {checkoutInventoryDetails.location_name && (
+                <p><strong>Location:</strong> {checkoutInventoryDetails.location_name}</p>
+              )}
+            </div>
+            
+            {checkoutInventoryDetails.items && checkoutInventoryDetails.items.length > 0 ? (
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold mb-2">Current Inventory Items:</h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-gray-200">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-4 py-2 text-left">Item Name</th>
+                        <th className="px-4 py-2 text-center">Complimentary</th>
+                        <th className="px-4 py-2 text-center">Payable</th>
+                        <th className="px-4 py-2 text-center">Total Quantity</th>
+                        <th className="px-4 py-2 text-right">Stock Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {checkoutInventoryDetails.items.map((item, idx) => (
+                        <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                          <td className="px-4 py-2">{item.name}</td>
+                          <td className="px-4 py-2 text-center text-green-600">{item.complimentary_qty || 0}</td>
+                          <td className="px-4 py-2 text-center text-red-600">{item.payable_qty || 0}</td>
+                          <td className="px-4 py-2 text-center">{item.current_stock || 0}</td>
+                          <td className="px-4 py-2 text-right">₹{item.stock_value || 0}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div className="mb-4 text-gray-500">
+                {checkoutInventoryDetails.message || "No inventory items found"}
+              </div>
+            )}
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-2">Inventory Verification Notes (Optional):</label>
+              <textarea
+                id="inventory-notes"
+                className="w-full border p-2 rounded-lg"
+                rows="3"
+                placeholder="Add any notes about inventory verification..."
+              />
+            </div>
+            
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setCheckoutInventoryModal(null);
+                  setCheckoutInventoryDetails(null);
+                }}
+                className="px-4 py-2 bg-gray-300 hover:bg-gray-400 text-gray-700 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const notes = document.getElementById('inventory-notes')?.value || '';
+                  handleCompleteCheckoutRequest(checkoutInventoryModal, notes);
+                }}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+              >
+                Complete Verification
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 };

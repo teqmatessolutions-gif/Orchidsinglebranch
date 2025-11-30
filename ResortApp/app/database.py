@@ -47,7 +47,7 @@ if SQLALCHEMY_DATABASE_URL and not SQLALCHEMY_DATABASE_URL.startswith("sqlite"):
     connect_args = {
         "sslmode": "disable",  # Disable SSL for local connections
         "connect_timeout": 10,  # Connection timeout in seconds
-        "options": "-c statement_timeout=30000"  # 30 second statement timeout
+        "options": "-c statement_timeout=60000"  # 60 second statement timeout (increased for large queries)
     }
 else:
     connect_args = {"check_same_thread": False}
@@ -67,3 +67,12 @@ engine = create_engine(
 )
 SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()
+
+
+def get_db():
+    """Dependency for getting database session"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

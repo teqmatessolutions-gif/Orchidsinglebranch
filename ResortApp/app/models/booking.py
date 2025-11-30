@@ -20,6 +20,7 @@ class Booking(Base):
     guest_photo_url = Column(String, nullable=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     total_amount = Column(Float, default=0.0)
+    advance_deposit = Column(Float, default=0.0)  # Advance payment made during booking
     # Relationships
     checkout = relationship("Checkout", back_populates="booking", uselist=False)
     user = relationship("User", back_populates="bookings")

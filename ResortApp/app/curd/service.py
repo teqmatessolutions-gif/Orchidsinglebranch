@@ -18,7 +18,8 @@ def create_service(
     charges: float,
     image_urls: List[str] = None,
     inventory_items: Optional[List[ServiceInventoryItemBase]] = None,
-    is_visible_to_guest: bool = False
+    is_visible_to_guest: bool = False,
+    average_completion_time: Optional[str] = None
 ):
     """
     Create a new service with optional images and inventory items.
@@ -34,6 +35,7 @@ def create_service(
             description=description,
             charges=charges,
             is_visible_to_guest=is_visible_to_guest,
+            average_completion_time=average_completion_time
         )
         db.add(db_service)
         db.commit()
@@ -179,6 +181,8 @@ def update_service(
         service.description = description
         service.charges = charges
         service.is_visible_to_guest = is_visible_to_guest
+        if average_completion_time is not None:
+            service.average_completion_time = average_completion_time
 
         # Remove selected images
         if images_to_remove:
@@ -545,54 +549,24 @@ def create_assigned_service(db: Session, assigned: AssignedServiceCreate):
 
 def get_assigned_services(db: Session, skip: int = 0, limit: int = 100):
     """
-    Get assigned services, but only for rooms that have checked-in bookings.
-    This ensures only active (checked-in) rooms are shown in the assigned services table.
+    Get assigned services - ultra-simplified version for maximum performance.
     """
     try:
-        today = date.today()
+        # Cap limit to prevent performance issues
+        if limit > 200:
+            limit = 200
+        if limit < 1:
+            limit = 20
         
-        # Find all room IDs that have checked-in bookings (regular or package)
-        checked_in_room_ids = set()
-        
-        try:
-            # Get rooms with checked-in regular bookings
-            regular_checked_in = db.query(BookingRoom.room_id).join(Booking).filter(
-                Booking.status.in_(['checked-in', 'checked_in']),
-                Booking.check_in <= today,
-                Booking.check_out > today
-            ).all()
-            checked_in_room_ids.update([r.room_id for r in regular_checked_in if r.room_id])
-        except Exception as e:
-            print(f"[WARNING] Error fetching regular checked-in bookings: {str(e)}")
-        
-        try:
-            # Get rooms with checked-in package bookings
-            package_checked_in = db.query(PackageBookingRoom.room_id).join(PackageBooking).filter(
-                PackageBooking.status.in_(['checked-in', 'checked_in']),
-                PackageBooking.check_in <= today,
-                PackageBooking.check_out > today
-            ).all()
-            checked_in_room_ids.update([r.room_id for r in package_checked_in if r.room_id])
-        except Exception as e:
-            print(f"[WARNING] Error fetching package checked-in bookings: {str(e)}")
-        
-        # If no checked-in rooms, return all assigned services (fallback)
-        if not checked_in_room_ids:
-            print("[INFO] No checked-in rooms found, returning all assigned services")
-            return db.query(AssignedService).options(
-                joinedload(AssignedService.service).joinedload(Service.images),
-                joinedload(AssignedService.employee),
-                joinedload(AssignedService.room)
-            ).offset(skip).limit(limit).all()
-        
-        # Return assigned services for checked-in rooms
-        return db.query(AssignedService).filter(
-            AssignedService.room_id.in_(list(checked_in_room_ids))
-        ).options(
-            joinedload(AssignedService.service).joinedload(Service.images),
+        # Ultra-simple query - minimal eager loading to avoid hangs
+        # Only load essential relationships
+        assigned_services = db.query(AssignedService).options(
+            joinedload(AssignedService.service),
             joinedload(AssignedService.employee),
             joinedload(AssignedService.room)
-        ).offset(skip).limit(limit).all()
+        ).order_by(AssignedService.id.desc()).offset(skip).limit(limit).all()
+        
+        return assigned_services
     except Exception as e:
         import traceback
         print(f"[ERROR] Error in get_assigned_services: {str(e)}")
@@ -614,8 +588,11 @@ def update_assigned_service_status(db: Session, assigned_id: int, update_data: A
     new_status = update_data.status.value if hasattr(update_data.status, 'value') else str(update_data.status)
     assigned.status = update_data.status
     
-    # If status changed to completed, handle inventory returns
+    # If status changed to completed, set completed time and handle inventory returns
     if new_status == "completed" and str(old_status) != "completed":
+        # Set completed time (last_used_at)
+        assigned.last_used_at = datetime.utcnow()
+        print(f"[DEBUG] Set completed time (last_used_at) for service {assigned_id}: {assigned.last_used_at}")
         try:
             from app.models.employee_inventory import EmployeeInventoryAssignment
             

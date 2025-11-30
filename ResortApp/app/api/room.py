@@ -313,6 +313,12 @@ def update_room_statuses_endpoint(db: Session = Depends(get_db)):
 def _get_rooms_impl(db: Session, skip: int = 0, limit: int = 20):
     """Helper function for get_rooms"""
     try:
+        # Optimized for low network - reduced to 50
+        if limit > 50:
+            limit = 50
+        if limit < 1:
+            limit = 20
+        
         # Test database connection first
         try:
             db.execute(text("SELECT 1"))

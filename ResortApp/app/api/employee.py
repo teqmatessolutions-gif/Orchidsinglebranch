@@ -87,6 +87,12 @@ def add_employee(
 
 def _list_employees_impl(db: Session, current_user: User, skip: int = 0, limit: int = 20):
     """Helper function for list_employees"""
+    # Cap limit to prevent performance issues
+    # Optimized for low network
+    if limit > 50:
+        limit = 50
+    if limit < 1:
+        limit = 20
     return crud_employee.get_employees(db, skip=skip, limit=limit)
 
 @router.get("", response_model=list[Employee])

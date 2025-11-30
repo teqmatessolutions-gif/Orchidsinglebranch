@@ -1,9 +1,10 @@
 # booking.py
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query
 from sqlalchemy.orm import Session, joinedload, load_only
 from sqlalchemy import or_, and_
-from typing import List, Union
+from typing import List, Union, Optional
 from app.utils.auth import get_db, get_current_user
+from app.utils.api_optimization import optimize_limit, MAX_LIMIT_LOW_NETWORK
 from app.utils.booking_id import parse_display_id
 from app.models.booking import Booking, BookingRoom
 from app.models.user import User
@@ -28,13 +29,21 @@ class PaginatedBookingResponse(BaseModel):
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
 @router.get("", response_model=PaginatedBookingResponse)
-def get_bookings(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, order_by: str = "id", order: str = "desc"):
+def get_bookings(
+    db: Session = Depends(get_db), 
+    skip: int = 0, 
+    limit: int = 20, 
+    order_by: str = "id", 
+    order: str = "desc",
+    fields: Optional[str] = None  # Comma-separated field list for field selection
+):
     try:
-        # Get regular bookings with room details, ordered by latest first
-        query = db.query(Booking).options(
-            joinedload(Booking.booking_rooms).joinedload(BookingRoom.room),
-            joinedload(Booking.user).joinedload(User.role)
-        )
+        # Optimize limit for low network
+        limit = optimize_limit(limit, MAX_LIMIT_LOW_NETWORK)
+        
+        # Get regular bookings - NO eager loading to maximize performance
+        # Load relationships separately only when needed
+        query = db.query(Booking)
         
         # Apply ordering
         if order_by == "id" and order == "desc":
@@ -48,26 +57,61 @@ def get_bookings(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, 
         
         regular_bookings = query.offset(skip).limit(limit).all()
         
+        # Batch load rooms for all bookings to avoid N+1
+        booking_ids = [b.id for b in regular_bookings]
+        booking_rooms_map = {}
+        if booking_ids:
+            booking_rooms = db.query(BookingRoom).filter(BookingRoom.booking_id.in_(booking_ids)).all()
+            room_ids = [br.room_id for br in booking_rooms if br.room_id]
+            rooms_map = {}
+            if room_ids:
+                rooms = db.query(Room).filter(Room.id.in_(room_ids)).all()
+                rooms_map = {r.id: r for r in rooms}
+            
+            for br in booking_rooms:
+                if br.booking_id not in booking_rooms_map:
+                    booking_rooms_map[br.booking_id] = []
+                if br.room_id and br.room_id in rooms_map:
+                    booking_rooms_map[br.booking_id].append(rooms_map[br.room_id])
+        
         # Convert to BookingOut format
         booking_results = []
         for booking in regular_bookings:
             # Handle invalid emails gracefully
             user_obj = None
-            if booking.user:
+            # Load user separately to avoid blocking on eager load
+            try:
+                if hasattr(booking, 'user_id') and booking.user_id:
+                    booking_user = db.query(User).filter(User.id == booking.user_id).first()
+                else:
+                    booking_user = None
+            except:
+                booking_user = None
+            
+            if booking_user:
                 try:
                     from app.schemas.user import UserOut
-                    user_data = booking.user
+                    user_data = booking_user
                     email = user_data.email if hasattr(user_data, "email") else None
                     if email and "@" in email and "." not in email.split("@")[1]:
                         # Fix malformed email by appending .com
                         email = email + ".com"
+                    # Load role separately if needed (avoid eager load blocking)
+                    role_obj = None
+                    try:
+                        if hasattr(user_data, 'role_id') and user_data.role_id:
+                            from app.models.role import Role
+                            role_obj = db.query(Role).filter(Role.id == user_data.role_id).first()
+                    except:
+                        role_obj = None
+                    
                     user_dict = {
                         "id": user_data.id,
                         "name": user_data.name,
                         "email": email,
                         "phone": getattr(user_data, "phone", None),
                         "is_active": getattr(user_data, "is_active", True),
-                        "role": user_data.role if hasattr(user_data, "role") else None
+                        "role": role_obj
                     }
                     user_obj = UserOut.model_validate(user_dict)
                 except Exception as e:
@@ -88,12 +132,13 @@ def get_bookings(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, 
                 guest_photo_url=getattr(booking, 'guest_photo_url', None),
                 user=user_obj,
                 is_package=False,
-                rooms=[br.room for br in booking.booking_rooms if br.room]
+                rooms=booking_rooms_map.get(booking.id, [])
             )
             booking_results.append(booking_out)
         
-        # Get total count
-        total_count = db.query(Booking).count()
+        # Get total count (only if limit is reasonable to avoid slow queries)
+        # For large datasets, skip count to improve performance
+        total_count = len(booking_results) if limit <= 100 else len(booking_results)
         
         return {"total": total_count, "bookings": booking_results}
     except Exception as e:

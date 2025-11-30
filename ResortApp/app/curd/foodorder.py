@@ -62,19 +62,44 @@ def create_food_order(db: Session, order_data: FoodOrderCreate):
         db.add(item)
     db.commit()
     db.refresh(order)
+    
+    # Create service request immediately for room service orders
+    if order.order_type == "room_service":
+        # Check if service request already exists
+        existing_request = db.query(ServiceRequest).filter(
+            ServiceRequest.food_order_id == order.id
+        ).first()
+        if not existing_request:
+            service_request = ServiceRequest(
+                food_order_id=order.id,
+                room_id=order.room_id,
+                employee_id=order.assigned_employee_id,
+                request_type="delivery",
+                description=order.delivery_request or f"Room service delivery for food order #{order.id}",
+                status="pending"
+            )
+            db.add(service_request)
+            db.commit()
+    
     return order
 
 def get_food_orders(db: Session, skip: int = 0, limit: int = 100):
-    orders = db.query(FoodOrder).offset(skip).limit(limit).all()
-    for order in orders:
-        for item in order.items:
-            item.food_item_name = item.food_item.name if item.food_item else "Unknown"
-        # Add guest_name by looking up active bookings for the room
-        if hasattr(order, 'room_id') and order.room_id:
-            guest_name = get_guest_for_room(order.room_id, db)
-            if guest_name:
-                order.guest_name = guest_name
-    return orders
+    # Cap limit to prevent performance issues
+    if limit > 200:
+        limit = 200
+    if limit < 1:
+        limit = 20
+    
+    # Ultra-simple query - no eager loading, no complex joins
+    # Just get the orders and return them - let the API layer handle serialization
+    try:
+        orders = db.query(FoodOrder).order_by(FoodOrder.id.desc()).offset(skip).limit(limit).all()
+        return orders
+    except Exception as e:
+        print(f"[ERROR] Error in get_food_orders: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return []
 
 def delete_food_order(db: Session, order_id: int):
     order = db.query(FoodOrder).filter(FoodOrder.id == order_id).first()

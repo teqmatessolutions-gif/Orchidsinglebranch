@@ -27,6 +27,7 @@ class Service(Base):
     description = Column(String, nullable=True)
     charges = Column(Float, nullable=False)
     is_visible_to_guest = Column(Boolean, default=False, nullable=False)  # Toggle for guest visibility
+    average_completion_time = Column(String, nullable=True)  # e.g., "30 minutes", "1 hour"
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships

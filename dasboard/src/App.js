@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import Login from "./pages/Login.jsx";
 import { ProtectedRoute } from "./layout/DashboardLayout";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -127,6 +127,10 @@ function App() {
               <Account />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/accounting"
+          element={<Navigate to="/account" replace />}
         />
         <Route
           path="/Userfrontend_data"

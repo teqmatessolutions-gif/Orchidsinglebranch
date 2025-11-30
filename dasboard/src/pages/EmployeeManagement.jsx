@@ -9,6 +9,7 @@ import { LineChart, Line, Tooltip, ResponsiveContainer } from "recharts";
 import CountUp from "react-countup";
 import BannerMessage from "../components/BannerMessage";
 import { getMediaBaseUrl } from "../utils/env";
+import { formatDateIST, formatDateTimeIST } from "../utils/dateUtils";
 
 const UserHistory = () => {
   const [users, setUsers] = useState([]);
@@ -533,7 +534,7 @@ const AttendanceTracking = () => {
                           onClick={() => setSelectedDay(selectedDay === day.date ? null : day.date)}
                         >
                           <td className="py-3 px-4 font-medium text-gray-800">
-                            {new Date(day.date).toLocaleDateString('en-US', { 
+                            {formatDateIST(day.date, {
                               weekday: 'short', 
                               year: 'numeric', 
                               month: 'short', 

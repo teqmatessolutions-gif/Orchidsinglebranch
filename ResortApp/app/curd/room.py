@@ -107,19 +107,22 @@ def calculate_bill_for_room(db: Session, room_number: str):
         # Regular booking
         stay_duration = (booking.check_out - booking.check_in).days
         charges.room_charges = room.price * stay_duration
-        charges.food_charges = sum(
-            order.amount for order in db.query(FoodOrder).filter(
-                FoodOrder.room_id == room.id,
-                FoodOrder.billing_status == "unbilled"
-            ).all()
-        )
-        # Corrected: Access the 'charges' attribute from the related 'Service' object.
-        charges.service_charges = sum(
-            assigned_service.service.charges for assigned_service in db.query(AssignedService).join(AssignedService.service).filter(
-                AssignedService.room_id == room.id,
-                AssignedService.billing_status == "unbilled"
-            ).all()
-        )
+        # Optimized: Use aggregation instead of loading all records
+        from sqlalchemy import func
+        food_total = db.query(func.sum(FoodOrder.amount)).filter(
+            FoodOrder.room_id == room.id,
+            FoodOrder.billing_status == "unbilled"
+        ).scalar() or 0.0
+        charges.food_charges = food_total
+        
+        # Optimized: Use aggregation for service charges
+        service_charges = db.query(func.sum(Service.charges)).join(
+            AssignedService, AssignedService.service_id == Service.id
+        ).filter(
+            AssignedService.room_id == room.id,
+            AssignedService.billing_status == "unbilled"
+        ).scalar() or 0.0
+        charges.service_charges = service_charges
     elif isinstance(booking, PackageBooking):
         # Package booking
         package = db.query(Package).filter(Package.id == booking.package_id).first()

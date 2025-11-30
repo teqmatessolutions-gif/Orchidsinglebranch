@@ -425,12 +425,18 @@ def book_package_guest_api(
 @router.get("/bookingsall", response_model=List[PackageBookingOut])
 def get_bookings(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
     try:
+        # Optimized for low network - reduced to 50
+        if limit > 50:
+            limit = 50
+        if limit < 1:
+            limit = 20
+        
+        # Simplified query - removed nested eager loading to prevent hangs
         # It's possible for a package to be deleted, leaving an orphaned booking.
         # We must filter to only include bookings that still have a valid package_id.
-        # We also need to eagerly load the related package and room data for the frontend.
         result = db.query(PackageBooking).options(
-            joinedload(PackageBooking.package),
-            joinedload(PackageBooking.rooms).joinedload(PackageBookingRoom.room)
+            joinedload(PackageBooking.package)
+            # Removed nested room loading to reduce query complexity
         ).filter(PackageBooking.package_id.is_not(None)).offset(skip).limit(limit).all()
         return result if result is not None else []
     except Exception as e:
@@ -447,6 +453,12 @@ def get_bookings(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
 def _list_packages_impl(db: Session, skip: int = 0, limit: int = 20):
     """Helper function for list_packages"""
     try:
+        # Optimized for low network - reduced to 50
+        if limit > 50:
+            limit = 50
+        if limit < 1:
+            limit = 20
+        
         # Query directly in the endpoint to apply pagination
         result = db.query(Package).offset(skip).limit(limit).all()
         return result if result is not None else []

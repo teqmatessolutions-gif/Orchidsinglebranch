@@ -44,6 +44,7 @@ class PackageBooking(Base):
     id_card_image_url = Column(String, nullable=True)
     guest_photo_url = Column(String, nullable=True)
     status = Column(String)
+    advance_deposit = Column(Float, default=0.0)  # Advance payment made during booking
 
     # Relationships
     package = relationship("Package", back_populates="bookings")

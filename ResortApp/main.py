@@ -2,11 +2,14 @@ from fastapi import FastAPI, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
+from starlette.middleware.base import BaseHTTPMiddleware
 from pathlib import Path
 import os
 import traceback
+from time import time
 
 # Import all API routers
 from app.api import (
@@ -30,7 +33,11 @@ from app.api import (
     service,
     attendance,
     service_request,
+    account,
+    gst_reports,
+    lost_found,
 )
+from app.api import reports_module
 
 # Import recipe router separately to catch any import errors
 recipe_module = None
@@ -54,6 +61,16 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     inventory = None
+
+# Import comprehensive reports router separately to catch any import errors
+try:
+    from app.api import comprehensive_reports
+    print("[OK] Comprehensive Reports router imported successfully")
+except Exception as e:
+    print(f"[ERROR] ERROR importing comprehensive_reports router: {e}")
+    import traceback
+    traceback.print_exc()
+    comprehensive_reports = None
 from app.database import engine, Base
 
 # Create database tables
@@ -69,23 +86,35 @@ app = FastAPI(
 # Exception handlers for proper error logging and responses
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
-    """Handle HTTP exceptions with proper logging"""
+    """Handle HTTP exceptions with proper logging and CORS headers"""
     import sys
     print(f"HTTP Exception {exc.status_code} in {request.method} {request.url.path}: {exc.detail}")
+    headers = dict(exc.headers) if hasattr(exc, 'headers') and exc.headers else {}
+    # Add CORS headers to error responses
+    headers.update({
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "*",
+        "Access-Control-Allow-Headers": "*",
+    })
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers=exc.headers if hasattr(exc, 'headers') else None
+        headers=headers
     )
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle validation errors with proper logging"""
+    """Handle validation errors with proper logging and CORS headers"""
     import sys
     print(f"Validation error in {request.method} {request.url.path}: {exc.errors()}")
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors()}
+        content={"detail": exc.errors()},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
     )
 
 @app.exception_handler(Exception)
@@ -98,11 +127,19 @@ async def global_exception_handler(request: Request, exc: Exception):
     print(f"ERROR (global handler): {error_detail}")
     sys.stderr.write(f"ERROR (global handler): {error_detail}\n")
     
-    # Return 500 with error message
+    # Return 500 with error message and CORS headers
     return JSONResponse(
         status_code=500,
-        content={"detail": f"Internal server error: {str(exc)}"}
+        content={"detail": f"Internal server error: {str(exc)}"},
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "*",
+            "Access-Control-Allow-Headers": "*",
+        }
     )
+
+# Compression middleware (reduces response size by 70-90%)
+app.add_middleware(GZipMiddleware, minimum_size=500)  # Compress responses > 500 bytes
 
 # CORS middleware
 app.add_middleware(
@@ -112,6 +149,32 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Performance monitoring and caching middleware
+class PerformanceMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        start_time = time()
+        response = await call_next(request)
+        process_time = time() - start_time
+        
+        # Add performance headers
+        response.headers["X-Process-Time"] = str(round(process_time, 3))
+        
+        # Add caching headers for GET requests (5 minutes for dynamic, 1 hour for static)
+        if request.method == "GET":
+            # Cache static/semi-static endpoints longer
+            if any(path in str(request.url.path) for path in ["/rooms", "/packages", "/services", "/food-items", "/inventory/items"]):
+                response.headers["Cache-Control"] = "public, max-age=300"  # 5 minutes
+            else:
+                response.headers["Cache-Control"] = "public, max-age=60"  # 1 minute for dynamic data
+        
+        # Log slow requests (> 1 second)
+        if process_time > 1.0:
+            print(f"[PERF] Slow request: {request.method} {request.url.path} took {process_time:.2f}s")
+        
+        return response
+
+app.add_middleware(PerformanceMiddleware)
 
 # Static file directories
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
@@ -178,7 +241,23 @@ app.include_router(reports.router, prefix="/api", tags=["Reports"])
 app.include_router(role.router, prefix="/api", tags=["Role"])
 app.include_router(service.router, prefix="/api", tags=["Service"])
 app.include_router(service_request.router, prefix="/api", tags=["Service Requests"])
+app.include_router(account.router, prefix="/api", tags=["Accounts"])
+app.include_router(gst_reports.router, prefix="/api", tags=["GST Reports"])
+app.include_router(reports_module.router, prefix="/api", tags=["Reports Module"])
 app.include_router(attendance.router, prefix="/api", tags=["Attendance"])
+app.include_router(lost_found.router, prefix="/api", tags=["Lost & Found"])
+
+# Include comprehensive reports router if it was imported successfully
+if comprehensive_reports is not None:
+    try:
+        app.include_router(comprehensive_reports.router, prefix="/api", tags=["Comprehensive Reports"])
+        print(f"[OK] Comprehensive Reports router registered with {len(comprehensive_reports.router.routes)} routes")
+    except Exception as e:
+        print(f"[ERROR] ERROR registering comprehensive_reports router: {e}")
+        import traceback
+        traceback.print_exc()
+else:
+    print("[ERROR] Comprehensive Reports router not imported, skipping registration")
 
 # Include inventory router if it was imported successfully
 if inventory is not None:

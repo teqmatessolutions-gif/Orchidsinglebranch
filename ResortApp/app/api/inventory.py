@@ -154,6 +154,7 @@ async def create_item(
             for key in created_item.__table__.columns.keys()
         }
         item_dict["category_name"] = category.name
+        item_dict["department"] = category.parent_department  # Add department from category
         item_dict["is_low_stock"] = created_item.current_stock <= created_item.min_stock_level if created_item.min_stock_level else False
         
         return item_dict
@@ -183,6 +184,7 @@ def get_items(
             result.append({
                 **item.__dict__,
                 "category_name": category.name if category else None,
+                "department": category.parent_department if category else None,  # Add department from category
                 "is_low_stock": item.current_stock <= item.min_stock_level if item.min_stock_level else False,
             })
         return result
@@ -201,6 +203,7 @@ def get_item(item_id: int, db: Session = Depends(get_db)):
     return {
         **item.__dict__,
         "category_name": category.name if category else None,
+        "department": category.parent_department if category else None,  # Add department from category
         "is_low_stock": item.current_stock <= item.min_stock_level
     }
 
@@ -261,11 +264,64 @@ def create_purchase(
 ):
     created = inventory_crud.create_purchase_master(db, purchase, created_by=current_user.id)
     
-    # Load relationships for response
+    # Automatically create journal entry for purchase (Scenario 1)
+    # Only create if purchase is confirmed/received (not draft)
+    if purchase.status in ["confirmed", "received"]:
+        try:
+            from app.utils.accounting_helpers import create_purchase_journal_entry
+            from app.models.inventory import Vendor
+            from app.api.gst_reports import RESORT_STATE_CODE
+            
+            vendor = inventory_crud.get_vendor_by_id(db, created.vendor_id)
+            vendor_name = (vendor.legal_name or vendor.name) if vendor else "Unknown"
+            
+            # Determine if inter-state purchase
+            is_interstate = False
+            if vendor and vendor.gst_number and len(vendor.gst_number) >= 2:
+                vendor_state_code = vendor.gst_number[:2]
+                is_interstate = vendor_state_code != RESORT_STATE_CODE
+            
+            # Calculate inventory amount (sub_total) and tax amounts
+            inventory_amount = float(created.sub_total or 0)
+            cgst_amount = float(created.cgst or 0)
+            sgst_amount = float(created.sgst or 0)
+            igst_amount = float(created.igst or 0)
+            
+            # Create journal entry
+            create_purchase_journal_entry(
+                db=db,
+                purchase_id=created.id,
+                vendor_id=created.vendor_id,
+                inventory_amount=inventory_amount,
+                cgst_amount=cgst_amount,
+                sgst_amount=sgst_amount,
+                igst_amount=igst_amount,
+                vendor_name=vendor_name,
+                is_interstate=is_interstate,
+                created_by=current_user.id
+            )
+        except Exception as e:
+            # Log error but don't fail purchase creation
+            import traceback
+            print(f"Warning: Could not create journal entry for purchase {created.id}: {str(e)}\n{traceback.format_exc()}")
+    
+    # Optimized: Batch load items to avoid N+1 queries
+    from sqlalchemy.orm import joinedload
+    db.refresh(created, ["details"])
+    detail_item_ids = [d.item_id for d in created.details if d.item_id]
+    items_map = {}
+    if detail_item_ids:
+        from app.models.inventory import InventoryItem
+        items = db.query(InventoryItem).filter(InventoryItem.id.in_(detail_item_ids)).all()
+        items_map = {item.id: item for item in items}
+    
+    # Load vendor
     vendor = inventory_crud.get_vendor_by_id(db, created.vendor_id)
+    
+    # Build details with item names from map
     details = []
     for detail in created.details:
-        item = inventory_crud.get_item_by_id(db, detail.item_id)
+        item = items_map.get(detail.item_id) if detail.item_id else None
         details.append({
             **detail.__dict__,
             "item_name": item.name if item else None
@@ -318,11 +374,21 @@ def get_purchase(purchase_id: int, db: Session = Depends(get_db)):
     if not purchase:
         raise HTTPException(status_code=404, detail="Purchase not found")
     
+    # Optimized: Batch load to avoid N+1 queries
     vendor = inventory_crud.get_vendor_by_id(db, purchase.vendor_id)
     user = db.query(User).filter(User.id == purchase.created_by).first()
+    
+    # Batch load items
+    detail_item_ids = [d.item_id for d in purchase.details if d.item_id]
+    items_map = {}
+    if detail_item_ids:
+        from app.models.inventory import InventoryItem
+        items = db.query(InventoryItem).filter(InventoryItem.id.in_(detail_item_ids)).all()
+        items_map = {item.id: item for item in items}
+    
     details = []
     for detail in purchase.details:
-        item = inventory_crud.get_item_by_id(db, detail.item_id)
+        item = items_map.get(detail.item_id) if detail.item_id else None
         details.append({
             **detail.__dict__,
             "item_name": item.name if item else None
@@ -496,14 +562,22 @@ def create_issue(
         issue_data = issue.model_dump()
         created = inventory_crud.create_stock_issue(db, issue_data, issued_by=current_user.id)
         
-        # Load relationships for response
+        # Optimized: Batch load to avoid N+1 queries
         issuer = db.query(User).filter(User.id == created.issued_by).first()
-        details = []
         source_loc = inventory_crud.get_location_by_id(db, created.source_location_id) if created.source_location_id else None
         dest_loc = inventory_crud.get_location_by_id(db, created.destination_location_id) if created.destination_location_id else None
         
+        # Batch load items
+        detail_item_ids = [d.item_id for d in created.details if d.item_id]
+        items_map = {}
+        if detail_item_ids:
+            from app.models.inventory import InventoryItem
+            items = db.query(InventoryItem).filter(InventoryItem.id.in_(detail_item_ids)).all()
+            items_map = {item.id: item for item in items}
+        
+        details = []
         for detail in created.details:
-            item = inventory_crud.get_item_by_id(db, detail.item_id)
+            item = items_map.get(detail.item_id) if detail.item_id else None
             details.append({
                 **detail.__dict__,
                 "item_name": item.name if item else None
@@ -890,6 +964,7 @@ def get_location_items(
             }
     
     # Add items from stock issues (consumables/stock transfers)
+    # Track complimentary and payable quantities separately
     for issue_detail in issues_to_location:
         item = inventory_crud.get_item_by_id(db, issue_detail.item_id)
         if item:
@@ -899,6 +974,7 @@ def get_location_items(
             is_paid = issue_detail.notes and "PAID" in issue_detail.notes.upper()
             issue_detail_id = issue_detail.id
             issue_id = issue_detail.issue_id
+            quantity = issue_detail.issued_quantity or 0
             
             if key not in items_dict:
                 category = inventory_crud.get_category_by_id(db, item.category_id)
@@ -912,6 +988,8 @@ def get_location_items(
                     "min_stock_level": item.min_stock_level,
                     "unit_price": item.unit_price,
                     "location_stock": 0,
+                    "complimentary_qty": 0,
+                    "payable_qty": 0,
                     "stock_value": 0,
                     "type": "consumable",
                     "is_low_stock": item.current_stock <= item.min_stock_level if item.min_stock_level else False,
@@ -919,22 +997,35 @@ def get_location_items(
                     "is_paid": is_paid,
                     "issue_detail_id": issue_detail_id,
                     "issue_id": issue_id,
-                    "notes": issue_detail.notes or ""
+                    "notes": issue_detail.notes or "",
+                    "issue_details": []  # Store all issue details for this item
                 }
+            
+            # Track quantities separately
+            if is_payable:
+                items_dict[key]["payable_qty"] = (items_dict[key].get("payable_qty", 0) or 0) + quantity
             else:
-                # If any issue for this item is payable, mark it as payable
-                if is_payable:
-                    items_dict[key]["is_payable"] = True
-                if is_paid:
-                    items_dict[key]["is_paid"] = True
-                # Keep the first issue_detail_id and issue_id for updates
-                if not items_dict[key].get("issue_detail_id"):
-                    items_dict[key]["issue_detail_id"] = issue_detail_id
-                    items_dict[key]["issue_id"] = issue_id
-            # Sum up quantities issued to this location
-            qty = getattr(issue_detail, 'issued_quantity', 0) or 0
-            items_dict[key]["location_stock"] += qty
-            items_dict[key]["stock_value"] = items_dict[key]["location_stock"] * (item.unit_price or 0)
+                items_dict[key]["complimentary_qty"] = (items_dict[key].get("complimentary_qty", 0) or 0) + quantity
+            
+            # Update total location stock
+            items_dict[key]["location_stock"] = (items_dict[key].get("location_stock", 0) or 0) + quantity
+            
+            # Store issue detail info
+            if "issue_details" not in items_dict[key]:
+                items_dict[key]["issue_details"] = []
+            items_dict[key]["issue_details"].append({
+                "issue_detail_id": issue_detail_id,
+                "issue_id": issue_id,
+                "quantity": quantity,
+                "is_payable": is_payable,
+                "is_paid": is_paid,
+                "notes": issue_detail.notes or ""
+            })
+            
+            # Update stock value (only for payable items)
+            if is_payable:
+                unit_price = item.unit_price or 0
+                items_dict[key]["stock_value"] = (items_dict[key].get("stock_value", 0) or 0) + (quantity * unit_price)
     
     # Get room usage information (services used, guest info) if this is a guest room
     room_usage = None

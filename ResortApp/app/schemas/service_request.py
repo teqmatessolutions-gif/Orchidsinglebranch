@@ -3,7 +3,7 @@ from typing import Optional
 from datetime import datetime
 
 class ServiceRequestCreate(BaseModel):
-    food_order_id: int
+    food_order_id: Optional[int] = None  # Nullable for cleaning/other non-food requests
     room_id: int
     employee_id: Optional[int] = None
     request_type: str = "delivery"
@@ -16,7 +16,7 @@ class ServiceRequestUpdate(BaseModel):
 
 class ServiceRequestOut(BaseModel):
     id: int
-    food_order_id: int
+    food_order_id: Optional[int] = None
     room_id: int
     employee_id: Optional[int] = None
     request_type: str

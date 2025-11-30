@@ -7,7 +7,7 @@ const apiBaseUrl = getApiBaseUrl();
 console.log("API Base URL:", apiBaseUrl); // Debug log
 const API = axios.create({
   baseURL: apiBaseUrl,
-  timeout: 30000, // 30 second timeout
+  timeout: 60000, // 60 second timeout (increased for large queries)
 });
 
 // Automatically add token to headers

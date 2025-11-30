@@ -21,6 +21,90 @@ def create_service_request(db: Session, request_data: ServiceRequestCreate):
     db.refresh(request)
     return request
 
+def create_cleaning_service_request(db: Session, room_id: int, room_number: str, guest_name: str = None):
+    """
+    Create a cleaning service request after checkout.
+    This is automatically triggered when a room is checked out.
+    """
+    request = ServiceRequest(
+        food_order_id=None,  # Cleaning requests don't have food orders
+        room_id=room_id,
+        employee_id=None,  # Will be assigned later
+        request_type="cleaning",
+        description=f"Room cleaning required after checkout - Room {room_number}" + (f" (Guest: {guest_name})" if guest_name else ""),
+        status="pending"
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+    return request
+
+def create_refill_service_request(db: Session, room_id: int, room_number: str, guest_name: str = None, checkout_id: int = None):
+    """
+    Create a refill service request after checkout.
+    This is automatically triggered when a room is checked out to replenish inventory items.
+    Refill requirements are calculated from the checkout consumables audit.
+    """
+    refill_items = []
+    
+    # Get refill requirements from checkout verification if checkout_id is provided
+    if checkout_id:
+        from app.models.checkout import CheckoutVerification
+        from app.models.inventory import InventoryItem
+        
+        # Get the checkout verification for this room
+        verification = db.query(CheckoutVerification).filter(
+            CheckoutVerification.checkout_id == checkout_id,
+            CheckoutVerification.room_number == room_number
+        ).first()
+        
+        if verification and verification.consumables_audit_data:
+            # Extract consumables data and calculate refill requirements
+            consumables_data = verification.consumables_audit_data
+            
+            for item_id_str, item_data in consumables_data.items():
+                try:
+                    item_id = int(item_id_str)
+                    actual_consumed = item_data.get("actual", 0)
+                    
+                    # Get inventory item details
+                    inv_item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+                    if inv_item and actual_consumed > 0:
+                        # What was consumed needs to be refilled
+                        refill_items.append({
+                            "item_id": item_id,
+                            "item_name": inv_item.name,
+                            "quantity_to_refill": actual_consumed,
+                            "unit": inv_item.unit or "pcs"
+                        })
+                except (ValueError, KeyError):
+                    continue
+    
+    # Build description with refill requirements
+    description_parts = [f"Room inventory refill required after checkout - Room {room_number}"]
+    if guest_name:
+        description_parts.append(f"Previous Guest: {guest_name}")
+    
+    if refill_items:
+        description_parts.append("Refill Requirements:")
+        for item in refill_items:
+            description_parts.append(f"- {item['item_name']}: {item['quantity_to_refill']} {item['unit']}")
+    else:
+        description_parts.append("Standard inventory refill required")
+    
+    request = ServiceRequest(
+        food_order_id=None,  # Refill requests don't have food orders
+        room_id=room_id,
+        employee_id=None,  # Will be assigned later
+        request_type="refill",
+        description=" | ".join(description_parts),
+        status="pending"
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+    return request
+
 def get_service_requests(db: Session, skip: int = 0, limit: int = 100, status: Optional[str] = None):
     query = db.query(ServiceRequest).options(
         joinedload(ServiceRequest.food_order),

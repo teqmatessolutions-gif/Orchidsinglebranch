@@ -23,9 +23,13 @@ from app.api import (
     report,
     role,
     room,
+    reports,
     service,
     service_report,
     user,
+    account,
+    gst_reports,
+    comprehensive_reports
 )
 
 # Import recipe router separately to catch any import errors
@@ -122,6 +126,11 @@ app.include_router(payment.router, prefix="/api")
 app.include_router(frontend.router, prefix="/api")
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(report.router, prefix="/api")
+
+# Include the missing routers to fix 404 errors
+app.include_router(account.router, prefix="/api")
+app.include_router(gst_reports.router, prefix="/api")
+app.include_router(comprehensive_reports.router, prefix="/api")
 
 # Include inventory router if it was imported successfully
 if inventory is not None:

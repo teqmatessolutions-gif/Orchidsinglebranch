@@ -20,8 +20,19 @@ const Expenses = () => {
     amount: "",
     date: "",
     description: "",
+    department: "",
     bill_image: null,
   });
+
+  const departments = [
+    "Restaurant",
+    "Facility",
+    "Hotel",
+    "Office",
+    "Security",
+    "Fire & Safety",
+    "Housekeeping"
+  ];
 
   const fileInputRef = useRef(null);
   const mediaBaseUrl = getMediaBaseUrl();
@@ -85,6 +96,7 @@ const Expenses = () => {
       data.append("amount", form.amount);
       data.append("date", form.date);
       data.append("description", form.description);
+      if (form.department) data.append("department", form.department);
       if (form.bill_image) data.append("image", form.bill_image);
 
       await API.post("/expenses", data, {
@@ -97,6 +109,7 @@ const Expenses = () => {
         amount: "",
         date: "",
         description: "",
+        department: "",
         bill_image: null,
       });
       setImagePreview(null);
@@ -219,6 +232,16 @@ const Expenses = () => {
             className="border p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 w-full"
             required
           />
+          <select
+            value={form.department}
+            onChange={(e) => setForm({ ...form, department: e.target.value })}
+            className="border p-3 rounded-xl focus:ring-2 focus:ring-indigo-500 w-full"
+          >
+            <option value="">Select Department</option>
+            {departments.map((dept) => (
+              <option key={dept} value={dept}>{dept}</option>
+            ))}
+          </select>
           <input
             type="text"
             placeholder="Description"
@@ -271,6 +294,7 @@ const Expenses = () => {
                 <th className="p-3 border">#</th>
                 <th className="p-3 border">Employee</th>
                 <th className="p-3 border">Category</th>
+                <th className="p-3 border">Department</th>
                 <th className="p-3 border">Amount</th>
                 <th className="p-3 border">Date</th>
                 <th className="p-3 border">Description</th>
@@ -285,6 +309,15 @@ const Expenses = () => {
                     <td className="p-2">{idx + 1}</td>
                     <td className="p-2">{exp.employee_name || "N/A"}</td>
                     <td className="p-2">{exp.category}</td>
+                    <td className="p-2">
+                      {exp.department ? (
+                        <span className="px-2 py-1 text-xs font-semibold text-indigo-800 bg-indigo-100 rounded-full">
+                          {exp.department}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
                     <td className="p-2 text-green-600 font-semibold">₹{exp.amount}</td>
                     <td className="p-2">{exp.date.includes("T") ? exp.date.split("T")[0] : exp.date}</td>
                     <td className="p-2">{exp.description}</td>
