@@ -107,16 +107,16 @@ def calculate_tax_breakdown(taxable_value: float, tax_rate: float, is_interstate
 
 
 # Helper function to get SAC code for service type
-def get_room_tax_rate(room_total: float) -> float:
+def get_room_tax_rate(room_tariff: float) -> float:
     """
-    Get GST rate for room based on tariff slab
-    - Rooms <= ₹4,999: 5% GST
+    Get GST rate for room based on tariff slab (per night)
+    - Rooms < ₹5,000: 5% GST
     - Rooms ₹5,000 - ₹7,499: 12% GST
     - Rooms >= ₹7,500: 18% GST
     """
-    if room_total <= 4999:
+    if room_tariff < 5000:
         return 5.0
-    elif room_total < 7500:
+    elif room_tariff <= 7500:
         return 12.0
     else:
         return 18.0
@@ -212,9 +212,20 @@ def get_b2b_sales_register(
             # Room Services: 12% if < ₹7,500, 18% if >= ₹7,500
             room_total = float(c.room_total or 0)
             if room_total > 0:
-                room_tax_rate = get_room_tax_rate(room_total)
-                # Calculate taxable value (excluding tax)
-                room_taxable = room_total / (1 + room_tax_rate / 100)
+                # Calculate nights to get daily rate
+                nights = 1
+                if c.booking and c.booking.check_in and c.booking.check_out:
+                    delta = (c.booking.check_out - c.booking.check_in).days
+                    nights = max(1, delta)
+                elif c.package_booking and c.package_booking.check_in and c.package_booking.check_out:
+                    delta = (c.package_booking.check_out - c.package_booking.check_in).days
+                    nights = max(1, delta)
+                
+                daily_rate = room_total / nights
+                room_tax_rate = get_room_tax_rate(daily_rate)
+                
+                # room_total is exclusive of tax (taxable value)
+                room_taxable = room_total
                 tax_breakdown = calculate_tax_breakdown(room_taxable, room_tax_rate, is_interstate)
                 
                 b2b_sales.append({
@@ -240,7 +251,8 @@ def get_b2b_sales_register(
             food_total = float(c.food_total or 0)
             if food_total > 0:
                 food_tax_rate = 5.0
-                food_taxable = food_total / (1 + food_tax_rate / 100)
+                # food_total is exclusive of tax
+                food_taxable = food_total
                 tax_breakdown = calculate_tax_breakdown(food_taxable, food_tax_rate, is_interstate)
                 
                 b2b_sales.append({
@@ -266,7 +278,8 @@ def get_b2b_sales_register(
             service_total = float(c.service_total or 0)
             if service_total > 0:
                 service_tax_rate = 18.0
-                service_taxable = service_total / (1 + service_tax_rate / 100)
+                # service_total is exclusive of tax
+                service_taxable = service_total
                 tax_breakdown = calculate_tax_breakdown(service_taxable, service_tax_rate, is_interstate)
                 
                 b2b_sales.append({
@@ -291,8 +304,22 @@ def get_b2b_sales_register(
             # Package Services: Use room rate logic
             package_total = float(c.package_total or 0)
             if package_total > 0:
-                package_tax_rate = 12.0 if package_total < 7500 else 18.0
-                package_taxable = package_total / (1 + package_tax_rate / 100)
+                # Calculate nights to get daily rate
+                nights = 1
+                if c.booking and c.booking.check_in and c.booking.check_out:
+                    delta = (c.booking.check_out - c.booking.check_in).days
+                    nights = max(1, delta)
+                elif c.package_booking and c.package_booking.check_in and c.package_booking.check_out:
+                    delta = (c.package_booking.check_out - c.package_booking.check_in).days
+                    nights = max(1, delta)
+                
+                daily_rate = package_total / nights
+                package_tax_rate = 12.0 if daily_rate <= 7500 else 18.0
+                if daily_rate < 5000:
+                    package_tax_rate = 5.0
+                    
+                # package_total is exclusive of tax
+                package_taxable = package_total
                 tax_breakdown = calculate_tax_breakdown(package_taxable, package_tax_rate, is_interstate)
                 
                 b2b_sales.append({
@@ -415,8 +442,20 @@ def get_b2c_sales_register(
             # Room Services
             room_total = float(c.room_total or 0)
             if room_total > 0:
-                room_tax_rate = get_room_tax_rate(room_total)
-                room_taxable = room_total / (1 + room_tax_rate / 100)
+                # Calculate nights
+                nights = 1
+                if c.booking and c.booking.check_in and c.booking.check_out:
+                    delta = (c.booking.check_out - c.booking.check_in).days
+                    nights = max(1, delta)
+                elif c.package_booking and c.package_booking.check_in and c.package_booking.check_out:
+                    delta = (c.package_booking.check_out - c.package_booking.check_in).days
+                    nights = max(1, delta)
+                
+                daily_rate = room_total / nights
+                room_tax_rate = get_room_tax_rate(daily_rate)
+                
+                # room_total is exclusive of tax
+                room_taxable = room_total
                 tax_breakdown = calculate_tax_breakdown(room_taxable, room_tax_rate, is_interstate)
                 invoice_rows.append({
                     "rate": room_tax_rate,
@@ -431,7 +470,7 @@ def get_b2c_sales_register(
             food_total = float(c.food_total or 0)
             if food_total > 0:
                 food_tax_rate = 5.0
-                food_taxable = food_total / (1 + food_tax_rate / 100)
+                food_taxable = food_total
                 tax_breakdown = calculate_tax_breakdown(food_taxable, food_tax_rate, is_interstate)
                 invoice_rows.append({
                     "rate": food_tax_rate,
@@ -446,7 +485,7 @@ def get_b2c_sales_register(
             service_total = float(c.service_total or 0)
             if service_total > 0:
                 service_tax_rate = 18.0
-                service_taxable = service_total / (1 + service_tax_rate / 100)
+                service_taxable = service_total
                 tax_breakdown = calculate_tax_breakdown(service_taxable, service_tax_rate, is_interstate)
                 invoice_rows.append({
                     "rate": service_tax_rate,
@@ -460,8 +499,21 @@ def get_b2c_sales_register(
             # Package Services
             package_total = float(c.package_total or 0)
             if package_total > 0:
-                package_tax_rate = 12.0 if package_total < 7500 else 18.0
-                package_taxable = package_total / (1 + package_tax_rate / 100)
+                # Calculate nights
+                nights = 1
+                if c.booking and c.booking.check_in and c.booking.check_out:
+                    delta = (c.booking.check_out - c.booking.check_in).days
+                    nights = max(1, delta)
+                elif c.package_booking and c.package_booking.check_in and c.package_booking.check_out:
+                    delta = (c.package_booking.check_out - c.package_booking.check_in).days
+                    nights = max(1, delta)
+                
+                daily_rate = package_total / nights
+                package_tax_rate = 12.0 if daily_rate <= 7500 else 18.0
+                if daily_rate < 5000:
+                    package_tax_rate = 5.0
+                    
+                package_taxable = package_total
                 tax_breakdown = calculate_tax_breakdown(package_taxable, package_tax_rate, is_interstate)
                 invoice_rows.append({
                     "rate": package_tax_rate,
@@ -670,9 +722,12 @@ def get_hsn_sac_summary(
             if room_total > 0:
                 room_count += 1
                 sac_code = "9963"
-                tax_rate = get_room_tax_rate(room_total)
-                total_value = room_total  # Grand total including tax
-                taxable_value = total_value / (1 + tax_rate / 100)
+                
+                daily_rate = room_total / nights
+                tax_rate = get_room_tax_rate(daily_rate)
+                
+                taxable_value = room_total
+                total_value = taxable_value * (1 + tax_rate / 100)
                 total_tax = total_value - taxable_value
                 
                 key = f"{sac_code}_{tax_rate}%"
@@ -708,8 +763,8 @@ def get_hsn_sac_summary(
                 food_count += 1
                 sac_code = "996331"
                 tax_rate = 5.0  # Restaurant services 5% GST
-                total_value = food_total
-                taxable_value = total_value / (1 + tax_rate / 100)
+                taxable_value = food_total
+                total_value = taxable_value * (1 + tax_rate / 100)
                 total_tax = total_value - taxable_value
                 
                 key = f"{sac_code}_{tax_rate}%"
@@ -744,8 +799,8 @@ def get_hsn_sac_summary(
                 service_count += 1
                 sac_code = "9997"
                 tax_rate = 18.0  # Other services typically 18%
-                total_value = service_total
-                taxable_value = total_value / (1 + tax_rate / 100)
+                taxable_value = service_total
+                total_value = taxable_value * (1 + tax_rate / 100)
                 total_tax = total_value - taxable_value
                 
                 key = f"{sac_code}_{tax_rate}%"
@@ -780,9 +835,14 @@ def get_hsn_sac_summary(
                 package_count += 1
                 # If package includes room, use SAC 9963, else 9997
                 sac_code = "9963" if room_total > 0 else "9997"
-                tax_rate = 12.0 if package_total < 7500 else 18.0
-                total_value = package_total
-                taxable_value = total_value / (1 + tax_rate / 100)
+                
+                daily_rate = package_total / nights
+                tax_rate = 12.0 if daily_rate <= 7500 else 18.0
+                if daily_rate < 5000:
+                    tax_rate = 5.0
+                    
+                taxable_value = package_total
+                total_value = taxable_value * (1 + tax_rate / 100)
                 total_tax = total_value - taxable_value
                 
                 key = f"{sac_code}_package_{tax_rate}%"

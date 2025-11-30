@@ -1128,24 +1128,34 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
     
     # Calculate GST
     # Room charges: 5% GST if < 5000, 12% GST if 5000-7500, 18% GST if > 7500
-    room_charge_amount = charges.room_charges or 0
-    if room_charge_amount > 0:
-        if room_charge_amount < 5000:
-            charges.room_gst = room_charge_amount * 0.05
-        elif room_charge_amount <= 7500:
-            charges.room_gst = room_charge_amount * 0.12
-        else:
-            charges.room_gst = room_charge_amount * 0.18
+    # FIX: Use room.price (per night rate) to determine slab
+    room_price = room.price or 0
+    room_gst_rate = 0.18 # Default > 7500
     
-    # Package charges: Same rule as room charges (5% if < 5000, 12% if 5000-7500, 18% if > 7500)
-    package_charge_amount = charges.package_charges or 0
-    if package_charge_amount > 0:
-        if package_charge_amount < 5000:
-            charges.package_gst = package_charge_amount * 0.05
-        elif package_charge_amount <= 7500:
-            charges.package_gst = package_charge_amount * 0.12
+    if room_price < 5000:
+        room_gst_rate = 0.05
+    elif room_price <= 7500:
+        room_gst_rate = 0.12
+        
+    charges.room_gst = (charges.room_charges or 0) * room_gst_rate
+    
+    # Package charges: Same rule as room charges
+    # Determine daily rate for package to find the slab
+    package_daily_rate = 0
+    if is_package:
+        if is_whole_property:
+            package_daily_rate = (package.price if package else 0) / max(1, stay_days)
         else:
-            charges.package_gst = package_charge_amount * 0.18
+            package_daily_rate = package.price if package else 0
+            
+    package_gst_rate = 0.18
+    if package_daily_rate > 0:
+        if package_daily_rate < 5000:
+            package_gst_rate = 0.05
+        elif package_daily_rate <= 7500:
+            package_gst_rate = 0.12
+            
+    charges.package_gst = (charges.package_charges or 0) * package_gst_rate
     
     # Food charges: 5% GST always
     food_charge_amount = charges.food_charges or 0
@@ -1318,24 +1328,38 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
 
     # Calculate GST
     # Room charges: 5% GST if < 5000, 12% GST if 5000-7500, 18% GST if > 7500
-    room_charge_amount = charges.room_charges or 0
-    if room_charge_amount > 0:
-        if room_charge_amount < 5000:
-            charges.room_gst = room_charge_amount * 0.05
-        elif room_charge_amount <= 7500:
-            charges.room_gst = room_charge_amount * 0.12
-        else:
-            charges.room_gst = room_charge_amount * 0.18
+    # FIX: Calculate GST for each room individually based on its nightly rate
+    charges.room_gst = 0.0
+    if not is_package:
+        for room in all_rooms:
+            room_price = room.price or 0
+            room_gst_rate = 0.18
+            if room_price < 5000:
+                room_gst_rate = 0.05
+            elif room_price <= 7500:
+                room_gst_rate = 0.12
+            
+            # Calculate total charge for this room
+            room_total = room_price * stay_days
+            charges.room_gst += room_total * room_gst_rate
     
-    # Package charges: Same rule as room charges (5% if < 5000, 12% if 5000-7500, 18% if > 7500)
-    package_charge_amount = charges.package_charges or 0
-    if package_charge_amount > 0:
-        if package_charge_amount < 5000:
-            charges.package_gst = package_charge_amount * 0.05
-        elif package_charge_amount <= 7500:
-            charges.package_gst = package_charge_amount * 0.12
+    # Package charges: Same rule as room charges
+    # Determine daily rate for package to find the slab
+    package_daily_rate = 0
+    if is_package:
+        if is_whole_property:
+            package_daily_rate = (package.price if package else 0) / max(1, stay_days)
         else:
-            charges.package_gst = package_charge_amount * 0.18
+            package_daily_rate = package.price if package else 0
+            
+    package_gst_rate = 0.18
+    if package_daily_rate > 0:
+        if package_daily_rate < 5000:
+            package_gst_rate = 0.05
+        elif package_daily_rate <= 7500:
+            package_gst_rate = 0.12
+            
+    charges.package_gst = (charges.package_charges or 0) * package_gst_rate
     
     # Food charges: 5% GST always
     food_charge_amount = charges.food_charges or 0
