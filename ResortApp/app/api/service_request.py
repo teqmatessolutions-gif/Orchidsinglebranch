@@ -6,6 +6,7 @@ from app.utils.auth import get_db, get_current_user
 from app.models.user import User
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
+import json
 
 router = APIRouter(prefix="/service-requests", tags=["Service Requests"])
 
@@ -35,7 +36,6 @@ def get_service_requests(
     # Convert service requests to dict format
     result = []
     for sr in service_requests:
-        import json
         refill_data = None
         if sr.refill_data:
             try:
@@ -43,21 +43,25 @@ def get_service_requests(
             except:
                 refill_data = None
         
-        result.append({
-            "id": sr.id,
-            "food_order_id": sr.food_order_id,
-            "room_id": sr.room_id,
-            "employee_id": sr.employee_id,
-            "request_type": sr.request_type,
-            "description": sr.description,
-            "status": sr.status,
-            "created_at": sr.created_at.isoformat() if sr.created_at else None,
-            "completed_at": sr.completed_at.isoformat() if sr.completed_at else None,
-            "is_checkout_request": False,
-            "room_number": getattr(sr, 'room_number', None),
-            "employee_name": getattr(sr, 'employee_name', None),
-            "refill_data": refill_data
-        })
+        try:
+            result.append({
+                "id": sr.id,
+                "food_order_id": sr.food_order_id,
+                "room_id": sr.room_id,
+                "employee_id": sr.employee_id,
+                "request_type": str(sr.request_type) if sr.request_type else None,
+                "description": str(sr.description) if sr.description else None,
+                "status": str(sr.status) if sr.status else "pending",
+                "created_at": sr.created_at.isoformat() if sr.created_at else None,
+                "completed_at": sr.completed_at.isoformat() if sr.completed_at else None,
+                "is_checkout_request": False,
+                "room_number": str(getattr(sr, 'room_number', '')) if getattr(sr, 'room_number', None) else None,
+                "employee_name": str(getattr(sr, 'employee_name', '')) if getattr(sr, 'employee_name', None) else None,
+                "refill_data": refill_data
+            })
+        except Exception as e:
+            print(f"[ERROR] Error converting service request {sr.id}: {e}")
+            continue
     
     # Also include checkout requests as service requests
     if include_checkout_requests:
@@ -85,22 +89,26 @@ def get_service_requests(
         for cr in checkout_requests:
             room = db.query(Room).filter(Room.number == cr.room_number).first()
             if room:
-                result.append({
-                    "id": cr.id + 1000000,  # Offset to avoid conflicts with regular service requests
-                    "food_order_id": None,
-                    "room_id": room.id,
-                    "employee_id": cr.employee_id,
-                    "request_type": "checkout_verification",
-                    "description": f"Checkout inventory verification for Room {cr.room_number} - Guest: {cr.guest_name}",
-                    "status": cr.status,
-                    "created_at": cr.created_at.isoformat() if cr.created_at else None,
-                    "completed_at": cr.completed_at.isoformat() if cr.completed_at else None,
-                    "is_checkout_request": True,
-                    "checkout_request_id": cr.id,
-                    "room_number": cr.room_number,
-                    "guest_name": cr.guest_name,
-                    "employee_name": cr.employee.name if cr.employee else None
-                })
+                try:
+                    result.append({
+                        "id": cr.id + 1000000,  # Offset to avoid conflicts with regular service requests
+                        "food_order_id": None,
+                        "room_id": room.id,
+                        "employee_id": cr.employee_id,
+                        "request_type": "checkout_verification",
+                        "description": f"Checkout inventory verification for Room {cr.room_number} - Guest: {cr.guest_name}",
+                        "status": str(cr.status) if cr.status else "pending",
+                        "created_at": cr.created_at.isoformat() if cr.created_at else None,
+                        "completed_at": cr.completed_at.isoformat() if cr.completed_at else None,
+                        "is_checkout_request": True,
+                        "checkout_request_id": cr.id,
+                        "room_number": str(cr.room_number) if cr.room_number else None,
+                        "guest_name": str(cr.guest_name) if cr.guest_name else None,
+                        "employee_name": str(cr.employee.name) if cr.employee and cr.employee.name else None
+                    })
+                except Exception as e:
+                    print(f"[ERROR] Error converting checkout request {cr.id}: {e}")
+                    continue
     
     return result
 

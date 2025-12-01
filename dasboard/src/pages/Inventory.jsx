@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import DashboardLayout from "../layout/DashboardLayout";
 import API from "../services/api";
-import { formatCurrency } from '../utils/currency';
+import { formatCurrency } from "../utils/currency";
 import { getApiBaseUrl } from "../utils/env";
-import { formatDateIST, formatDateTimeIST, getCurrentDateIST, getCurrentDateTimeIST } from "../utils/dateUtils";
-import { 
-  Package, 
-  Plus, 
-  Edit, 
+import {
+  formatDateIST,
+  formatDateTimeIST,
+  getCurrentDateIST,
+  getCurrentDateTimeIST,
+} from "../utils/dateUtils";
+import {
+  Package,
+  Plus,
+  Edit,
   Trash2,
-  X, 
-  AlertTriangle, 
-  ShoppingCart, 
+  X,
+  AlertTriangle,
+  ShoppingCart,
   Building2,
   TrendingUp,
   FileText,
@@ -27,7 +32,7 @@ import {
   Camera,
   FileEdit,
   Calendar,
-  Filter
+  Filter,
 } from "lucide-react";
 
 // Location Stock View Component
@@ -48,35 +53,68 @@ const LocationStockView = ({ locations, onLocationClick }) => {
               onClick={() => onLocationClick(loc.id)}
             >
               <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-gray-900">{loc.name || `${loc.building} - ${loc.room_area}`}</h3>
-                <span className="text-xs text-gray-500">{loc.location_type}</span>
+                <h3 className="font-semibold text-gray-900">
+                  {loc.name || `${loc.building} - ${loc.room_area}`}
+                </h3>
+                <span className="text-xs text-gray-500">
+                  {loc.location_type}
+                </span>
               </div>
               <div className="space-y-1 text-sm text-gray-600">
                 {loc.location_code && (
-                  <p><span className="font-medium">Code:</span> {loc.location_code}</p>
+                  <p>
+                    <span className="font-medium">Code:</span>{" "}
+                    {loc.location_code}
+                  </p>
                 )}
-                <p><span className="font-medium">Total Items:</span> {loc.total_items || 0}</p>
-                <p><span className="font-medium">Assets:</span> {loc.asset_count || 0}</p>
-                <p><span className="font-medium">Consumables:</span> {loc.consumable_items_count || 0}</p>
-                <p><span className="font-medium">Stock Value:</span> {formatCurrency(loc.total_stock_value || 0)}</p>
+                <p>
+                  <span className="font-medium">Total Items:</span>{" "}
+                  {loc.total_items || 0}
+                </p>
+                <p>
+                  <span className="font-medium">Assets:</span>{" "}
+                  {loc.asset_count || 0}
+                </p>
+                <p>
+                  <span className="font-medium">Consumables:</span>{" "}
+                  {loc.consumable_items_count || 0}
+                </p>
+                <p>
+                  <span className="font-medium">Stock Value:</span>{" "}
+                  {formatCurrency(loc.total_stock_value || 0)}
+                </p>
               </div>
             </div>
           ))
         )}
       </div>
-      
+
       {/* Desktop Table View */}
       <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Items</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assets</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Consumables</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Value</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Location
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Type
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Total Items
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Assets
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Consumables
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Stock Value
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                Action
+              </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -88,24 +126,38 @@ const LocationStockView = ({ locations, onLocationClick }) => {
               </tr>
             ) : (
               locations.map((loc) => (
-                <tr 
-                  key={loc.id} 
+                <tr
+                  key={loc.id}
                   className="hover:bg-gray-50 cursor-pointer transition-colors"
                   onClick={() => onLocationClick(loc.id)}
                 >
                   <td className="px-4 py-3">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{loc.name || `${loc.building} - ${loc.room_area}`}</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {loc.name || `${loc.building} - ${loc.room_area}`}
+                      </p>
                       {loc.location_code && (
-                        <p className="text-xs text-gray-500">{loc.location_code}</p>
+                        <p className="text-xs text-gray-500">
+                          {loc.location_code}
+                        </p>
                       )}
                     </div>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{loc.location_type}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900 font-medium">{loc.total_items || 0}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{loc.asset_count || 0}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{loc.consumable_items_count || 0}</td>
-                  <td className="px-4 py-3 text-sm font-semibold text-gray-900">{formatCurrency(loc.total_stock_value || 0)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {loc.location_type}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                    {loc.total_items || 0}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {loc.asset_count || 0}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    {loc.consumable_items_count || 0}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                    {formatCurrency(loc.total_stock_value || 0)}
+                  </td>
                   <td className="px-4 py-3">
                     <button
                       onClick={(e) => {
@@ -131,124 +183,191 @@ const LocationStockView = ({ locations, onLocationClick }) => {
 // Location Stock Details Modal
 const LocationStockDetailsModal = ({ locationData, onClose }) => {
   if (!locationData) return null;
-  
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Inventory at {locationData.location.name}</h2>
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+              Inventory at {locationData.location.name}
+            </h2>
             <p className="text-sm text-gray-500 mt-1">
-              {locationData.location.building} {locationData.location.floor ? `- ${locationData.location.floor}` : ""}
+              {locationData.location.building}{" "}
+              {locationData.location.floor
+                ? `- ${locationData.location.floor}`
+                : ""}
             </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
         <div className="p-4 sm:p-6 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 bg-gray-50 rounded-lg">
             <div>
-              <label className="text-xs font-medium text-gray-500">Total Items</label>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{locationData.total_items}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Total Items
+              </label>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {locationData.total_items}
+              </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Stock Value</label>
-              <p className="text-2xl font-bold text-green-600 mt-1">{formatCurrency(locationData.total_stock_value)}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Stock Value
+              </label>
+              <p className="text-2xl font-bold text-green-600 mt-1">
+                {formatCurrency(locationData.total_stock_value)}
+              </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Location Type</label>
-              <p className="text-sm font-semibold text-gray-900 mt-1">{locationData.location.location_type}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Location Type
+              </label>
+              <p className="text-sm font-semibold text-gray-900 mt-1">
+                {locationData.location.location_type}
+              </p>
             </div>
           </div>
-          
+
           {/* Room Usage Section - Only show for GUEST_ROOM locations */}
           {locationData.room_usage && (
             <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">Room Usage Information</h3>
-              
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">
+                Room Usage Information
+              </h3>
+
               {/* Current Guest Info */}
               {locationData.room_usage.booking_info && (
                 <div className="mb-4 p-3 bg-white rounded-lg border border-blue-100">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600">Current Guest:</span>
-                    <span className="text-lg font-bold text-blue-700">{locationData.room_usage.booking_info.guest_name}</span>
+                    <span className="text-sm font-medium text-gray-600">
+                      Current Guest:
+                    </span>
+                    <span className="text-lg font-bold text-blue-700">
+                      {locationData.room_usage.booking_info.guest_name}
+                    </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
                     {locationData.room_usage.booking_info.guest_mobile && (
                       <div>
-                        <span className="font-medium">Mobile:</span> {locationData.room_usage.booking_info.guest_mobile}
+                        <span className="font-medium">Mobile:</span>{" "}
+                        {locationData.room_usage.booking_info.guest_mobile}
                       </div>
                     )}
                     {locationData.room_usage.booking_info.guest_email && (
                       <div>
-                        <span className="font-medium">Email:</span> {locationData.room_usage.booking_info.guest_email}
+                        <span className="font-medium">Email:</span>{" "}
+                        {locationData.room_usage.booking_info.guest_email}
                       </div>
                     )}
                     {locationData.room_usage.booking_info.check_in && (
                       <div>
-                        <span className="font-medium">Check-in:</span> {formatDateIST(locationData.room_usage.booking_info.check_in)}
+                        <span className="font-medium">Check-in:</span>{" "}
+                        {formatDateIST(
+                          locationData.room_usage.booking_info.check_in,
+                        )}
                       </div>
                     )}
                     {locationData.room_usage.booking_info.check_out && (
                       <div>
-                        <span className="font-medium">Check-out:</span> {formatDateIST(locationData.room_usage.booking_info.check_out)}
+                        <span className="font-medium">Check-out:</span>{" "}
+                        {formatDateIST(
+                          locationData.room_usage.booking_info.check_out,
+                        )}
                       </div>
                     )}
                   </div>
                 </div>
               )}
-              
+
               {/* Services Used */}
-              {locationData.room_usage.services_used && locationData.room_usage.services_used.length > 0 ? (
+              {locationData.room_usage.services_used &&
+              locationData.room_usage.services_used.length > 0 ? (
                 <div className="mb-4">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600">Services Used:</span>
+                    <span className="text-sm font-medium text-gray-600">
+                      Services Used:
+                    </span>
                     <span className="text-sm font-semibold text-gray-800">
-                      {locationData.room_usage.total_services} service(s) - Total: ₹{locationData.room_usage.total_service_charges.toFixed(2)}
+                      {locationData.room_usage.total_services} service(s) -
+                      Total: ₹
+                      {locationData.room_usage.total_service_charges.toFixed(2)}
                     </span>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
                       <thead className="bg-gray-100">
                         <tr>
-                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Service</th>
-                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Employee</th>
-                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Charges</th>
-                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Status</th>
-                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Assigned</th>
-                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">Last Used</th>
+                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">
+                            Service
+                          </th>
+                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">
+                            Employee
+                          </th>
+                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">
+                            Charges
+                          </th>
+                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">
+                            Status
+                          </th>
+                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">
+                            Assigned
+                          </th>
+                          <th className="px-2 py-1 text-left text-xs font-medium text-gray-600">
+                            Last Used
+                          </th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {locationData.room_usage.services_used.map((service, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50">
-                            <td className="px-2 py-1 text-gray-900 font-medium">{service.service_name}</td>
-                            <td className="px-2 py-1 text-gray-600">{service.employee_name || "N/A"}</td>
-                            <td className="px-2 py-1 text-gray-900 font-semibold">₹{service.charges}</td>
-                            <td className="px-2 py-1">
-                              <span className={`px-2 py-0.5 text-xs rounded-full ${
-                                service.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                service.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-gray-100 text-gray-800'
-                              }`}>
-                                {service.status}
-                              </span>
-                            </td>
-                            <td className="px-2 py-1 text-gray-600 text-xs">
-                              {service.assigned_at ? formatDateTimeIST(service.assigned_at) : "N/A"}
-                            </td>
-                            <td className="px-2 py-1 text-gray-600 text-xs">
-                              {service.last_used_at ? (
-                                <span className="text-green-600 font-medium">
-                                  {formatDateTimeIST(service.last_used_at)}
+                        {locationData.room_usage.services_used.map(
+                          (service, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="px-2 py-1 text-gray-900 font-medium">
+                                {service.service_name}
+                              </td>
+                              <td className="px-2 py-1 text-gray-600">
+                                {service.employee_name || "N/A"}
+                              </td>
+                              <td className="px-2 py-1 text-gray-900 font-semibold">
+                                ₹{service.charges}
+                              </td>
+                              <td className="px-2 py-1">
+                                <span
+                                  className={`px-2 py-0.5 text-xs rounded-full ${
+                                    service.status === "completed"
+                                      ? "bg-green-100 text-green-800"
+                                      : service.status === "in_progress"
+                                        ? "bg-yellow-100 text-yellow-800"
+                                        : "bg-gray-100 text-gray-800"
+                                  }`}
+                                >
+                                  {service.status}
                                 </span>
-                              ) : (
-                                <span className="text-gray-400 italic">Never</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
+                              </td>
+                              <td className="px-2 py-1 text-gray-600 text-xs">
+                                {service.assigned_at
+                                  ? formatDateTimeIST(service.assigned_at)
+                                  : "N/A"}
+                              </td>
+                              <td className="px-2 py-1 text-gray-600 text-xs">
+                                {service.last_used_at ? (
+                                  <span className="text-green-600 font-medium">
+                                    {formatDateTimeIST(service.last_used_at)}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400 italic">
+                                    Never
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ),
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -262,49 +381,93 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
           )}
 
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Items & Stock</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">
+              Items & Stock
+            </h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Location Stock</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Value</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Item
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Category
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Type
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Location Stock
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Unit
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Unit Price
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Value
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Status
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {locationData.items.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                      <td
+                        colSpan="8"
+                        className="px-4 py-8 text-center text-gray-500"
+                      >
                         No items found at this location
                       </td>
                     </tr>
                   ) : (
                     locationData.items.map((item, index) => (
-                      <tr key={index} className={item.is_low_stock ? "bg-red-50" : ""}>
-                        <td className="px-3 py-2 text-sm font-medium text-gray-900">{item.item_name}</td>
-                        <td className="px-3 py-2 text-sm text-gray-600">{item.category_name || "-"}</td>
+                      <tr
+                        key={index}
+                        className={item.is_low_stock ? "bg-red-50" : ""}
+                      >
+                        <td className="px-3 py-2 text-sm font-medium text-gray-900">
+                          {item.item_name}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600">
+                          {item.category_name || "-"}
+                        </td>
                         <td className="px-3 py-2">
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            item.type === "asset" ? "bg-blue-100 text-blue-800" : "bg-green-100 text-green-800"
-                          }`}>
+                          <span
+                            className={`px-2 py-1 text-xs rounded-full ${
+                              item.type === "asset"
+                                ? "bg-blue-100 text-blue-800"
+                                : "bg-green-100 text-green-800"
+                            }`}
+                          >
                             {item.type === "asset" ? "Asset" : "Consumable"}
                           </span>
                         </td>
-                        <td className="px-3 py-2 text-sm text-gray-900 font-medium">{item.location_stock || 0}</td>
-                        <td className="px-3 py-2 text-sm text-gray-600">{item.unit}</td>
-                        <td className="px-3 py-2 text-sm text-gray-600">{formatCurrency(item.unit_price || 0)}</td>
-                        <td className="px-3 py-2 text-sm font-semibold text-gray-900">{formatCurrency(item.stock_value || 0)}</td>
+                        <td className="px-3 py-2 text-sm text-gray-900 font-medium">
+                          {item.location_stock || 0}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600">
+                          {item.unit}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600">
+                          {formatCurrency(item.unit_price || 0)}
+                        </td>
+                        <td className="px-3 py-2 text-sm font-semibold text-gray-900">
+                          {formatCurrency(item.stock_value || 0)}
+                        </td>
                         <td className="px-3 py-2">
                           {item.is_low_stock ? (
-                            <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">Low Stock</span>
+                            <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">
+                              Low Stock
+                            </span>
                           ) : (
-                            <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">In Stock</span>
+                            <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                              In Stock
+                            </span>
                           )}
                         </td>
                       </tr>
@@ -314,7 +477,7 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
               </table>
             </div>
           </div>
-          
+
           <div className="flex justify-end pt-4 border-t">
             <button
               onClick={onClose}
@@ -359,7 +522,7 @@ const Inventory = () => {
     servings: 1,
     prep_time_minutes: "",
     cook_time_minutes: "",
-    ingredients: []
+    ingredients: [],
   });
   const [transactionFilters, setTransactionFilters] = useState({
     type: "all", // all, purchase, usage, waste, adjustment
@@ -380,14 +543,14 @@ const Inventory = () => {
   const [showPurchaseDetails, setShowPurchaseDetails] = useState(false);
   const [showUnitForm, setShowUnitForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
-  
+
   // New form states for Stock Issue & Consumption module
   const [showRequisitionForm, setShowRequisitionForm] = useState(false);
   const [showIssueForm, setShowIssueForm] = useState(false);
   const [showWasteForm, setShowWasteForm] = useState(false);
   const [showLocationForm, setShowLocationForm] = useState(false);
   const [showAssetMappingForm, setShowAssetMappingForm] = useState(false);
-  
+
   // Detail view states
   const [selectedRequisition, setSelectedRequisition] = useState(null);
   const [showRequisitionDetails, setShowRequisitionDetails] = useState(false);
@@ -399,7 +562,7 @@ const Inventory = () => {
   const [showLocationDetails, setShowLocationDetails] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [showAssetDetails, setShowAssetDetails] = useState(false);
-  
+
   // Units state - predefined + custom units
   const [units, setUnits] = useState([
     { value: "pcs", label: "Pieces (pcs)" },
@@ -450,28 +613,28 @@ const Inventory = () => {
     name: "",
     description: "",
     // Basic Identification
-    parent_department: "",  // Restaurant, Facility, Hotel, Office, Fire & Safety, Security
-    gst_tax_rate: 0,  // 5%, 12%, 18%, 28% - Essential for Purchase Logic
+    parent_department: "", // Restaurant, Facility, Hotel, Office, Fire & Safety, Security
+    gst_tax_rate: 0, // 5%, 12%, 18%, 28% - Essential for Purchase Logic
     // GST Classification Properties
-    classification: "",  // "Goods" or "Services"
-    hsn_sac_code: "",  // Essential for GST Compliance
+    classification: "", // "Goods" or "Services"
+    hsn_sac_code: "", // Essential for GST Compliance
     default_gst_rate: 0,
     cess_percentage: 0,
     // ITC Rules
-    itc_eligibility: "Eligible",  // "Eligible" or "Ineligible (Blocked)"
+    itc_eligibility: "Eligible", // "Eligible" or "Ineligible (Blocked)"
     is_capital_good: false,
     // Logic Switches (The "Brain" of the System)
-    is_perishable: false,  // Activates Logic 1.1: Expiry-based alerts
-    is_asset_fixed: false,  // Activates Logic 2.2 & 6.2: Auto-generates maintenance reminders
-    is_sellable: false,  // Activates Logic 3.2: If usage exceeds limit, add charge to customer billing
-    track_laundry: false,  // Activates Logic 5.4: Enables "Fresh -> Used -> Laundry -> Fresh" cycle
-    allow_partial_usage: false,  // Activates Logic 1.2: Kitchen raises stock usage request by weight/volume
-    consumable_instant: false,  // Activates Logic 4.1: System deducts requested quantity immediately upon issuance
+    is_perishable: false, // Activates Logic 1.1: Expiry-based alerts
+    is_asset_fixed: false, // Activates Logic 2.2 & 6.2: Auto-generates maintenance reminders
+    is_sellable: false, // Activates Logic 3.2: If usage exceeds limit, add charge to customer billing
+    track_laundry: false, // Activates Logic 5.4: Enables "Fresh -> Used -> Laundry -> Fresh" cycle
+    allow_partial_usage: false, // Activates Logic 1.2: Kitchen raises stock usage request by weight/volume
+    consumable_instant: false, // Activates Logic 4.1: System deducts requested quantity immediately upon issuance
   });
 
   // Vendor form - GST Friendly
   const [vendorForm, setVendorForm] = useState({
-    name: "",  // Trade Name
+    name: "", // Trade Name
     company_name: "",
     // Core GST Properties
     gst_registration_type: "",
@@ -506,7 +669,7 @@ const Inventory = () => {
     account_holder_name: "",
     bank_name: "",
     account_number: "",
-    account_number_confirm: "",  // For double-entry validation
+    account_number_confirm: "", // For double-entry validation
     ifsc_code: "",
     branch_name: "",
     upi_id: "",
@@ -528,19 +691,21 @@ const Inventory = () => {
     payment_status: "pending",
     notes: "",
     status: "draft",
-    details: [{ 
-      item_id: "", 
-      category: "",
-      hsn_code: "",
-      unit: "pcs",
-      quantity: 0, 
-      unit_price: 0, 
-      gst_rate: 0, 
-      tax_inclusive: false,
-      serial_batch: "",
-      expiry_date: "",
-      discount: 0 
-    }],
+    details: [
+      {
+        item_id: "",
+        category: "",
+        hsn_code: "",
+        unit: "pcs",
+        quantity: 0,
+        unit_price: 0,
+        gst_rate: 0,
+        tax_inclusive: false,
+        serial_batch: "",
+        expiry_date: "",
+        discount: 0,
+      },
+    ],
   });
 
   // Optimized: Fetch essential data once on mount (categories, vendors, locations)
@@ -551,7 +716,7 @@ const Inventory = () => {
         const [categoriesRes, vendorsRes, locationsRes] = await Promise.all([
           API.get("/inventory/categories?limit=1000"),
           API.get("/inventory/vendors?limit=1000"),
-          API.get("/inventory/locations?limit=10000")
+          API.get("/inventory/locations?limit=10000"),
         ]);
         setCategories(categoriesRes.data || []);
         setVendors(vendorsRes.data || []);
@@ -573,7 +738,7 @@ const Inventory = () => {
     try {
       // Use smaller limits for better performance, add pagination later if needed
       const limit = activeTab === "locations" ? 10000 : 500; // Locations need all for room sync
-      
+
       if (activeTab === "items") {
         const res = await API.get(`/inventory/items?limit=${limit}`);
         setItems(res.data || []);
@@ -618,9 +783,16 @@ const Inventory = () => {
         setLocationStock(res.data || []);
       } else if (activeTab === "recipe") {
         try {
-          console.log("Fetching recipes from:", API.defaults.baseURL + "/recipes");
+          console.log(
+            "Fetching recipes from:",
+            API.defaults.baseURL + "/recipes",
+          );
           const res = await API.get("/recipes");
-          console.log("Recipes fetched successfully:", res.data?.length || 0, "recipes");
+          console.log(
+            "Recipes fetched successfully:",
+            res.data?.length || 0,
+            "recipes",
+          );
           setRecipes(res.data || []);
         } catch (err) {
           console.error("Failed to fetch recipes:", err);
@@ -631,14 +803,19 @@ const Inventory = () => {
             status: err.response?.status,
             statusText: err.response?.statusText,
             data: err.response?.data,
-            message: err.message
+            message: err.message,
           });
           // Show more detailed error message
           if (err.response?.status === 404) {
-            const fullUrl = (err.config?.baseURL || '') + (err.config?.url || '');
-            alert(`Recipe endpoint not found (404).\n\nRequested URL: ${fullUrl}\n\nPlease check:\n1. Backend server is running on port 8011\n2. Recipe router is registered\n3. Try hard refresh (Ctrl+Shift+R)`);
+            const fullUrl =
+              (err.config?.baseURL || "") + (err.config?.url || "");
+            alert(
+              `Recipe endpoint not found (404).\n\nRequested URL: ${fullUrl}\n\nPlease check:\n1. Backend server is running on port 8011\n2. Recipe router is registered\n3. Try hard refresh (Ctrl+Shift+R)`,
+            );
           } else {
-            alert(`Failed to fetch recipes: ${err.response?.data?.detail || err.message || "Unknown error"}`);
+            alert(
+              `Failed to fetch recipes: ${err.response?.data?.detail || err.message || "Unknown error"}`,
+            );
           }
           setRecipes([]); // Set empty array on error
         }
@@ -661,13 +838,18 @@ const Inventory = () => {
   // Summary calculations
   const summary = {
     totalItems: items.length,
-    lowStockItems: items.filter(item => item.is_low_stock).length,
-    totalValue: items.reduce((sum, item) => sum + (item.current_stock * item.unit_price), 0),
+    lowStockItems: items.filter((item) => item.is_low_stock).length,
+    totalValue: items.reduce(
+      (sum, item) => sum + item.current_stock * item.unit_price,
+      0,
+    ),
     categoriesCount: categories.length,
     totalVendors: vendors.length,
-    activeVendors: vendors.filter(v => v.is_active).length,
+    activeVendors: vendors.filter((v) => v.is_active).length,
     totalPurchases: purchases.length,
-    pendingPurchases: purchases.filter(p => p.status === "draft" || p.status === "confirmed").length,
+    pendingPurchases: purchases.filter(
+      (p) => p.status === "draft" || p.status === "confirmed",
+    ).length,
   };
 
   // Item handlers
@@ -675,30 +857,39 @@ const Inventory = () => {
     e.preventDefault();
     try {
       const formData = new FormData();
-      
+
       // Add all form fields to FormData
-      Object.keys(itemForm).forEach(key => {
-        if (key === 'image') {
+      Object.keys(itemForm).forEach((key) => {
+        if (key === "image") {
           if (itemForm.image) {
-            formData.append('image', itemForm.image);
+            formData.append("image", itemForm.image);
           }
-        } else if (key === 'max_stock_level' || key === 'selling_price' || 
-                   key === 'maintenance_schedule_days' || key === 'complimentary_limit' ||
-                   key === 'ingredient_yield_percentage' || key === 'preferred_vendor_id' ||
-                   key === 'lead_time_days') {
+        } else if (
+          key === "max_stock_level" ||
+          key === "selling_price" ||
+          key === "maintenance_schedule_days" ||
+          key === "complimentary_limit" ||
+          key === "ingredient_yield_percentage" ||
+          key === "preferred_vendor_id" ||
+          key === "lead_time_days"
+        ) {
           // Handle optional fields that might be empty strings
-          if (itemForm[key] !== "" && itemForm[key] !== null && itemForm[key] !== undefined) {
+          if (
+            itemForm[key] !== "" &&
+            itemForm[key] !== null &&
+            itemForm[key] !== undefined
+          ) {
             formData.append(key, itemForm[key]);
           }
         } else {
           formData.append(key, itemForm[key]);
         }
       });
-      
+
       await API.post("/inventory/items", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      
+
       // Reset form
       setItemForm({
         name: "",
@@ -734,7 +925,10 @@ const Inventory = () => {
       fetchData();
     } catch (error) {
       console.error("Error submitting item:", error);
-      alert("Failed to submit item: " + (error.response?.data?.detail || error.message));
+      alert(
+        "Failed to submit item: " +
+          (error.response?.data?.detail || error.message),
+      );
     }
   };
 
@@ -783,14 +977,18 @@ const Inventory = () => {
   // Vendor handlers
   const handleVendorSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validate account number match if bank transfer is selected
     if (vendorForm.preferred_payment_method === "Bank Transfer") {
       if (vendorForm.account_number !== vendorForm.account_number_confirm) {
         alert("Account numbers do not match! Please verify.");
         return;
       }
-      if (!vendorForm.account_number || vendorForm.account_number.length < 9 || vendorForm.account_number.length > 18) {
+      if (
+        !vendorForm.account_number ||
+        vendorForm.account_number.length < 9 ||
+        vendorForm.account_number.length > 18
+      ) {
         alert("Account number must be 9-18 digits!");
         return;
       }
@@ -799,10 +997,10 @@ const Inventory = () => {
         return;
       }
     }
-    
+
     // Remove account_number_confirm before sending (it's only for validation)
     const { account_number_confirm, ...vendorDataToSend } = vendorForm;
-    
+
     // Convert empty strings to null for optional fields to match Pydantic schema
     const cleanedData = {};
     for (const [key, value] of Object.entries(vendorDataToSend)) {
@@ -824,7 +1022,7 @@ const Inventory = () => {
         }
       }
     }
-    
+
     try {
       await API.post("/inventory/vendors", cleanedData);
       setVendorForm({
@@ -869,10 +1067,11 @@ const Inventory = () => {
       fetchData();
     } catch (error) {
       console.error("Error submitting vendor:", error);
-      const errorMessage = error.response?.data?.detail || 
-                          error.response?.data?.message || 
-                          error.message || 
-                          "Failed to submit vendor";
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to submit vendor";
       alert(`Failed to submit vendor: ${errorMessage}`);
     }
   };
@@ -889,8 +1088,8 @@ const Inventory = () => {
 
       // Calculate totals and prepare details
       const details = purchaseForm.details
-        .filter(detail => detail.item_id && detail.item_id !== "") // Filter out empty details
-        .map(detail => {
+        .filter((detail) => detail.item_id && detail.item_id !== "") // Filter out empty details
+        .map((detail) => {
           const qty = parseFloat(detail.quantity) || 0;
           const price = parseFloat(detail.unit_price) || 0;
           const gstRate = parseFloat(detail.gst_rate) || 0;
@@ -917,8 +1116,10 @@ const Inventory = () => {
             gst_rate: gstRate,
             discount: discount,
             hsn_code: detail.hsn_code || null,
-            notes: detail.serial_batch || detail.expiry_date ? 
-              `Serial/Batch: ${detail.serial_batch || 'N/A'}, Expiry: ${detail.expiry_date || 'N/A'}` : null,
+            notes:
+              detail.serial_batch || detail.expiry_date
+                ? `Serial/Batch: ${detail.serial_batch || "N/A"}, Expiry: ${detail.expiry_date || "N/A"}`
+                : null,
           };
         });
 
@@ -956,25 +1157,30 @@ const Inventory = () => {
         payment_status: "pending",
         notes: "",
         status: "draft",
-        details: [{ 
-          item_id: "", 
-          category: "",
-          hsn_code: "",
-          unit: "pcs",
-          quantity: 0, 
-          unit_price: 0, 
-          gst_rate: 0, 
-          tax_inclusive: false,
-          serial_batch: "",
-          expiry_date: "",
-          discount: 0 
-        }],
+        details: [
+          {
+            item_id: "",
+            category: "",
+            hsn_code: "",
+            unit: "pcs",
+            quantity: 0,
+            unit_price: 0,
+            gst_rate: 0,
+            tax_inclusive: false,
+            serial_batch: "",
+            expiry_date: "",
+            discount: 0,
+          },
+        ],
       });
       setShowPurchaseForm(false);
       fetchData();
     } catch (error) {
       console.error("Error submitting purchase:", error);
-      const errorMessage = error.response?.data?.detail || error.message || "Failed to submit purchase";
+      const errorMessage =
+        error.response?.data?.detail ||
+        error.message ||
+        "Failed to submit purchase";
       alert(`Failed to submit purchase: ${errorMessage}`);
     }
   };
@@ -982,19 +1188,22 @@ const Inventory = () => {
   const addPurchaseDetail = () => {
     setPurchaseForm({
       ...purchaseForm,
-      details: [...purchaseForm.details, { 
-        item_id: "", 
-        category: "",
-        hsn_code: "",
-        unit: "pcs",
-        quantity: 0, 
-        unit_price: 0, 
-        gst_rate: 0, 
-        tax_inclusive: false,
-        serial_batch: "",
-        expiry_date: "",
-        discount: 0 
-      }],
+      details: [
+        ...purchaseForm.details,
+        {
+          item_id: "",
+          category: "",
+          hsn_code: "",
+          unit: "pcs",
+          quantity: 0,
+          unit_price: 0,
+          gst_rate: 0,
+          tax_inclusive: false,
+          serial_batch: "",
+          expiry_date: "",
+          discount: 0,
+        },
+      ],
     });
   };
 
@@ -1011,25 +1220,30 @@ const Inventory = () => {
     date_needed: "",
     priority: "normal", // normal, urgent, critical
     notes: "",
-    details: [{
-      item_id: "",
-      requested_quantity: 0,
-      approved_quantity: null,
-      unit: "pcs",
-      notes: ""
-    }]
+    details: [
+      {
+        item_id: "",
+        requested_quantity: 0,
+        approved_quantity: null,
+        unit: "pcs",
+        notes: "",
+      },
+    ],
   });
 
   const addRequisitionDetail = () => {
     setRequisitionForm({
       ...requisitionForm,
-      details: [...requisitionForm.details, {
-        item_id: "",
-        requested_quantity: 0,
-        approved_quantity: null,
-        unit: "pcs",
-        notes: ""
-      }]
+      details: [
+        ...requisitionForm.details,
+        {
+          item_id: "",
+          requested_quantity: 0,
+          approved_quantity: null,
+          unit: "pcs",
+          notes: "",
+        },
+      ],
     });
   };
 
@@ -1037,13 +1251,18 @@ const Inventory = () => {
     const newDetails = requisitionForm.details.filter((_, i) => i !== index);
     setRequisitionForm({
       ...requisitionForm,
-      details: newDetails.length > 0 ? newDetails : [{
-        item_id: "",
-        requested_quantity: 0,
-        approved_quantity: null,
-        unit: "pcs",
-        notes: ""
-      }]
+      details:
+        newDetails.length > 0
+          ? newDetails
+          : [
+              {
+                item_id: "",
+                requested_quantity: 0,
+                approved_quantity: null,
+                unit: "pcs",
+                notes: "",
+              },
+            ],
     });
   };
 
@@ -1051,13 +1270,15 @@ const Inventory = () => {
     e.preventDefault();
     try {
       const details = requisitionForm.details
-        .filter(d => d.item_id && d.item_id !== "")
-        .map(d => ({
+        .filter((d) => d.item_id && d.item_id !== "")
+        .map((d) => ({
           item_id: parseInt(d.item_id),
           requested_quantity: parseFloat(d.requested_quantity) || 0,
-          approved_quantity: d.approved_quantity ? parseFloat(d.approved_quantity) : null,
+          approved_quantity: d.approved_quantity
+            ? parseFloat(d.approved_quantity)
+            : null,
           unit: d.unit || "pcs",
-          notes: d.notes || null
+          notes: d.notes || null,
         }));
 
       if (details.length === 0) {
@@ -1070,7 +1291,7 @@ const Inventory = () => {
         date_needed: requisitionForm.date_needed || null,
         priority: requisitionForm.priority,
         notes: requisitionForm.notes,
-        details: details
+        details: details,
       });
 
       alert("Requisition created successfully!");
@@ -1080,18 +1301,23 @@ const Inventory = () => {
         date_needed: "",
         priority: "Normal",
         notes: "",
-        details: [{
-          item_id: "",
-          requested_quantity: 0,
-          approved_quantity: null,
-          unit: "pcs",
-          notes: ""
-        }]
+        details: [
+          {
+            item_id: "",
+            requested_quantity: 0,
+            approved_quantity: null,
+            unit: "pcs",
+            notes: "",
+          },
+        ],
       });
       fetchData();
     } catch (error) {
       console.error("Error creating requisition:", error);
-      alert("Failed to create requisition: " + (error.response?.data?.detail || error.message));
+      alert(
+        "Failed to create requisition: " +
+          (error.response?.data?.detail || error.message),
+      );
     }
   };
 
@@ -1102,27 +1328,32 @@ const Inventory = () => {
     destination_location_id: "",
     issue_date: getCurrentDateIST(),
     notes: "",
-    details: [{
-      item_id: "",
-      issued_quantity: 0,
-      unit: "pcs",
-      batch_lot_number: "",
-      cost: 0,
-      notes: ""
-    }]
-  });
-
-  const addIssueDetail = () => {
-    setIssueForm({
-      ...issueForm,
-      details: [...issueForm.details, {
+    details: [
+      {
         item_id: "",
         issued_quantity: 0,
         unit: "pcs",
         batch_lot_number: "",
         cost: 0,
-        notes: ""
-      }]
+        notes: "",
+      },
+    ],
+  });
+
+  const addIssueDetail = () => {
+    setIssueForm({
+      ...issueForm,
+      details: [
+        ...issueForm.details,
+        {
+          item_id: "",
+          issued_quantity: 0,
+          unit: "pcs",
+          batch_lot_number: "",
+          cost: 0,
+          notes: "",
+        },
+      ],
     });
   };
 
@@ -1130,14 +1361,19 @@ const Inventory = () => {
     const newDetails = issueForm.details.filter((_, i) => i !== index);
     setIssueForm({
       ...issueForm,
-      details: newDetails.length > 0 ? newDetails : [{
-        item_id: "",
-        issued_quantity: 0,
-        unit: "pcs",
-        batch_lot_number: "",
-        cost: 0,
-        notes: ""
-      }]
+      details:
+        newDetails.length > 0
+          ? newDetails
+          : [
+              {
+                item_id: "",
+                issued_quantity: 0,
+                unit: "pcs",
+                batch_lot_number: "",
+                cost: 0,
+                notes: "",
+              },
+            ],
     });
   };
 
@@ -1145,14 +1381,14 @@ const Inventory = () => {
     e.preventDefault();
     try {
       const details = issueForm.details
-        .filter(d => d.item_id && d.item_id !== "")
-        .map(d => ({
+        .filter((d) => d.item_id && d.item_id !== "")
+        .map((d) => ({
           item_id: parseInt(d.item_id),
           issued_quantity: parseFloat(d.issued_quantity) || 0,
           unit: d.unit || "pcs",
           batch_lot_number: d.batch_lot_number || null,
           cost: d.cost ? parseFloat(d.cost) : null,
-          notes: d.notes || null
+          notes: d.notes || null,
         }));
 
       if (details.length === 0) {
@@ -1171,7 +1407,7 @@ const Inventory = () => {
         destination_location_id: parseInt(issueForm.destination_location_id),
         issue_date: issueForm.issue_date || null,
         notes: issueForm.notes || null,
-        details: details
+        details: details,
       });
 
       alert("Stock issue created successfully!");
@@ -1182,19 +1418,24 @@ const Inventory = () => {
         destination_location_id: "",
         issue_date: getCurrentDateIST(),
         notes: "",
-        details: [{
-          item_id: "",
-          issued_quantity: 0,
-          unit: "pcs",
-          batch_lot_number: "",
-          cost: 0,
-          notes: ""
-        }]
+        details: [
+          {
+            item_id: "",
+            issued_quantity: 0,
+            unit: "pcs",
+            batch_lot_number: "",
+            cost: 0,
+            notes: "",
+          },
+        ],
       });
       fetchData();
     } catch (error) {
       console.error("Error creating issue:", error);
-      alert("Failed to create issue: " + (error.response?.data?.detail || error.message));
+      alert(
+        "Failed to create issue: " +
+          (error.response?.data?.detail || error.message),
+      );
     }
   };
 
@@ -1203,38 +1444,48 @@ const Inventory = () => {
       // Get requisition details first
       const reqRes = await API.get(`/inventory/requisitions/${requisitionId}`);
       const requisition = reqRes.data;
-      
+
       // Find main warehouse location (source) - usually the first inventory point
-      const mainWarehouse = locations.find(loc => loc.is_inventory_point && loc.location_type === "warehouse");
+      const mainWarehouse = locations.find(
+        (loc) => loc.is_inventory_point && loc.location_type === "warehouse",
+      );
       if (!mainWarehouse) {
         alert("Please create a main warehouse location first!");
         return;
       }
-      
+
       // Find or create destination location based on department
-      let destinationLocation = locations.find(loc => 
-        loc.name.toLowerCase().includes(requisition.destination_department.toLowerCase()) ||
-        loc.room_area?.toLowerCase().includes(requisition.destination_department.toLowerCase())
+      let destinationLocation = locations.find(
+        (loc) =>
+          loc.name
+            .toLowerCase()
+            .includes(requisition.destination_department.toLowerCase()) ||
+          loc.room_area
+            ?.toLowerCase()
+            .includes(requisition.destination_department.toLowerCase()),
       );
-      
+
       if (!destinationLocation) {
         // Use main warehouse as destination if department location not found
         destinationLocation = mainWarehouse;
       }
-      
+
       // Create stock issue from requisition with proper fields
-      const issueDetails = requisition.details.map(d => ({
+      const issueDetails = requisition.details.map((d) => ({
         item_id: d.item_id,
-        issued_quantity: d.approved_quantity || d.requested_quantity || d.quantity || 0,
+        issued_quantity:
+          d.approved_quantity || d.requested_quantity || d.quantity || 0,
         unit: d.unit,
         batch_lot_number: d.batch_lot_number || null,
         cost: null, // Will be calculated on backend
-        notes: d.notes || null
+        notes: d.notes || null,
       }));
 
       // First approve the requisition
-      await API.patch(`/inventory/requisitions/${requisitionId}/status?status=approved`);
-      
+      await API.patch(
+        `/inventory/requisitions/${requisitionId}/status?status=approved`,
+      );
+
       // Create stock issue (this will deduct stock)
       await API.post("/inventory/issues", {
         requisition_id: requisitionId,
@@ -1242,14 +1493,17 @@ const Inventory = () => {
         destination_location_id: destinationLocation.id,
         issue_date: getCurrentDateTimeIST(),
         notes: `Auto-issued from requisition ${requisition.requisition_number}`,
-        details: issueDetails
+        details: issueDetails,
       });
 
       alert("Requisition approved and stock issued successfully!");
       fetchData();
     } catch (error) {
       console.error("Error approving requisition:", error);
-      alert("Failed to approve requisition: " + (error.response?.data?.detail || error.message));
+      alert(
+        "Failed to approve requisition: " +
+          (error.response?.data?.detail || error.message),
+      );
     }
   };
 
@@ -1265,7 +1519,7 @@ const Inventory = () => {
     location_id: "",
     waste_date: getCurrentDateIST(),
     notes: "",
-    photo: null
+    photo: null,
   });
 
   const handleWasteSubmit = async (e) => {
@@ -1273,19 +1527,24 @@ const Inventory = () => {
     try {
       const formData = new FormData();
       formData.append("item_id", wasteForm.item_id);
-      if (wasteForm.batch_number) formData.append("batch_number", wasteForm.batch_number);
-      if (wasteForm.expiry_date) formData.append("expiry_date", wasteForm.expiry_date);
+      if (wasteForm.batch_number)
+        formData.append("batch_number", wasteForm.batch_number);
+      if (wasteForm.expiry_date)
+        formData.append("expiry_date", wasteForm.expiry_date);
       formData.append("quantity", wasteForm.quantity);
       formData.append("unit", wasteForm.unit);
       formData.append("reason_code", wasteForm.reason_code);
-      if (wasteForm.action_taken) formData.append("action_taken", wasteForm.action_taken);
-      if (wasteForm.location_id) formData.append("location_id", wasteForm.location_id);
-      if (wasteForm.waste_date) formData.append("waste_date", wasteForm.waste_date);
+      if (wasteForm.action_taken)
+        formData.append("action_taken", wasteForm.action_taken);
+      if (wasteForm.location_id)
+        formData.append("location_id", wasteForm.location_id);
+      if (wasteForm.waste_date)
+        formData.append("waste_date", wasteForm.waste_date);
       if (wasteForm.notes) formData.append("notes", wasteForm.notes);
       if (wasteForm.photo) formData.append("photo", wasteForm.photo);
 
       await API.post("/inventory/waste-logs", formData, {
-        headers: { "Content-Type": "multipart/form-data" }
+        headers: { "Content-Type": "multipart/form-data" },
       });
 
       alert("Waste log created successfully!");
@@ -1301,12 +1560,15 @@ const Inventory = () => {
         location_id: "",
         waste_date: getCurrentDateIST(),
         notes: "",
-        photo: null
+        photo: null,
       });
       fetchData();
     } catch (error) {
       console.error("Error creating waste log:", error);
-      alert("Failed to create waste log: " + (error.response?.data?.detail || error.message));
+      alert(
+        "Failed to create waste log: " +
+          (error.response?.data?.detail || error.message),
+      );
     }
   };
 
@@ -1320,7 +1582,7 @@ const Inventory = () => {
     parent_location_id: "",
     is_inventory_point: false,
     description: "",
-    is_active: true
+    is_active: true,
   });
 
   const handleLocationSubmit = async (e) => {
@@ -1338,12 +1600,15 @@ const Inventory = () => {
         parent_location_id: "",
         is_inventory_point: false,
         description: "",
-        is_active: true
+        is_active: true,
       });
       fetchData();
     } catch (error) {
       console.error("Error creating location:", error);
-      alert("Failed to create location: " + (error.response?.data?.detail || error.message));
+      alert(
+        "Failed to create location: " +
+          (error.response?.data?.detail || error.message),
+      );
     }
   };
 
@@ -1352,7 +1617,7 @@ const Inventory = () => {
     item_id: "",
     location_id: "",
     serial_number: "",
-    notes: ""
+    notes: "",
   });
 
   const handleAssetMappingSubmit = async (e) => {
@@ -1362,7 +1627,7 @@ const Inventory = () => {
         item_id: parseInt(assetMappingForm.item_id),
         location_id: parseInt(assetMappingForm.location_id),
         serial_number: assetMappingForm.serial_number || null,
-        notes: assetMappingForm.notes || null
+        notes: assetMappingForm.notes || null,
       });
       alert("Asset assigned successfully!");
       setShowAssetMappingForm(false);
@@ -1370,24 +1635,31 @@ const Inventory = () => {
         item_id: "",
         location_id: "",
         serial_number: "",
-        notes: ""
+        notes: "",
       });
       fetchData();
     } catch (error) {
       console.error("Error creating asset mapping:", error);
-      alert("Failed to assign asset: " + (error.response?.data?.detail || error.message));
+      alert(
+        "Failed to assign asset: " +
+          (error.response?.data?.detail || error.message),
+      );
     }
   };
 
   const handleUnassignAsset = async (mappingId) => {
-    if (!window.confirm("Are you sure you want to unassign this asset?")) return;
+    if (!window.confirm("Are you sure you want to unassign this asset?"))
+      return;
     try {
       await API.delete(`/inventory/asset-mappings/${mappingId}`);
       alert("Asset unassigned successfully!");
       fetchData();
     } catch (error) {
       console.error("Error unassigning asset:", error);
-      alert("Failed to unassign asset: " + (error.response?.data?.detail || error.message));
+      alert(
+        "Failed to unassign asset: " +
+          (error.response?.data?.detail || error.message),
+      );
     }
   };
 
@@ -1396,27 +1668,29 @@ const Inventory = () => {
   const filteredItems = useMemo(() => {
     if (!searchTerm) return items;
     const lowerSearch = searchTerm.toLowerCase();
-    return items.filter(item =>
-      item.name?.toLowerCase().includes(lowerSearch) ||
-      item.description?.toLowerCase().includes(lowerSearch) ||
-      item.category_name?.toLowerCase().includes(lowerSearch)
+    return items.filter(
+      (item) =>
+        item.name?.toLowerCase().includes(lowerSearch) ||
+        item.description?.toLowerCase().includes(lowerSearch) ||
+        item.category_name?.toLowerCase().includes(lowerSearch),
     );
   }, [items, searchTerm]);
 
   const filteredCategories = useMemo(() => {
     if (!searchTerm) return categories;
     const lowerSearch = searchTerm.toLowerCase();
-    return categories.filter(cat =>
-      cat.name?.toLowerCase().includes(lowerSearch)
+    return categories.filter((cat) =>
+      cat.name?.toLowerCase().includes(lowerSearch),
     );
   }, [categories, searchTerm]);
 
   const filteredVendors = useMemo(() => {
     if (!searchTerm) return vendors;
     const lowerSearch = searchTerm.toLowerCase();
-    return vendors.filter(vendor =>
-      vendor.name?.toLowerCase().includes(lowerSearch) ||
-      vendor.company_name?.toLowerCase().includes(lowerSearch)
+    return vendors.filter(
+      (vendor) =>
+        vendor.name?.toLowerCase().includes(lowerSearch) ||
+        vendor.company_name?.toLowerCase().includes(lowerSearch),
     );
   }, [vendors, searchTerm]);
 
@@ -1424,75 +1698,91 @@ const Inventory = () => {
   const filteredPurchases = useMemo(() => {
     if (!searchTerm) return purchases;
     const lowerSearch = searchTerm.toLowerCase();
-    return purchases.filter(purchase =>
-      purchase.purchase_number?.toLowerCase().includes(lowerSearch) ||
-      purchase.vendor_name?.toLowerCase().includes(lowerSearch)
+    return purchases.filter(
+      (purchase) =>
+        purchase.purchase_number?.toLowerCase().includes(lowerSearch) ||
+        purchase.vendor_name?.toLowerCase().includes(lowerSearch),
     );
   }, [purchases, searchTerm]);
 
   const filteredTransactions = useMemo(() => {
     if (!searchTerm) return transactions;
     const lowerSearch = searchTerm.toLowerCase();
-    return transactions.filter(trans =>
-      trans.item_name?.toLowerCase().includes(lowerSearch) ||
-      trans.transaction_type?.toLowerCase().includes(lowerSearch)
+    return transactions.filter(
+      (trans) =>
+        trans.item_name?.toLowerCase().includes(lowerSearch) ||
+        trans.transaction_type?.toLowerCase().includes(lowerSearch),
     );
   }, [transactions, searchTerm]);
 
   const filteredRequisitions = useMemo(() => {
     if (!searchTerm) return requisitions;
     const lowerSearch = searchTerm.toLowerCase();
-    return requisitions.filter(req =>
-      req.requisition_number?.toLowerCase().includes(lowerSearch) ||
-      req.destination_department?.toLowerCase().includes(lowerSearch)
+    return requisitions.filter(
+      (req) =>
+        req.requisition_number?.toLowerCase().includes(lowerSearch) ||
+        req.destination_department?.toLowerCase().includes(lowerSearch),
     );
   }, [requisitions, searchTerm]);
 
   const filteredIssues = useMemo(() => {
     if (!searchTerm) return issues;
     const lowerSearch = searchTerm.toLowerCase();
-    return issues.filter(issue =>
-      issue.issue_number?.toLowerCase().includes(lowerSearch)
+    return issues.filter((issue) =>
+      issue.issue_number?.toLowerCase().includes(lowerSearch),
     );
   }, [issues, searchTerm]);
 
   const filteredWasteLogs = useMemo(() => {
     if (!searchTerm) return wasteLogs;
     const lowerSearch = searchTerm.toLowerCase();
-    return wasteLogs.filter(log =>
-      log.item_name?.toLowerCase().includes(lowerSearch) ||
-      log.reason_code?.toLowerCase().includes(lowerSearch)
+    return wasteLogs.filter(
+      (log) =>
+        log.item_name?.toLowerCase().includes(lowerSearch) ||
+        log.reason_code?.toLowerCase().includes(lowerSearch),
     );
   }, [wasteLogs, searchTerm]);
 
   const filteredLocations = useMemo(() => {
     if (!searchTerm) return locations;
     const lowerSearch = searchTerm.toLowerCase();
-    return locations.filter(loc =>
-      loc.building?.toLowerCase().includes(lowerSearch) ||
-      loc.room_area?.toLowerCase().includes(lowerSearch)
+    return locations.filter(
+      (loc) =>
+        loc.building?.toLowerCase().includes(lowerSearch) ||
+        loc.room_area?.toLowerCase().includes(lowerSearch),
     );
   }, [locations, searchTerm]);
 
   const filteredAssetMappings = useMemo(() => {
     if (!searchTerm) return assetMappings;
     const lowerSearch = searchTerm.toLowerCase();
-    return assetMappings.filter(mapping =>
-      mapping.item_name?.toLowerCase().includes(lowerSearch) ||
-      mapping.location_name?.toLowerCase().includes(lowerSearch)
+    return assetMappings.filter(
+      (mapping) =>
+        mapping.item_name?.toLowerCase().includes(lowerSearch) ||
+        mapping.location_name?.toLowerCase().includes(lowerSearch),
     );
   }, [assetMappings, searchTerm]);
 
   return (
     <DashboardLayout>
       <div className="bubbles-container">
-        <li></li><li></li><li></li><li></li><li></li>
-        <li></li><li></li><li></li><li></li><li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
+        <li></li>
       </div>
 
       <div className="max-w-[1600px] mx-auto px-4 py-6 space-y-6">
         <div className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold text-gray-800">Inventory Management</h1>
+          <h1 className="text-3xl font-bold text-gray-800">
+            Inventory Management
+          </h1>
         </div>
 
         {/* Summary Cards */}
@@ -1545,7 +1835,20 @@ const Inventory = () => {
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
           <div className="flex border-b border-gray-200">
-            {["items", "categories", "vendors", "purchases", "transactions", "requisitions", "issues", "waste", "locations", "assets", "location-stock", "recipe"].map((tab) => (
+            {[
+              "items",
+              "categories",
+              "vendors",
+              "purchases",
+              "transactions",
+              "requisitions",
+              "issues",
+              "waste",
+              "locations",
+              "assets",
+              "location-stock",
+              "recipe",
+            ].map((tab) => (
               <button
                 key={tab}
                 onClick={() => {
@@ -1558,7 +1861,11 @@ const Inventory = () => {
                     : "text-gray-600 hover:text-gray-900"
                 }`}
               >
-                {tab === "location-stock" ? "Location Stock" : tab === "recipe" ? "Recipe" : tab}
+                {tab === "location-stock"
+                  ? "Location Stock"
+                  : tab === "recipe"
+                    ? "Recipe"
+                    : tab}
               </button>
             ))}
           </div>
@@ -1689,8 +1996,8 @@ const Inventory = () => {
                   <VendorsTable vendors={filteredVendors} />
                 )}
                 {activeTab === "purchases" && (
-                  <PurchasesTable 
-                    purchases={filteredPurchases} 
+                  <PurchasesTable
+                    purchases={filteredPurchases}
                     onPurchaseClick={(purchase) => {
                       setSelectedPurchase(purchase);
                       setShowPurchaseDetails(true);
@@ -1699,7 +2006,7 @@ const Inventory = () => {
                 )}
                 {activeTab === "transactions" && (
                   <>
-                    <SmartTransactionsTab 
+                    <SmartTransactionsTab
                       transactions={transactions}
                       purchases={purchases}
                       items={items}
@@ -1732,7 +2039,8 @@ const Inventory = () => {
                     <div className="md:hidden space-y-4">
                       {filteredRequisitions.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
-                          No requisitions found. Click "New Requisition" to create one.
+                          No requisitions found. Click "New Requisition" to
+                          create one.
                         </div>
                       ) : (
                         filteredRequisitions.map((req) => (
@@ -1745,29 +2053,51 @@ const Inventory = () => {
                             }}
                           >
                             <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-semibold text-gray-900">{req.requisition_number}</h3>
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                req.status === "approved" ? "bg-green-100 text-green-800" :
-                                req.status === "rejected" ? "bg-red-100 text-red-800" :
-                                "bg-yellow-100 text-yellow-800"
-                              }`}>
+                              <h3 className="font-semibold text-gray-900">
+                                {req.requisition_number}
+                              </h3>
+                              <span
+                                className={`px-2 py-1 text-xs rounded-full ${
+                                  req.status === "approved"
+                                    ? "bg-green-100 text-green-800"
+                                    : req.status === "rejected"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-yellow-100 text-yellow-800"
+                                }`}
+                              >
                                 {req.status}
                               </span>
                             </div>
                             <div className="space-y-1 text-sm text-gray-600">
-                              <p><span className="font-medium">Department:</span> {req.destination_department}</p>
-                              <p><span className="font-medium">Priority:</span> 
-                                <span className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
-                                  req.priority === "urgent" ? "bg-red-100 text-red-800" :
-                                  req.priority === "critical" ? "bg-purple-100 text-purple-800" :
-                                  "bg-blue-100 text-blue-800"
-                                }`}>
+                              <p>
+                                <span className="font-medium">Department:</span>{" "}
+                                {req.destination_department}
+                              </p>
+                              <p>
+                                <span className="font-medium">Priority:</span>
+                                <span
+                                  className={`ml-1 px-2 py-0.5 text-xs rounded-full ${
+                                    req.priority === "urgent"
+                                      ? "bg-red-100 text-red-800"
+                                      : req.priority === "critical"
+                                        ? "bg-purple-100 text-purple-800"
+                                        : "bg-blue-100 text-blue-800"
+                                  }`}
+                                >
                                   {req.priority}
                                 </span>
                               </p>
-                              <p><span className="font-medium">Items:</span> {req.details?.length || 0}</p>
+                              <p>
+                                <span className="font-medium">Items:</span>{" "}
+                                {req.details?.length || 0}
+                              </p>
                               {req.date_needed && (
-                                <p><span className="font-medium">Date Needed:</span> {formatDateIST(req.date_needed)}</p>
+                                <p>
+                                  <span className="font-medium">
+                                    Date Needed:
+                                  </span>{" "}
+                                  {formatDateIST(req.date_needed)}
+                                </p>
                               )}
                             </div>
                             {req.status === "pending" && (
@@ -1790,70 +2120,111 @@ const Inventory = () => {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Req #</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Date Needed</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Req #
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Department
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">
+                              Date Needed
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Priority
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Status
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Items
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Actions
+                            </th>
                           </tr>
                         </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredRequisitions.length === 0 ? (
-                          <tr>
-                            <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
-                              No requisitions found. Click "New Requisition" to create one.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredRequisitions.map((req) => (
-                            <tr 
-                              key={req.id} 
-                              className="hover:bg-gray-50 cursor-pointer transition-colors"
-                              onClick={() => {
-                                setSelectedRequisition(req);
-                                setShowRequisitionDetails(true);
-                              }}
-                            >
-                              <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">{req.requisition_number}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{req.destination_department}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">{req.date_needed ? formatDateIST(req.date_needed) : "-"}</td>
-                              <td className="px-2 sm:px-4 py-3">
-                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                  req.priority === "urgent" ? "bg-red-100 text-red-800" :
-                                  req.priority === "critical" ? "bg-purple-100 text-purple-800" :
-                                  "bg-blue-100 text-blue-800"
-                                }`}>
-                                  {req.priority}
-                                </span>
-                              </td>
-                              <td className="px-2 sm:px-4 py-3">
-                                <span className={`px-2 py-1 text-xs rounded-full ${
-                                  req.status === "approved" ? "bg-green-100 text-green-800" :
-                                  req.status === "rejected" ? "bg-red-100 text-red-800" :
-                                  "bg-yellow-100 text-yellow-800"
-                                }`}>
-                                  {req.status}
-                                </span>
-                              </td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{req.details?.length || 0} items</td>
-                              <td className="px-2 sm:px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                {req.status === "pending" && (
-                                  <button
-                                    onClick={() => handleApproveRequisition(req.id)}
-                                    className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
-                                  >
-                                    Approve & Issue
-                                  </button>
-                                )}
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {filteredRequisitions.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan="7"
+                                className="px-4 py-8 text-center text-gray-500"
+                              >
+                                No requisitions found. Click "New Requisition"
+                                to create one.
                               </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                          ) : (
+                            filteredRequisitions.map((req) => (
+                              <tr
+                                key={req.id}
+                                className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                onClick={() => {
+                                  setSelectedRequisition(req);
+                                  setShowRequisitionDetails(true);
+                                }}
+                              >
+                                <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">
+                                  {req.requisition_number}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                                  {req.destination_department}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">
+                                  {req.date_needed
+                                    ? formatDateIST(req.date_needed)
+                                    : "-"}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3">
+                                  <span
+                                    className={`px-2 py-1 text-xs rounded-full ${
+                                      req.priority === "urgent"
+                                        ? "bg-red-100 text-red-800"
+                                        : req.priority === "critical"
+                                          ? "bg-purple-100 text-purple-800"
+                                          : "bg-blue-100 text-blue-800"
+                                    }`}
+                                  >
+                                    {req.priority}
+                                  </span>
+                                </td>
+                                <td className="px-2 sm:px-4 py-3">
+                                  <span
+                                    className={`px-2 py-1 text-xs rounded-full ${
+                                      req.status === "approved"
+                                        ? "bg-green-100 text-green-800"
+                                        : req.status === "rejected"
+                                          ? "bg-red-100 text-red-800"
+                                          : "bg-yellow-100 text-yellow-800"
+                                    }`}
+                                  >
+                                    {req.status}
+                                  </span>
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">
+                                  {req.details?.length || 0} items
+                                </td>
+                                <td
+                                  className="px-2 sm:px-4 py-3"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {req.status === "pending" && (
+                                    <button
+                                      onClick={() =>
+                                        handleApproveRequisition(req.id)
+                                      }
+                                      className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                                    >
+                                      Approve & Issue
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </>
                 )}
                 {activeTab === "issues" && (
@@ -1875,13 +2246,28 @@ const Inventory = () => {
                             }}
                           >
                             <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-semibold text-gray-900">{issue.issue_number}</h3>
-                              <span className="text-xs text-gray-500">{formatDateIST(issue.issue_date || issue.created_at)}</span>
+                              <h3 className="font-semibold text-gray-900">
+                                {issue.issue_number}
+                              </h3>
+                              <span className="text-xs text-gray-500">
+                                {formatDateIST(
+                                  issue.issue_date || issue.created_at,
+                                )}
+                              </span>
                             </div>
                             <div className="space-y-1 text-sm text-gray-600">
-                              <p><span className="font-medium">From:</span> {issue.source_location_name || "Main Store"}</p>
-                              <p><span className="font-medium">To:</span> {issue.destination_location_name || "-"}</p>
-                              <p><span className="font-medium">Items:</span> {issue.details?.length || 0}</p>
+                              <p>
+                                <span className="font-medium">From:</span>{" "}
+                                {issue.source_location_name || "Main Store"}
+                              </p>
+                              <p>
+                                <span className="font-medium">To:</span>{" "}
+                                {issue.destination_location_name || "-"}
+                              </p>
+                              <p>
+                                <span className="font-medium">Items:</span>{" "}
+                                {issue.details?.length || 0}
+                              </p>
                             </div>
                           </div>
                         ))
@@ -1892,41 +2278,67 @@ const Inventory = () => {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Issue #</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">From</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">To</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Issue #
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              From
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              To
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Date
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Items
+                            </th>
                           </tr>
                         </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredIssues.length === 0 ? (
-                          <tr>
-                            <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
-                              No issues found. Click "New Issue" to create one.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredIssues.map((issue) => (
-                            <tr 
-                              key={issue.id} 
-                              className="hover:bg-gray-50 cursor-pointer transition-colors"
-                              onClick={() => {
-                                setSelectedIssue(issue);
-                                setShowIssueDetails(true);
-                              }}
-                            >
-                              <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">{issue.issue_number}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{issue.source_location_name || "Main Store"}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{issue.destination_location_name || "-"}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{formatDateIST(issue.issue_date || issue.created_at)}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{issue.details?.length || 0} items</td>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {filteredIssues.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan="5"
+                                className="px-4 py-8 text-center text-gray-500"
+                              >
+                                No issues found. Click "New Issue" to create
+                                one.
+                              </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                          ) : (
+                            filteredIssues.map((issue) => (
+                              <tr
+                                key={issue.id}
+                                className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                onClick={() => {
+                                  setSelectedIssue(issue);
+                                  setShowIssueDetails(true);
+                                }}
+                              >
+                                <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">
+                                  {issue.issue_number}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                                  {issue.source_location_name || "Main Store"}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                                  {issue.destination_location_name || "-"}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">
+                                  {formatDateIST(
+                                    issue.issue_date || issue.created_at,
+                                  )}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">
+                                  {issue.details?.length || 0} items
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </>
                 )}
                 {activeTab === "waste" && (
@@ -1935,7 +2347,8 @@ const Inventory = () => {
                     <div className="md:hidden space-y-4">
                       {filteredWasteLogs.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
-                          No waste logs found. Click "Log Waste/Spoilage" to create one.
+                          No waste logs found. Click "Log Waste/Spoilage" to
+                          create one.
                         </div>
                       ) : (
                         filteredWasteLogs.map((log) => (
@@ -1948,15 +2361,33 @@ const Inventory = () => {
                             }}
                           >
                             <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-semibold text-gray-900">{log.log_number || `WL-${log.id}`}</h3>
-                              <span className="text-xs text-gray-500">{formatDateIST(log.waste_date || log.created_at)}</span>
+                              <h3 className="font-semibold text-gray-900">
+                                {log.log_number || `WL-${log.id}`}
+                              </h3>
+                              <span className="text-xs text-gray-500">
+                                {formatDateIST(
+                                  log.waste_date || log.created_at,
+                                )}
+                              </span>
                             </div>
                             <div className="space-y-1 text-sm text-gray-600">
-                              <p><span className="font-medium">Item:</span> {log.item_name || "N/A"}</p>
-                              <p><span className="font-medium">Quantity:</span> {log.quantity} {log.unit}</p>
-                              <p><span className="font-medium">Reason:</span> {log.reason_code || log.reason || "N/A"}</p>
+                              <p>
+                                <span className="font-medium">Item:</span>{" "}
+                                {log.item_name || "N/A"}
+                              </p>
+                              <p>
+                                <span className="font-medium">Quantity:</span>{" "}
+                                {log.quantity} {log.unit}
+                              </p>
+                              <p>
+                                <span className="font-medium">Reason:</span>{" "}
+                                {log.reason_code || log.reason || "N/A"}
+                              </p>
                               {log.location_name && (
-                                <p><span className="font-medium">Location:</span> {log.location_name}</p>
+                                <p>
+                                  <span className="font-medium">Location:</span>{" "}
+                                  {log.location_name}
+                                </p>
                               )}
                             </div>
                           </div>
@@ -1968,43 +2399,73 @@ const Inventory = () => {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Log #</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Quantity</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Reason</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Location</th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Log #
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Item
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
+                              Quantity
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">
+                              Reason
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Date
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">
+                              Location
+                            </th>
                           </tr>
                         </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredWasteLogs.length === 0 ? (
-                          <tr>
-                            <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                              No waste logs found. Click "Log Waste/Spoilage" to create one.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredWasteLogs.map((log) => (
-                            <tr 
-                              key={log.id} 
-                              className="hover:bg-gray-50 cursor-pointer transition-colors"
-                              onClick={() => {
-                                setSelectedWasteLog(log);
-                                setShowWasteLogDetails(true);
-                              }}
-                            >
-                              <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">{log.log_number || `WL-${log.id}`}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{log.item_name || "N/A"}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{log.quantity} {log.unit}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">{log.reason_code || log.reason || "N/A"}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{formatDateIST(log.waste_date || log.created_at)}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">{log.location_name || "-"}</td>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {filteredWasteLogs.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan="6"
+                                className="px-4 py-8 text-center text-gray-500"
+                              >
+                                No waste logs found. Click "Log Waste/Spoilage"
+                                to create one.
+                              </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                          ) : (
+                            filteredWasteLogs.map((log) => (
+                              <tr
+                                key={log.id}
+                                className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                onClick={() => {
+                                  setSelectedWasteLog(log);
+                                  setShowWasteLogDetails(true);
+                                }}
+                              >
+                                <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">
+                                  {log.log_number || `WL-${log.id}`}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">
+                                  {log.item_name || "N/A"}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                                  {log.quantity} {log.unit}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">
+                                  {log.reason_code || log.reason || "N/A"}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">
+                                  {formatDateIST(
+                                    log.waste_date || log.created_at,
+                                  )}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">
+                                  {log.location_name || "-"}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </>
                 )}
                 {activeTab === "locations" && (
@@ -2013,7 +2474,8 @@ const Inventory = () => {
                     <div className="md:hidden space-y-4">
                       {filteredLocations.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
-                          No locations found. Click "New Location" to create one.
+                          No locations found. Click "New Location" to create
+                          one.
                         </div>
                       ) : (
                         filteredLocations.map((loc) => (
@@ -2026,16 +2488,36 @@ const Inventory = () => {
                             }}
                           >
                             <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-semibold text-gray-900">{loc.name}</h3>
+                              <h3 className="font-semibold text-gray-900">
+                                {loc.name}
+                              </h3>
                               {loc.is_inventory_point ? (
-                                <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Inventory Point</span>
+                                <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                                  Inventory Point
+                                </span>
                               ) : null}
                             </div>
                             <div className="space-y-1 text-sm text-gray-600">
-                              <p><span className="font-medium">Code:</span> {loc.location_code || `LOC-${loc.id}`}</p>
-                              {loc.building && <p><span className="font-medium">Building:</span> {loc.building}</p>}
-                              {loc.floor && <p><span className="font-medium">Floor:</span> {loc.floor}</p>}
-                              <p><span className="font-medium">Type:</span> {loc.location_type}</p>
+                              <p>
+                                <span className="font-medium">Code:</span>{" "}
+                                {loc.location_code || `LOC-${loc.id}`}
+                              </p>
+                              {loc.building && (
+                                <p>
+                                  <span className="font-medium">Building:</span>{" "}
+                                  {loc.building}
+                                </p>
+                              )}
+                              {loc.floor && (
+                                <p>
+                                  <span className="font-medium">Floor:</span>{" "}
+                                  {loc.floor}
+                                </p>
+                              )}
+                              <p>
+                                <span className="font-medium">Type:</span>{" "}
+                                {loc.location_type}
+                              </p>
                             </div>
                           </div>
                         ))
@@ -2046,49 +2528,79 @@ const Inventory = () => {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Building</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Floor</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Type</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Inventory Point</th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Code
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Name
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
+                              Building
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">
+                              Floor
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
+                              Type
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Inventory Point
+                            </th>
                           </tr>
                         </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredLocations.length === 0 ? (
-                          <tr>
-                            <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
-                              No locations found. Click "New Location" to create one.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredLocations.map((loc) => (
-                            <tr 
-                              key={loc.id} 
-                              className="hover:bg-gray-50 cursor-pointer transition-colors"
-                              onClick={() => {
-                                setSelectedLocation(loc);
-                                setShowLocationDetails(true);
-                              }}
-                            >
-                              <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">{loc.location_code || `LOC-${loc.id}`}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{loc.name}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{loc.building || "-"}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">{loc.floor || "-"}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{loc.location_type}</td>
-                              <td className="px-2 sm:px-4 py-3">
-                                {loc.is_inventory_point ? (
-                                  <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Yes</span>
-                                ) : (
-                                  <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">No</span>
-                                )}
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {filteredLocations.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan="6"
+                                className="px-4 py-8 text-center text-gray-500"
+                              >
+                                No locations found. Click "New Location" to
+                                create one.
                               </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                          ) : (
+                            filteredLocations.map((loc) => (
+                              <tr
+                                key={loc.id}
+                                className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                onClick={() => {
+                                  setSelectedLocation(loc);
+                                  setShowLocationDetails(true);
+                                }}
+                              >
+                                <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">
+                                  {loc.location_code || `LOC-${loc.id}`}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">
+                                  {loc.name}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                                  {loc.building || "-"}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">
+                                  {loc.floor || "-"}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                                  {loc.location_type}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3">
+                                  {loc.is_inventory_point ? (
+                                    <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                                      Yes
+                                    </span>
+                                  ) : (
+                                    <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">
+                                      No
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </>
                 )}
                 {activeTab === "assets" && (
@@ -2097,7 +2609,8 @@ const Inventory = () => {
                     <div className="md:hidden space-y-4">
                       {filteredAssetMappings.length === 0 ? (
                         <div className="text-center py-8 text-gray-500">
-                          No asset mappings found. Click "Assign Asset" to create one.
+                          No asset mappings found. Click "Assign Asset" to
+                          create one.
                         </div>
                       ) : (
                         filteredAssetMappings.map((mapping) => (
@@ -2110,13 +2623,25 @@ const Inventory = () => {
                             }}
                           >
                             <div className="flex justify-between items-start mb-2">
-                              <h3 className="font-semibold text-gray-900">{mapping.item_name || "N/A"}</h3>
-                              <span className="text-xs text-gray-500">{formatDateIST(mapping.assigned_date || mapping.created_at)}</span>
+                              <h3 className="font-semibold text-gray-900">
+                                {mapping.item_name || "N/A"}
+                              </h3>
+                              <span className="text-xs text-gray-500">
+                                {formatDateIST(
+                                  mapping.assigned_date || mapping.created_at,
+                                )}
+                              </span>
                             </div>
                             <div className="space-y-1 text-sm text-gray-600">
-                              <p><span className="font-medium">Location:</span> {mapping.location_name || "-"}</p>
+                              <p>
+                                <span className="font-medium">Location:</span>{" "}
+                                {mapping.location_name || "-"}
+                              </p>
                               {mapping.serial_number && (
-                                <p><span className="font-medium">Serial #:</span> {mapping.serial_number}</p>
+                                <p>
+                                  <span className="font-medium">Serial #:</span>{" "}
+                                  {mapping.serial_number}
+                                </p>
                               )}
                             </div>
                             <button
@@ -2137,48 +2662,77 @@ const Inventory = () => {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Location</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Serial #</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned Date</th>
-                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Item
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
+                              Location
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">
+                              Serial #
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Assigned Date
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Actions
+                            </th>
                           </tr>
                         </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredAssetMappings.length === 0 ? (
-                          <tr>
-                            <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
-                              No asset mappings found. Click "Assign Asset" to create one.
-                            </td>
-                          </tr>
-                        ) : (
-                          filteredAssetMappings.map((mapping) => (
-                            <tr 
-                              key={mapping.id} 
-                              className="hover:bg-gray-50 cursor-pointer transition-colors"
-                              onClick={() => {
-                                setSelectedAsset(mapping);
-                                setShowAssetDetails(true);
-                              }}
-                            >
-                              <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">{mapping.item_name || "N/A"}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">{mapping.location_name || "-"}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">{mapping.serial_number || "-"}</td>
-                              <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">{formatDateIST(mapping.assigned_date || mapping.created_at)}</td>
-                              <td className="px-2 sm:px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                <button
-                                  onClick={() => handleUnassignAsset(mapping.id)}
-                                  className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-                                >
-                                  Unassign
-                                </button>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {filteredAssetMappings.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan="5"
+                                className="px-4 py-8 text-center text-gray-500"
+                              >
+                                No asset mappings found. Click "Assign Asset" to
+                                create one.
                               </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
+                          ) : (
+                            filteredAssetMappings.map((mapping) => (
+                              <tr
+                                key={mapping.id}
+                                className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                onClick={() => {
+                                  setSelectedAsset(mapping);
+                                  setShowAssetDetails(true);
+                                }}
+                              >
+                                <td className="px-2 sm:px-4 py-3 text-sm font-medium text-gray-900">
+                                  {mapping.item_name || "N/A"}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
+                                  {mapping.location_name || "-"}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">
+                                  {mapping.serial_number || "-"}
+                                </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">
+                                  {formatDateIST(
+                                    mapping.assigned_date || mapping.created_at,
+                                  )}
+                                </td>
+                                <td
+                                  className="px-2 sm:px-4 py-3"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    onClick={() =>
+                                      handleUnassignAsset(mapping.id)
+                                    }
+                                    className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                                  >
+                                    Unassign
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </>
                 )}
                 {activeTab === "location-stock" && (
@@ -2186,12 +2740,17 @@ const Inventory = () => {
                     locations={locationStock}
                     onLocationClick={async (locationId) => {
                       try {
-                        const res = await API.get(`/inventory/locations/${locationId}/items`);
+                        const res = await API.get(
+                          `/inventory/locations/${locationId}/items`,
+                        );
                         setLocationStockDetails(res.data);
                         setSelectedLocationStock(locationId);
                       } catch (error) {
                         console.error("Error fetching location items:", error);
-                        alert("Failed to load location items: " + (error.response?.data?.detail || error.message));
+                        alert(
+                          "Failed to load location items: " +
+                            (error.response?.data?.detail || error.message),
+                        );
                       }
                     }}
                   />
@@ -2200,7 +2759,9 @@ const Inventory = () => {
                 {activeTab === "recipe" && (
                   <div className="space-y-4">
                     <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-semibold text-gray-800">Food Item Recipes</h3>
+                      <h3 className="text-lg font-semibold text-gray-800">
+                        Food Item Recipes
+                      </h3>
                       <button
                         onClick={() => {
                           setRecipeForm({
@@ -2210,7 +2771,7 @@ const Inventory = () => {
                             servings: 1,
                             prep_time_minutes: "",
                             cook_time_minutes: "",
-                            ingredients: []
+                            ingredients: [],
                           });
                           setEditingRecipe(null);
                           setShowRecipeModal(true);
@@ -2230,22 +2791,39 @@ const Inventory = () => {
                         <table className="min-w-full divide-y divide-gray-200">
                           <thead className="bg-gray-50">
                             <tr>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Food Item</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recipe Name</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Servings</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ingredients</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cost/Serving</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                Food Item
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                Recipe Name
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                Servings
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                Ingredients
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                Cost/Serving
+                              </th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                Actions
+                              </th>
                             </tr>
                           </thead>
                           <tbody className="bg-white divide-y divide-gray-200">
                             {recipes.map((recipe) => (
                               <tr key={recipe.id} className="hover:bg-gray-50">
                                 <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                                  {recipe.food_item_name || `Food Item #${recipe.food_item_id}`}
+                                  {recipe.food_item_name ||
+                                    `Food Item #${recipe.food_item_id}`}
                                 </td>
-                                <td className="px-4 py-3 text-sm text-gray-900">{recipe.name}</td>
-                                <td className="px-4 py-3 text-sm text-gray-600">{recipe.servings}</td>
+                                <td className="px-4 py-3 text-sm text-gray-900">
+                                  {recipe.name}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-gray-600">
+                                  {recipe.servings}
+                                </td>
                                 <td className="px-4 py-3 text-sm text-gray-600">
                                   {recipe.ingredients.length} ingredient(s)
                                 </td>
@@ -2262,14 +2840,19 @@ const Inventory = () => {
                                           name: recipe.name,
                                           description: recipe.description || "",
                                           servings: recipe.servings,
-                                          prep_time_minutes: recipe.prep_time_minutes || "",
-                                          cook_time_minutes: recipe.cook_time_minutes || "",
-                                          ingredients: recipe.ingredients.map(ing => ({
-                                            inventory_item_id: ing.inventory_item_id,
-                                            quantity: ing.quantity,
-                                            unit: ing.unit,
-                                            notes: ing.notes || ""
-                                          }))
+                                          prep_time_minutes:
+                                            recipe.prep_time_minutes || "",
+                                          cook_time_minutes:
+                                            recipe.cook_time_minutes || "",
+                                          ingredients: recipe.ingredients.map(
+                                            (ing) => ({
+                                              inventory_item_id:
+                                                ing.inventory_item_id,
+                                              quantity: ing.quantity,
+                                              unit: ing.unit,
+                                              notes: ing.notes || "",
+                                            }),
+                                          ),
                                         });
                                         setShowRecipeModal(true);
                                       }}
@@ -2279,12 +2862,22 @@ const Inventory = () => {
                                     </button>
                                     <button
                                       onClick={async () => {
-                                        if (window.confirm("Are you sure you want to delete this recipe?")) {
+                                        if (
+                                          window.confirm(
+                                            "Are you sure you want to delete this recipe?",
+                                          )
+                                        ) {
                                           try {
-                                            await API.delete(`/recipes/${recipe.id}`);
+                                            await API.delete(
+                                              `/recipes/${recipe.id}`,
+                                            );
                                             fetchData();
                                           } catch (error) {
-                                            alert("Failed to delete recipe: " + (error.response?.data?.detail || error.message));
+                                            alert(
+                                              "Failed to delete recipe: " +
+                                                (error.response?.data?.detail ||
+                                                  error.message),
+                                            );
                                           }
                                         }
                                       }}
@@ -2318,19 +2911,22 @@ const Inventory = () => {
           onAddDetail={() => {
             setRequisitionForm({
               ...requisitionForm,
-              details: [...requisitionForm.details, {
-                item_id: "",
-                requested_quantity: 0,
-                approved_quantity: null,
-                unit: "pcs",
-                notes: ""
-              }]
+              details: [
+                ...requisitionForm.details,
+                {
+                  item_id: "",
+                  requested_quantity: 0,
+                  approved_quantity: null,
+                  unit: "pcs",
+                  notes: "",
+                },
+              ],
             });
           }}
           onRemoveDetail={(index) => {
             setRequisitionForm({
               ...requisitionForm,
-              details: requisitionForm.details.filter((_, i) => i !== index)
+              details: requisitionForm.details.filter((_, i) => i !== index),
             });
           }}
           onClose={() => {
@@ -2340,13 +2936,15 @@ const Inventory = () => {
               date_needed: "",
               priority: "normal",
               notes: "",
-              details: [{
-                item_id: "",
-                requested_quantity: 0,
-                approved_quantity: null,
-                unit: "pcs",
-                notes: ""
-              }]
+              details: [
+                {
+                  item_id: "",
+                  requested_quantity: 0,
+                  approved_quantity: null,
+                  unit: "pcs",
+                  notes: "",
+                },
+              ],
             });
           }}
         />
@@ -2370,7 +2968,7 @@ const Inventory = () => {
               unit: "pcs",
               reason: "",
               notes: "",
-              photo: null
+              photo: null,
             });
           }}
         />
@@ -2393,7 +2991,7 @@ const Inventory = () => {
               parent_location_id: "",
               is_inventory_point: false,
               description: "",
-              is_active: true
+              is_active: true,
             });
           }}
         />
@@ -2414,7 +3012,7 @@ const Inventory = () => {
               item_id: "",
               location_id: "",
               serial_number: "",
-              notes: ""
+              notes: "",
             });
           }}
         />
@@ -2429,8 +3027,15 @@ const Inventory = () => {
             e.preventDefault();
             if (newUnit.value && newUnit.label) {
               // Check if unit already exists
-              if (!units.find(u => u.value.toLowerCase() === newUnit.value.toLowerCase())) {
-                setUnits([...units, { value: newUnit.value.toLowerCase(), label: newUnit.label }]);
+              if (
+                !units.find(
+                  (u) => u.value.toLowerCase() === newUnit.value.toLowerCase(),
+                )
+              ) {
+                setUnits([
+                  ...units,
+                  { value: newUnit.value.toLowerCase(), label: newUnit.label },
+                ]);
                 setItemForm({ ...itemForm, unit: newUnit.value.toLowerCase() });
                 setNewUnit({ value: "", label: "" });
                 setShowUnitForm(false);
@@ -2583,9 +3188,11 @@ const Inventory = () => {
           }}
           onUpdate={(updatedPurchase) => {
             // Update the purchase in the list
-            setPurchases(purchases.map(p => 
-              p.id === updatedPurchase.id ? updatedPurchase : p
-            ));
+            setPurchases(
+              purchases.map((p) =>
+                p.id === updatedPurchase.id ? updatedPurchase : p,
+              ),
+            );
             setSelectedPurchase(updatedPurchase);
           }}
         />
@@ -2617,19 +3224,21 @@ const Inventory = () => {
               payment_status: "pending",
               notes: "",
               status: "draft",
-              details: [{ 
-                item_id: "", 
-                category: "",
-                hsn_code: "",
-                unit: "pcs",
-                quantity: 0, 
-                unit_price: 0, 
-                gst_rate: 0, 
-                tax_inclusive: false,
-                serial_batch: "",
-                expiry_date: "",
-                discount: 0 
-              }],
+              details: [
+                {
+                  item_id: "",
+                  category: "",
+                  hsn_code: "",
+                  unit: "pcs",
+                  quantity: 0,
+                  unit_price: 0,
+                  gst_rate: 0,
+                  tax_inclusive: false,
+                  serial_batch: "",
+                  expiry_date: "",
+                  discount: 0,
+                },
+              ],
             });
           }}
         />
@@ -2651,13 +3260,15 @@ const Inventory = () => {
               date_needed: "",
               priority: "Normal",
               notes: "",
-              details: [{
-                item_id: "",
-                requested_quantity: 0,
-                approved_quantity: null,
-                unit: "pcs",
-                notes: ""
-              }]
+              details: [
+                {
+                  item_id: "",
+                  requested_quantity: 0,
+                  approved_quantity: null,
+                  unit: "pcs",
+                  notes: "",
+                },
+              ],
             });
           }}
         />
@@ -2682,14 +3293,16 @@ const Inventory = () => {
               destination_location_id: "",
               issue_date: getCurrentDateIST(),
               notes: "",
-              details: [{
-                item_id: "",
-                issued_quantity: 0,
-                unit: "pcs",
-                batch_lot_number: "",
-                cost: 0,
-                notes: ""
-              }]
+              details: [
+                {
+                  item_id: "",
+                  issued_quantity: 0,
+                  unit: "pcs",
+                  batch_lot_number: "",
+                  cost: 0,
+                  notes: "",
+                },
+              ],
             });
           }}
         />
@@ -2716,7 +3329,7 @@ const Inventory = () => {
               location_id: "",
               waste_date: getCurrentDateIST(),
               notes: "",
-              photo: null
+              photo: null,
             });
           }}
         />
@@ -2740,7 +3353,7 @@ const Inventory = () => {
               parent_location_id: "",
               is_inventory_point: false,
               description: "",
-              is_active: true
+              is_active: true,
             });
           }}
         />
@@ -2766,7 +3379,7 @@ const Inventory = () => {
               warranty_expiry_date: "",
               last_maintenance_date: "",
               next_maintenance_due_date: "",
-              notes: ""
+              notes: "",
             });
           }}
         />
@@ -2865,7 +3478,10 @@ const Inventory = () => {
               setEditingRecipe(null);
               fetchData();
             } catch (error) {
-              alert("Failed to save recipe: " + (error.response?.data?.detail || error.message));
+              alert(
+                "Failed to save recipe: " +
+                  (error.response?.data?.detail || error.message),
+              );
             }
           }}
           onClose={() => {
@@ -2878,7 +3494,7 @@ const Inventory = () => {
               servings: 1,
               prep_time_minutes: "",
               cook_time_minutes: "",
-              ingredients: []
+              ingredients: [],
             });
           }}
         />
@@ -2900,11 +3516,15 @@ const SummaryCard = ({ label, value, icon, color, highlight }) => {
   };
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border-2 p-4 ${highlight ? 'border-red-300' : 'border-gray-100'}`}>
+    <div
+      className={`bg-white rounded-xl shadow-sm border-2 p-4 ${highlight ? "border-red-300" : "border-gray-100"}`}
+    >
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm text-gray-600">{label}</p>
-          <p className={`text-2xl font-bold mt-1 ${colorClasses[color]}`}>{value}</p>
+          <p className={`text-2xl font-bold mt-1 ${colorClasses[color]}`}>
+            {value}
+          </p>
         </div>
         <div className={colorClasses[color] + " p-3 rounded-lg"}>{icon}</div>
       </div>
@@ -2919,15 +3539,33 @@ const ItemsTable = ({ items, categories, onDelete }) => {
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Min Level</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Name
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Category
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Department
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Stock
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Min Level
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Unit Price
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Total Value
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Status
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -2940,8 +3578,12 @@ const ItemsTable = ({ items, categories, onDelete }) => {
           ) : (
             items.map((item) => (
               <tr key={item.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-medium text-gray-900">{item.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{item.category_name || "-"}</td>
+                <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                  {item.name}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-600">
+                  {item.category_name || "-"}
+                </td>
                 <td className="px-4 py-3 text-sm">
                   {item.department ? (
                     <span className="px-2 py-1 text-xs font-semibold text-indigo-800 bg-indigo-100 rounded-full">
@@ -2952,12 +3594,20 @@ const ItemsTable = ({ items, categories, onDelete }) => {
                   )}
                 </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
-                  <span className={item.is_low_stock ? "text-red-600 font-semibold" : ""}>
+                  <span
+                    className={
+                      item.is_low_stock ? "text-red-600 font-semibold" : ""
+                    }
+                  >
                     {item.current_stock} {item.unit}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-600">{item.min_stock_level}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{formatCurrency(item.unit_price)}</td>
+                <td className="px-4 py-3 text-sm text-gray-600">
+                  {item.min_stock_level}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-600">
+                  {formatCurrency(item.unit_price)}
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
                   {formatCurrency(item.current_stock * item.unit_price)}
                 </td>
@@ -2996,9 +3646,15 @@ const CategoriesTable = ({ categories }) => {
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Name
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Description
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Created
+            </th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -3011,8 +3667,12 @@ const CategoriesTable = ({ categories }) => {
           ) : (
             categories.map((cat) => (
               <tr key={cat.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-medium text-gray-900">{cat.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{cat.description || "-"}</td>
+                <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                  {cat.name}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-600">
+                  {cat.description || "-"}
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
                   {formatDateIST(cat.created_at)}
                 </td>
@@ -3032,11 +3692,21 @@ const VendorsTable = ({ vendors }) => {
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Company</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">GST</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Name
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Company
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              GST
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Contact
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Status
+            </th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -3049,9 +3719,15 @@ const VendorsTable = ({ vendors }) => {
           ) : (
             vendors.map((vendor) => (
               <tr key={vendor.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-medium text-gray-900">{vendor.name}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{vendor.company_name || "-"}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{vendor.gst_number || "-"}</td>
+                <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                  {vendor.name}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-600">
+                  {vendor.company_name || "-"}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-600">
+                  {vendor.gst_number || "-"}
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
                   {vendor.phone || vendor.email || "-"}
                 </td>
@@ -3082,12 +3758,24 @@ const PurchasesTable = ({ purchases, onPurchaseClick }) => {
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">PO Number</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vendor</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment</th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              PO Number
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Vendor
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Date
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Status
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Payment
+            </th>
+            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+              Total
+            </th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
@@ -3099,32 +3787,45 @@ const PurchasesTable = ({ purchases, onPurchaseClick }) => {
             </tr>
           ) : (
             purchases.map((purchase) => (
-              <tr 
-                key={purchase.id} 
+              <tr
+                key={purchase.id}
                 className="hover:bg-indigo-50 cursor-pointer transition-colors"
                 onClick={() => onPurchaseClick && onPurchaseClick(purchase)}
               >
-                <td className="px-4 py-3 text-sm font-medium text-gray-900">{purchase.purchase_number}</td>
-                <td className="px-4 py-3 text-sm text-gray-600">{purchase.vendor_name || "-"}</td>
+                <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                  {purchase.purchase_number}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-600">
+                  {purchase.vendor_name || "-"}
+                </td>
                 <td className="px-4 py-3 text-sm text-gray-600">
                   {formatDateIST(purchase.purchase_date)}
                 </td>
                 <td className="px-4 py-3 text-sm">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                    purchase.status === "received" ? "bg-green-100 text-green-800" :
-                    purchase.status === "confirmed" ? "bg-blue-100 text-blue-800" :
-                    purchase.status === "cancelled" ? "bg-red-100 text-red-800" :
-                    "bg-gray-100 text-gray-800"
-                  }`}>
+                  <span
+                    className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                      purchase.status === "received"
+                        ? "bg-green-100 text-green-800"
+                        : purchase.status === "confirmed"
+                          ? "bg-blue-100 text-blue-800"
+                          : purchase.status === "cancelled"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
                     {purchase.status}
                   </span>
                 </td>
                 <td className="px-4 py-3 text-sm">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                    purchase.payment_status === "paid" ? "bg-green-100 text-green-800" :
-                    purchase.payment_status === "partial" ? "bg-yellow-100 text-yellow-800" :
-                    "bg-gray-100 text-gray-800"
-                  }`}>
+                  <span
+                    className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                      purchase.payment_status === "paid"
+                        ? "bg-green-100 text-green-800"
+                        : purchase.payment_status === "partial"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
                     {purchase.payment_status}
                   </span>
                 </td>
@@ -3141,7 +3842,16 @@ const PurchasesTable = ({ purchases, onPurchaseClick }) => {
 };
 
 // Smart Stock Transaction & Movement Tab
-const SmartTransactionsTab = ({ transactions, purchases, items, categories, filters, setFilters, onRefresh, onTransactionClick }) => {
+const SmartTransactionsTab = ({
+  transactions,
+  purchases,
+  items,
+  categories,
+  filters,
+  setFilters,
+  onRefresh,
+  onTransactionClick,
+}) => {
   // Calculate dashboard metrics (all-time totals)
   const calculateMetrics = () => {
     // Total Purchases (from purchase masters - all time)
@@ -3151,21 +3861,34 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
 
     // Kitchen Consumption (Usage transactions - all time)
     const kitchenUsage = transactions
-      .filter(t => t.transaction_type === "out" && t.notes?.toLowerCase().includes("kitchen"))
+      .filter(
+        (t) =>
+          t.transaction_type === "out" &&
+          t.notes?.toLowerCase().includes("kitchen"),
+      )
       .reduce((sum, t) => {
         return sum + (parseFloat(t.total_amount) || 0);
       }, 0);
 
     // Waste/Spoilage (Waste transactions - all time)
     const wasteSpoilage = transactions
-      .filter(t => t.transaction_type === "out" && (t.notes?.toLowerCase().includes("waste") || t.notes?.toLowerCase().includes("spoilage")))
+      .filter(
+        (t) =>
+          t.transaction_type === "out" &&
+          (t.notes?.toLowerCase().includes("waste") ||
+            t.notes?.toLowerCase().includes("spoilage")),
+      )
       .reduce((sum, t) => {
         return sum + (parseFloat(t.total_amount) || 0);
       }, 0);
 
     // Current Stock Value (from items)
     const currentStockValue = items.reduce((sum, item) => {
-      return sum + (parseFloat(item.current_stock) || 0) * (parseFloat(item.unit_price) || 0);
+      return (
+        sum +
+        (parseFloat(item.current_stock) || 0) *
+          (parseFloat(item.unit_price) || 0)
+      );
     }, 0);
 
     return {
@@ -3190,12 +3913,20 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
         waste: "out",
         adjustment: "adjustment",
       };
-      filtered = filtered.filter(t => {
+      filtered = filtered.filter((t) => {
         if (filters.type === "waste") {
-          return t.transaction_type === "out" && (t.notes?.toLowerCase().includes("waste") || t.notes?.toLowerCase().includes("spoilage"));
+          return (
+            t.transaction_type === "out" &&
+            (t.notes?.toLowerCase().includes("waste") ||
+              t.notes?.toLowerCase().includes("spoilage"))
+          );
         }
         if (filters.type === "usage") {
-          return t.transaction_type === "out" && !t.notes?.toLowerCase().includes("waste") && !t.notes?.toLowerCase().includes("spoilage");
+          return (
+            t.transaction_type === "out" &&
+            !t.notes?.toLowerCase().includes("waste") &&
+            !t.notes?.toLowerCase().includes("spoilage")
+          );
         }
         return t.transaction_type === typeMap[filters.type];
       });
@@ -3203,10 +3934,10 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
 
     // Filter by category
     if (filters.category !== "all") {
-      filtered = filtered.filter(t => {
-        const item = items.find(i => i.id === t.item_id);
+      filtered = filtered.filter((t) => {
+        const item = items.find((i) => i.id === t.item_id);
         if (!item) return false;
-        const category = categories.find(c => c.id === item.category_id);
+        const category = categories.find((c) => c.id === item.category_id);
         return category?.name === filters.category;
       });
     }
@@ -3215,31 +3946,37 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
     if (filters.dateRange !== "all") {
       const now = new Date();
       let startDate = new Date();
-      
+
       if (filters.dateRange === "today") {
         startDate.setHours(0, 0, 0, 0);
       } else if (filters.dateRange === "week") {
         startDate.setDate(now.getDate() - 7);
       } else if (filters.dateRange === "month") {
         startDate.setMonth(now.getMonth() - 1);
-      } else if (filters.dateRange === "custom" && filters.startDate && filters.endDate) {
+      } else if (
+        filters.dateRange === "custom" &&
+        filters.startDate &&
+        filters.endDate
+      ) {
         startDate = new Date(filters.startDate);
         const endDate = new Date(filters.endDate);
         endDate.setHours(23, 59, 59, 999);
-        filtered = filtered.filter(t => {
+        filtered = filtered.filter((t) => {
           const transDate = new Date(t.created_at);
           return transDate >= startDate && transDate <= endDate;
         });
         return filtered;
       }
-      
-      filtered = filtered.filter(t => {
+
+      filtered = filtered.filter((t) => {
         const transDate = new Date(t.created_at);
         return transDate >= startDate;
       });
     }
 
-    return filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return filtered.sort(
+      (a, b) => new Date(b.created_at) - new Date(a.created_at),
+    );
   };
 
   const filteredTransactions = getFilteredTransactions();
@@ -3254,7 +3991,10 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
         statusColor: "bg-green-500",
       };
     } else if (trans.transaction_type === "out") {
-      if (trans.notes?.toLowerCase().includes("waste") || trans.notes?.toLowerCase().includes("spoilage")) {
+      if (
+        trans.notes?.toLowerCase().includes("waste") ||
+        trans.notes?.toLowerCase().includes("spoilage")
+      ) {
         return {
           icon: <Trash className="w-4 h-4" />,
           label: "Waste/Spoilage",
@@ -3288,9 +4028,9 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
 
   // Get item details
   const getItemDetails = (itemId) => {
-    const item = items.find(i => i.id === itemId);
+    const item = items.find((i) => i.id === itemId);
     if (!item) return { name: "-", category: "-", unit: "-" };
-    const category = categories.find(c => c.id === item.category_id);
+    const category = categories.find((c) => c.id === item.category_id);
     return {
       name: item.name,
       category: category?.name || "-",
@@ -3306,9 +4046,15 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Total Purchases</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(metrics.totalPurchases)}</p>
-              <p className="text-xs text-gray-500 mt-1">Sum of all Purchase Invoices</p>
+              <p className="text-sm font-medium text-gray-600">
+                Total Purchases
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {formatCurrency(metrics.totalPurchases)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Sum of all Purchase Invoices
+              </p>
             </div>
             <ArrowDownCircle className="w-8 h-8 text-blue-500" />
           </div>
@@ -3317,9 +4063,15 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Kitchen Consumption</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(metrics.kitchenUsage)}</p>
-              <p className="text-xs text-gray-500 mt-1">Sum of Usage Logs (COGS)</p>
+              <p className="text-sm font-medium text-gray-600">
+                Kitchen Consumption
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {formatCurrency(metrics.kitchenUsage)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Sum of Usage Logs (COGS)
+              </p>
             </div>
             <ShoppingCart className="w-8 h-8 text-yellow-500" />
           </div>
@@ -3328,9 +4080,15 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Waste / Spoilage</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(metrics.wasteSpoilage)}</p>
-              <p className="text-xs text-gray-500 mt-1">Loss from expired/ruined food</p>
+              <p className="text-sm font-medium text-gray-600">
+                Waste / Spoilage
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {formatCurrency(metrics.wasteSpoilage)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Loss from expired/ruined food
+              </p>
             </div>
             <Trash className="w-8 h-8 text-red-500" />
           </div>
@@ -3339,9 +4097,15 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
         <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Current Stock Value</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{formatCurrency(metrics.currentStockValue)}</p>
-              <p className="text-xs text-gray-500 mt-1">Value of inventory on shelves</p>
+              <p className="text-sm font-medium text-gray-600">
+                Current Stock Value
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-1">
+                {formatCurrency(metrics.currentStockValue)}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                Value of inventory on shelves
+              </p>
             </div>
             <Package className="w-8 h-8 text-green-500" />
           </div>
@@ -3357,14 +4121,32 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Transaction Type Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Transaction Type</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Transaction Type
+            </label>
             <div className="flex flex-wrap gap-2">
               {[
                 { value: "all", label: "All", icon: null },
-                { value: "purchase", label: "Purchase (In)", icon: <ArrowDownCircle className="w-4 h-4" /> },
-                { value: "usage", label: "Kitchen Usage", icon: <ShoppingCart className="w-4 h-4" /> },
-                { value: "waste", label: "Waste/Spoilage", icon: <Trash className="w-4 h-4" /> },
-                { value: "adjustment", label: "Audit Correction", icon: <RotateCcw className="w-4 h-4" /> },
+                {
+                  value: "purchase",
+                  label: "Purchase (In)",
+                  icon: <ArrowDownCircle className="w-4 h-4" />,
+                },
+                {
+                  value: "usage",
+                  label: "Kitchen Usage",
+                  icon: <ShoppingCart className="w-4 h-4" />,
+                },
+                {
+                  value: "waste",
+                  label: "Waste/Spoilage",
+                  icon: <Trash className="w-4 h-4" />,
+                },
+                {
+                  value: "adjustment",
+                  label: "Audit Correction",
+                  icon: <RotateCcw className="w-4 h-4" />,
+                },
               ].map((option) => (
                 <button
                   key={option.value}
@@ -3384,26 +4166,36 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
 
           {/* Category Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Category
+            </label>
             <select
               value={filters.category}
-              onChange={(e) => setFilters({ ...filters, category: e.target.value })}
+              onChange={(e) =>
+                setFilters({ ...filters, category: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
             >
               <option value="all">All Categories</option>
               {categories.map((cat) => (
-                <option key={cat.id} value={cat.name}>{cat.name}</option>
+                <option key={cat.id} value={cat.name}>
+                  {cat.name}
+                </option>
               ))}
             </select>
           </div>
 
           {/* Date Range Filter */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Date Range</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Date Range
+            </label>
             <div className="flex gap-2">
               <select
                 value={filters.dateRange}
-                onChange={(e) => setFilters({ ...filters, dateRange: e.target.value })}
+                onChange={(e) =>
+                  setFilters({ ...filters, dateRange: e.target.value })
+                }
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="today">Today</option>
@@ -3417,14 +4209,18 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
                   <input
                     type="date"
                     value={filters.startDate}
-                    onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
+                    onChange={(e) =>
+                      setFilters({ ...filters, startDate: e.target.value })
+                    }
                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                     placeholder="Start Date"
                   />
                   <input
                     type="date"
                     value={filters.endDate}
-                    onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
+                    onChange={(e) =>
+                      setFilters({ ...filters, endDate: e.target.value })
+                    }
                     className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                     placeholder="End Date"
                   />
@@ -3441,20 +4237,39 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item Details</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Transaction Type</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty Change</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Batch/Expiry</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Financials</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Date
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Item Details
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Transaction Type
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Qty Change
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Batch/Expiry
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Financials
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                  Action
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredTransactions.length === 0 ? (
                 <tr>
-                  <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                  <td
+                    colSpan="8"
+                    className="px-4 py-8 text-center text-gray-500"
+                  >
                     No transactions found
                   </td>
                 </tr>
@@ -3463,28 +4278,36 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
                   const typeInfo = getTransactionTypeInfo(trans);
                   const itemDetails = getItemDetails(trans.item_id);
                   const isPositive = trans.transaction_type === "in";
-                  
+
                   return (
                     <tr key={trans.id} className="hover:bg-gray-50">
                       {/* Status Indicator */}
                       <td className="px-4 py-3">
-                        <div className={`w-3 h-3 rounded-full ${typeInfo.statusColor}`}></div>
+                        <div
+                          className={`w-3 h-3 rounded-full ${typeInfo.statusColor}`}
+                        ></div>
                       </td>
-                      
+
                       {/* Date */}
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {formatDateIST(trans.created_at)}
                       </td>
-                      
+
                       {/* Item Details */}
                       <td className="px-4 py-3">
-                        <div className="text-sm font-medium text-gray-900">{itemDetails.name}</div>
-                        <div className="text-xs text-gray-500">({itemDetails.category} / {itemDetails.unit})</div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {itemDetails.name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          ({itemDetails.category} / {itemDetails.unit})
+                        </div>
                       </td>
-                      
+
                       {/* Transaction Type */}
                       <td className="px-4 py-3">
-                        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${typeInfo.color}`}>
+                        <div
+                          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold ${typeInfo.color}`}
+                        >
                           {typeInfo.icon}
                           {typeInfo.label}
                         </div>
@@ -3495,35 +4318,36 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
                           </div>
                         )}
                       </td>
-                      
+
                       {/* Quantity Change */}
                       <td className="px-4 py-3">
-                        <div className={`text-sm font-semibold ${isPositive ? "text-green-600" : "text-red-600"}`}>
-                          {isPositive ? "+" : "-"} {trans.quantity} {itemDetails.unit}
+                        <div
+                          className={`text-sm font-semibold ${isPositive ? "text-green-600" : "text-red-600"}`}
+                        >
+                          {isPositive ? "+" : "-"} {trans.quantity}{" "}
+                          {itemDetails.unit}
                         </div>
                       </td>
-                      
+
                       {/* Batch/Expiry */}
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {trans.notes?.includes("Exp:") ? (
                           <span className="text-orange-600 font-medium">
-                            {trans.notes.match(/Exp: ([^\n]+)/)?.[1] || "See notes"}
+                            {trans.notes.match(/Exp: ([^\n]+)/)?.[1] ||
+                              "See notes"}
                           </span>
+                        ) : trans.notes?.includes("Batch:") ? (
+                          <span className="text-blue-600">
+                            {trans.notes.match(/Batch: ([^\n]+)/)?.[1] ||
+                              "See notes"}
+                          </span>
+                        ) : itemDetails.isPerishable ? (
+                          <span className="text-gray-400 italic">N/A</span>
                         ) : (
-                          trans.notes?.includes("Batch:") ? (
-                            <span className="text-blue-600">
-                              {trans.notes.match(/Batch: ([^\n]+)/)?.[1] || "See notes"}
-                            </span>
-                          ) : (
-                            itemDetails.isPerishable ? (
-                              <span className="text-gray-400 italic">N/A</span>
-                            ) : (
-                              "-"
-                            )
-                          )
+                          "-"
                         )}
                       </td>
-                      
+
                       {/* Financials */}
                       <td className="px-4 py-3">
                         {trans.total_amount ? (
@@ -3541,7 +4365,7 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      
+
                       {/* Actions */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
@@ -3574,28 +4398,59 @@ const SmartTransactionsTab = ({ transactions, purchases, items, categories, filt
 };
 
 // Item Form Modal - Comprehensive Smart Form
-const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitForm, onSubmit, onClose }) => {
+const ItemFormModal = ({
+  form,
+  setForm,
+  categories,
+  vendors,
+  units,
+  setShowUnitForm,
+  onSubmit,
+  onClose,
+}) => {
   // Get selected category name for conditional logic
-  const selectedCategory = categories.find(cat => cat.id === parseInt(form.category_id));
+  const selectedCategory = categories.find(
+    (cat) => cat.id === parseInt(form.category_id),
+  );
   const categoryName = selectedCategory?.name?.toLowerCase() || "";
-  
+
   // Determine which department-specific fields to show
-  const isRestaurant = categoryName.includes("restaurant") || categoryName.includes("food");
-  const isLinen = categoryName.includes("linen") || categoryName.includes("hotel");
-  const isSecurity = categoryName.includes("security") || categoryName.includes("office");
-  const isFireSafety = categoryName.includes("fire") || categoryName.includes("safety");
-  const isConsumable = categoryName.includes("consumable") || categoryName.includes("guest");
-  
+  const isRestaurant =
+    categoryName.includes("restaurant") || categoryName.includes("food");
+  const isLinen =
+    categoryName.includes("linen") || categoryName.includes("hotel");
+  const isSecurity =
+    categoryName.includes("security") || categoryName.includes("office");
+  const isFireSafety =
+    categoryName.includes("fire") || categoryName.includes("safety");
+  const isConsumable =
+    categoryName.includes("consumable") || categoryName.includes("guest");
+
   // Storage location options
   const storageLocations = [
-    "Cold Storage", "Dry Store", "Housekeeping Closet", "Server Room",
-    "Warehouse A", "Warehouse B", "Main Store", "Kitchen Store", "Office Store"
+    "Cold Storage",
+    "Dry Store",
+    "Housekeeping Closet",
+    "Server Room",
+    "Warehouse A",
+    "Warehouse B",
+    "Main Store",
+    "Kitchen Store",
+    "Office Store",
   ];
-  
+
   // Sub-category options based on main category
   const getSubCategories = () => {
     if (isRestaurant) {
-      return ["Meat", "Dairy", "Spices", "Vegetables", "Beverages", "Dry Goods", "Frozen"];
+      return [
+        "Meat",
+        "Dairy",
+        "Spices",
+        "Vegetables",
+        "Beverages",
+        "Dry Goods",
+        "Frozen",
+      ];
     } else if (categoryName.includes("facility")) {
       return ["Plumbing", "Electrical", "HVAC", "Maintenance", "Tools"];
     } else if (isLinen) {
@@ -3603,18 +4458,25 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
     }
     return [];
   };
-  
+
   const subCategories = getSubCategories();
-  
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full mx-4 max-h-[95vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10 shadow-sm">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Create Inventory Item</h2>
-            <p className="text-sm text-gray-500 mt-1">Smart form adapts based on category selection</p>
+            <h2 className="text-2xl font-bold text-gray-800">
+              Create Inventory Item
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Smart form adapts based on category selection
+            </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -3622,7 +4484,9 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
           {/* 1. Basic Information Section */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">1</span>
+              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                1
+              </span>
               Basic Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3646,7 +4510,9 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                 <input
                   type="text"
                   value={form.item_code}
-                  onChange={(e) => setForm({ ...form, item_code: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, item_code: e.target.value })
+                  }
                   placeholder="Unique system ID"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -3657,13 +4523,21 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                 </label>
                 <select
                   value={form.category_id}
-                  onChange={(e) => setForm({ ...form, category_id: e.target.value, sub_category: "" })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      category_id: e.target.value,
+                      sub_category: "",
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 >
                   <option value="">Select Category</option>
                   {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -3674,12 +4548,16 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                   </label>
                   <select
                     value={form.sub_category}
-                    onChange={(e) => setForm({ ...form, sub_category: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, sub_category: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   >
                     <option value="">Select Sub-Category</option>
                     {subCategories.map((sub) => (
-                      <option key={sub} value={sub}>{sub}</option>
+                      <option key={sub} value={sub}>
+                        {sub}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -3691,14 +4569,17 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                 <input
                   type="text"
                   value={form.hsn_code}
-                  onChange={(e) => setForm({ ...form, hsn_code: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, hsn_code: e.target.value })
+                  }
                   placeholder="For GST compliance"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Unit of Measurement (UOM) <span className="text-red-500">*</span>
+                  Unit of Measurement (UOM){" "}
+                  <span className="text-red-500">*</span>
                 </label>
                 <div className="flex gap-2">
                   <select
@@ -3709,7 +4590,9 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                   >
                     <option value="">Select Unit</option>
                     {units.map((unit) => (
-                      <option key={unit.value} value={unit.value}>{unit.label}</option>
+                      <option key={unit.value} value={unit.value}>
+                        {unit.label}
+                      </option>
                     ))}
                   </select>
                   <button
@@ -3729,7 +4612,9 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                 </label>
                 <textarea
                   value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                  }
                   rows="3"
                   placeholder="e.g., Samsung 43 inch TV, Double ply toilet paper"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -3742,11 +4627,15 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => setForm({ ...form, image: e.target.files[0] || null })}
+                  onChange={(e) =>
+                    setForm({ ...form, image: e.target.files[0] || null })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
                 {form.image && (
-                  <p className="text-xs text-gray-500 mt-1">Selected: {form.image.name}</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Selected: {form.image.name}
+                  </p>
                 )}
               </div>
             </div>
@@ -3755,7 +4644,9 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
           {/* 2. Inventory & Measurement Settings */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">2</span>
+              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                2
+              </span>
               Inventory & Measurement Settings
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3768,7 +4659,12 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                   step="0.01"
                   min="0"
                   value={form.initial_stock}
-                  onChange={(e) => setForm({ ...form, initial_stock: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      initial_stock: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   placeholder="0.00"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -3782,11 +4678,18 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                   step="0.01"
                   min="0"
                   value={form.min_stock_level}
-                  onChange={(e) => setForm({ ...form, min_stock_level: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      min_stock_level: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   placeholder="0.00"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
-                <p className="text-xs text-gray-500 mt-1">System alerts when stock hits this</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  System alerts when stock hits this
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -3794,12 +4697,16 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                 </label>
                 <select
                   value={form.location}
-                  onChange={(e) => setForm({ ...form, location: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, location: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   <option value="">Select Location</option>
                   {storageLocations.map((loc) => (
-                    <option key={loc} value={loc}>{loc}</option>
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -3808,24 +4715,39 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                   <input
                     type="checkbox"
                     checked={form.is_perishable}
-                    onChange={(e) => setForm({ ...form, is_perishable: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, is_perishable: e.target.checked })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                   />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Is Perishable / Has Expiry?</span>
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    Is Perishable / Has Expiry?
+                  </span>
                 </label>
-                <span className="ml-2 text-xs text-gray-500">(Required for Restaurant & Fire Safety)</span>
+                <span className="ml-2 text-xs text-gray-500">
+                  (Required for Restaurant & Fire Safety)
+                </span>
               </div>
               <div className="flex items-center pt-6">
                 <label className="flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={form.track_serial_number}
-                    onChange={(e) => setForm({ ...form, track_serial_number: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        track_serial_number: e.target.checked,
+                      })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                   />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Track Serial Number?</span>
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    Track Serial Number?
+                  </span>
                 </label>
-                <span className="ml-2 text-xs text-gray-500">(For Security & Facility assets)</span>
+                <span className="ml-2 text-xs text-gray-500">
+                  (For Security & Facility assets)
+                </span>
               </div>
             </div>
           </div>
@@ -3833,7 +4755,9 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
           {/* 3. Pricing & Tax */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">3</span>
+              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                3
+              </span>
               Pricing & Tax (Purchase & Sales)
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3846,11 +4770,18 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                   step="0.01"
                   min="0"
                   value={form.unit_price}
-                  onChange={(e) => setForm({ ...form, unit_price: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      unit_price: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   placeholder="0.00"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
-                <p className="text-xs text-gray-500 mt-1">Rate you pay the vendor</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Rate you pay the vendor
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -3858,7 +4789,12 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                 </label>
                 <select
                   value={form.gst_rate}
-                  onChange={(e) => setForm({ ...form, gst_rate: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      gst_rate: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   <option value="0">0%</option>
@@ -3873,12 +4809,21 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                   <input
                     type="checkbox"
                     checked={form.is_sellable_to_guest}
-                    onChange={(e) => setForm({ ...form, is_sellable_to_guest: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        is_sellable_to_guest: e.target.checked,
+                      })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                   />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Is Sellable to Guest?</span>
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    Is Sellable to Guest?
+                  </span>
                 </label>
-                <span className="ml-2 text-xs text-gray-500">(Vegetables: No, Soft Drinks: Yes)</span>
+                <span className="ml-2 text-xs text-gray-500">
+                  (Vegetables: No, Soft Drinks: Yes)
+                </span>
               </div>
               {form.is_sellable_to_guest && (
                 <div>
@@ -3890,11 +4835,20 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                     step="0.01"
                     min="0"
                     value={form.selling_price}
-                    onChange={(e) => setForm({ ...form, selling_price: e.target.value ? parseFloat(e.target.value) : "" })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        selling_price: e.target.value
+                          ? parseFloat(e.target.value)
+                          : "",
+                      })
+                    }
                     placeholder="0.00"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Price charged to guest if consumed</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Price charged to guest if consumed
+                  </p>
                 </div>
               )}
             </div>
@@ -3903,7 +4857,9 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
           {/* 4. Vendor Linking */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">4</span>
+              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                4
+              </span>
               Vendor Linking (Procurement)
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -3913,13 +4869,24 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                 </label>
                 <select
                   value={form.preferred_vendor_id}
-                  onChange={(e) => setForm({ ...form, preferred_vendor_id: e.target.value ? parseInt(e.target.value) : "" })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      preferred_vendor_id: e.target.value
+                        ? parseInt(e.target.value)
+                        : "",
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   <option value="">Select Vendor</option>
-                  {vendors.filter(v => v.is_active).map((vendor) => (
-                    <option key={vendor.id} value={vendor.id}>{vendor.name}</option>
-                  ))}
+                  {vendors
+                    .filter((v) => v.is_active)
+                    .map((vendor) => (
+                      <option key={vendor.id} value={vendor.id}>
+                        {vendor.name}
+                      </option>
+                    ))}
                 </select>
               </div>
               <div>
@@ -3929,7 +4896,9 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                 <input
                   type="text"
                   value={form.vendor_item_code}
-                  onChange={(e) => setForm({ ...form, vendor_item_code: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, vendor_item_code: e.target.value })
+                  }
                   placeholder="Vendor's code for this item"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -3942,7 +4911,14 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                   type="number"
                   min="0"
                   value={form.lead_time_days}
-                  onChange={(e) => setForm({ ...form, lead_time_days: e.target.value ? parseInt(e.target.value) : "" })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      lead_time_days: e.target.value
+                        ? parseInt(e.target.value)
+                        : "",
+                    })
+                  }
                   placeholder="Days to arrive after ordering"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -3952,10 +4928,14 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
                   <input
                     type="checkbox"
                     checked={form.is_active}
-                    onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, is_active: e.target.checked })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                   />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Item is Active</span>
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    Item is Active
+                  </span>
                 </label>
               </div>
             </div>
@@ -3987,13 +4967,42 @@ const ItemFormModal = ({ form, setForm, categories, vendors, units, setShowUnitF
 const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
   // Indian States list for dropdown
   const indianStates = [
-    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
-    "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
-    "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana",
-    "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands",
-    "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir",
-    "Ladakh", "Lakshadweep", "Puducherry"
+    "Andhra Pradesh",
+    "Arunachal Pradesh",
+    "Assam",
+    "Bihar",
+    "Chhattisgarh",
+    "Goa",
+    "Gujarat",
+    "Haryana",
+    "Himachal Pradesh",
+    "Jharkhand",
+    "Karnataka",
+    "Kerala",
+    "Madhya Pradesh",
+    "Maharashtra",
+    "Manipur",
+    "Meghalaya",
+    "Mizoram",
+    "Nagaland",
+    "Odisha",
+    "Punjab",
+    "Rajasthan",
+    "Sikkim",
+    "Tamil Nadu",
+    "Telangana",
+    "Tripura",
+    "Uttar Pradesh",
+    "Uttarakhand",
+    "West Bengal",
+    "Andaman and Nicobar Islands",
+    "Chandigarh",
+    "Dadra and Nagar Haveli and Daman and Diu",
+    "Delhi",
+    "Jammu and Kashmir",
+    "Ladakh",
+    "Lakshadweep",
+    "Puducherry",
   ];
 
   return (
@@ -4002,16 +5011,23 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Add Category</h2>
-            <p className="text-sm text-gray-500 mt-1">GST-friendly category setup</p>
+            <p className="text-sm text-gray-500 mt-1">
+              GST-friendly category setup
+            </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
         <form onSubmit={onSubmit} className="p-6 space-y-6">
           {/* Basic Information */}
           <div className="border-b border-gray-200 pb-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Basic Information</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              Basic Information
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4032,7 +5048,9 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                 </label>
                 <select
                   value={form.parent_department}
-                  onChange={(e) => setForm({ ...form, parent_department: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, parent_department: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 >
@@ -4051,7 +5069,12 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                 </label>
                 <select
                   value={form.gst_tax_rate}
-                  onChange={(e) => setForm({ ...form, gst_tax_rate: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      gst_tax_rate: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 >
@@ -4061,7 +5084,9 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <option value="18">18%</option>
                   <option value="28">28%</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Essential for Purchase Logic</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Essential for Purchase Logic
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4069,7 +5094,9 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                 </label>
                 <select
                   value={form.classification}
-                  onChange={(e) => setForm({ ...form, classification: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, classification: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 >
@@ -4077,13 +5104,19 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <option value="Goods">Goods</option>
                   <option value="Services">Services</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Goods require HSN, Services require SAC</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Goods require HSN, Services require SAC
+                </p>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Description
+                </label>
                 <textarea
                   value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, description: e.target.value })
+                  }
                   rows="3"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -4093,7 +5126,9 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
 
           {/* GST Classification Properties */}
           <div className="border-b border-gray-200 pb-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">GST Classification Properties</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              GST Classification Properties
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4102,12 +5137,20 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                 <input
                   type="text"
                   value={form.hsn_sac_code}
-                  onChange={(e) => setForm({ ...form, hsn_sac_code: e.target.value })}
-                  placeholder={form.classification === "Goods" ? "e.g., 6302 (Bed Linen)" : "e.g., 996331 (Restaurant Service)"}
+                  onChange={(e) =>
+                    setForm({ ...form, hsn_sac_code: e.target.value })
+                  }
+                  placeholder={
+                    form.classification === "Goods"
+                      ? "e.g., 6302 (Bed Linen)"
+                      : "e.g., 996331 (Restaurant Service)"
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 />
-                <p className="text-xs text-gray-500 mt-1">4, 6, or 8 digits - Mandatory for invoices</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  4, 6, or 8 digits - Mandatory for invoices
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4115,7 +5158,12 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                 </label>
                 <select
                   value={form.default_gst_rate}
-                  onChange={(e) => setForm({ ...form, default_gst_rate: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      default_gst_rate: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 >
@@ -4125,7 +5173,9 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <option value="18">18%</option>
                   <option value="28">28%</option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Default tax rate for all items in this category</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Default tax rate for all items in this category
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4136,18 +5186,27 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   step="0.01"
                   min="0"
                   value={form.cess_percentage}
-                  onChange={(e) => setForm({ ...form, cess_percentage: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      cess_percentage: parseFloat(e.target.value) || 0,
+                    })
+                  }
                   placeholder="e.g., 12"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
-                <p className="text-xs text-gray-500 mt-1">Required for Aerated Drinks, Tobacco, etc.</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Required for Aerated Drinks, Tobacco, etc.
+                </p>
               </div>
             </div>
           </div>
 
           {/* ITC (Input Tax Credit) Rules */}
           <div className="border-b border-gray-200 pb-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">ITC (Input Tax Credit) Rules</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              ITC (Input Tax Credit) Rules
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4155,46 +5214,69 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                 </label>
                 <select
                   value={form.itc_eligibility}
-                  onChange={(e) => setForm({ ...form, itc_eligibility: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, itc_eligibility: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 >
                   <option value="Eligible">Eligible</option>
-                  <option value="Ineligible (Blocked)">Ineligible (Blocked)</option>
+                  <option value="Ineligible (Blocked)">
+                    Ineligible (Blocked)
+                  </option>
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Construction materials are usually Blocked</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Construction materials are usually Blocked
+                </p>
               </div>
               <div className="flex items-center pt-6">
                 <label className="flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={form.is_capital_good}
-                    onChange={(e) => setForm({ ...form, is_capital_good: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, is_capital_good: e.target.checked })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                   />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Capital Good?</span>
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    Capital Good?
+                  </span>
                 </label>
-                <span className="ml-2 text-xs text-gray-500">(ACs, Generators have different rules)</span>
+                <span className="ml-2 text-xs text-gray-500">
+                  (ACs, Generators have different rules)
+                </span>
               </div>
             </div>
           </div>
 
           {/* Logic Switches (The "Brain" of the System) */}
           <div className="border-b border-gray-200 pb-4">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Logic Switches</h3>
-            <p className="text-sm text-gray-600 mb-4">Enable specific workflows by toggling these options:</p>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              Logic Switches
+            </h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Enable specific workflows by toggling these options:
+            </p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="flex items-start p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
                 <label className="flex items-start cursor-pointer flex-1">
                   <input
                     type="checkbox"
                     checked={form.is_perishable}
-                    onChange={(e) => setForm({ ...form, is_perishable: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, is_perishable: e.target.checked })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mt-1"
                   />
                   <div className="ml-3 flex-1">
-                    <span className="text-sm font-medium text-gray-700">Is Perishable</span>
-                    <p className="text-xs text-gray-500 mt-1">Activates Logic 1.1: System schedules expiry-based alerts. Used for: Vegetables, Milk, Meat (Restaurant)</p>
+                    <span className="text-sm font-medium text-gray-700">
+                      Is Perishable
+                    </span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Activates Logic 1.1: System schedules expiry-based alerts.
+                      Used for: Vegetables, Milk, Meat (Restaurant)
+                    </p>
                   </div>
                 </label>
               </div>
@@ -4203,12 +5285,20 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <input
                     type="checkbox"
                     checked={form.is_asset_fixed}
-                    onChange={(e) => setForm({ ...form, is_asset_fixed: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, is_asset_fixed: e.target.checked })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mt-1"
                   />
                   <div className="ml-3 flex-1">
-                    <span className="text-sm font-medium text-gray-700">Is Asset / Fixed</span>
-                    <p className="text-xs text-gray-500 mt-1">Activates Logic 2.2 & 6.2: System auto-generates maintenance reminders. Used for: ACs, CCTV, Fire Extinguishers</p>
+                    <span className="text-sm font-medium text-gray-700">
+                      Is Asset / Fixed
+                    </span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Activates Logic 2.2 & 6.2: System auto-generates
+                      maintenance reminders. Used for: ACs, CCTV, Fire
+                      Extinguishers
+                    </p>
                   </div>
                 </label>
               </div>
@@ -4217,12 +5307,20 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <input
                     type="checkbox"
                     checked={form.is_sellable}
-                    onChange={(e) => setForm({ ...form, is_sellable: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, is_sellable: e.target.checked })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mt-1"
                   />
                   <div className="ml-3 flex-1">
-                    <span className="text-sm font-medium text-gray-700">Is Sellable</span>
-                    <p className="text-xs text-gray-500 mt-1">Activates Logic 3.2: If usage exceeds limit, add charge to customer billing. Used for: Minibar drinks, Snacks, Chargeable Toiletries</p>
+                    <span className="text-sm font-medium text-gray-700">
+                      Is Sellable
+                    </span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Activates Logic 3.2: If usage exceeds limit, add charge to
+                      customer billing. Used for: Minibar drinks, Snacks,
+                      Chargeable Toiletries
+                    </p>
                   </div>
                 </label>
               </div>
@@ -4231,12 +5329,19 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <input
                     type="checkbox"
                     checked={form.track_laundry}
-                    onChange={(e) => setForm({ ...form, track_laundry: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, track_laundry: e.target.checked })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mt-1"
                   />
                   <div className="ml-3 flex-1">
-                    <span className="text-sm font-medium text-gray-700">Track Laundry Cycle</span>
-                    <p className="text-xs text-gray-500 mt-1">Activates Logic 5.4: Enables "Fresh → Used → Laundry → Fresh" cycle. Used for: Bed sheets, Towels, Robes</p>
+                    <span className="text-sm font-medium text-gray-700">
+                      Track Laundry Cycle
+                    </span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Activates Logic 5.4: Enables "Fresh → Used → Laundry →
+                      Fresh" cycle. Used for: Bed sheets, Towels, Robes
+                    </p>
                   </div>
                 </label>
               </div>
@@ -4245,12 +5350,22 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <input
                     type="checkbox"
                     checked={form.allow_partial_usage}
-                    onChange={(e) => setForm({ ...form, allow_partial_usage: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        allow_partial_usage: e.target.checked,
+                      })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mt-1"
                   />
                   <div className="ml-3 flex-1">
-                    <span className="text-sm font-medium text-gray-700">Allow Partial Usage</span>
-                    <p className="text-xs text-gray-500 mt-1">Activates Logic 1.2: Kitchen raises stock usage request by weight/volume. Used for: Oil (Liters), Rice (Kg)</p>
+                    <span className="text-sm font-medium text-gray-700">
+                      Allow Partial Usage
+                    </span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Activates Logic 1.2: Kitchen raises stock usage request by
+                      weight/volume. Used for: Oil (Liters), Rice (Kg)
+                    </p>
                   </div>
                 </label>
               </div>
@@ -4259,12 +5374,20 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <input
                     type="checkbox"
                     checked={form.consumable_instant}
-                    onChange={(e) => setForm({ ...form, consumable_instant: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, consumable_instant: e.target.checked })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 mt-1"
                   />
                   <div className="ml-3 flex-1">
-                    <span className="text-sm font-medium text-gray-700">Consumable Instant</span>
-                    <p className="text-xs text-gray-500 mt-1">Activates Logic 4.1: System deducts requested quantity immediately upon issuance. Used for: Office Stationery, Paper Cups</p>
+                    <span className="text-sm font-medium text-gray-700">
+                      Consumable Instant
+                    </span>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Activates Logic 4.1: System deducts requested quantity
+                      immediately upon issuance. Used for: Office Stationery,
+                      Paper Cups
+                    </p>
                   </div>
                 </label>
               </div>
@@ -4296,18 +5419,49 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
 const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
   // Indian States list
   const indianStates = [
-    "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh",
-    "Goa", "Gujarat", "Haryana", "Himachal Pradesh", "Jharkhand", "Karnataka",
-    "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram",
-    "Nagaland", "Odisha", "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana",
-    "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal", "Andaman and Nicobar Islands",
-    "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir",
-    "Ladakh", "Lakshadweep", "Puducherry"
+    "Andhra Pradesh",
+    "Arunachal Pradesh",
+    "Assam",
+    "Bihar",
+    "Chhattisgarh",
+    "Goa",
+    "Gujarat",
+    "Haryana",
+    "Himachal Pradesh",
+    "Jharkhand",
+    "Karnataka",
+    "Kerala",
+    "Madhya Pradesh",
+    "Maharashtra",
+    "Manipur",
+    "Meghalaya",
+    "Mizoram",
+    "Nagaland",
+    "Odisha",
+    "Punjab",
+    "Rajasthan",
+    "Sikkim",
+    "Tamil Nadu",
+    "Telangana",
+    "Tripura",
+    "Uttar Pradesh",
+    "Uttarakhand",
+    "West Bengal",
+    "Andaman and Nicobar Islands",
+    "Chandigarh",
+    "Dadra and Nagar Haveli and Daman and Diu",
+    "Delhi",
+    "Jammu and Kashmir",
+    "Ladakh",
+    "Lakshadweep",
+    "Puducherry",
   ];
 
   // Determine if vendor is "With GST" (Regular) or "Without GST" (Unregistered/Composition)
   const isWithGst = form.gst_registration_type === "Regular";
-  const isWithoutGst = form.gst_registration_type === "Unregistered" || form.gst_registration_type === "Composition";
+  const isWithoutGst =
+    form.gst_registration_type === "Unregistered" ||
+    form.gst_registration_type === "Composition";
 
   // Auto-extract PAN from GSTIN (chars 3-12) - only for Regular vendors
   const handleGstinChange = (gstin) => {
@@ -4333,9 +5487,14 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">Add Vendor</h2>
-            <p className="text-sm text-gray-500 mt-1">GST-friendly vendor setup for GSTR compliance</p>
+            <p className="text-sm text-gray-500 mt-1">
+              GST-friendly vendor setup for GSTR compliance
+            </p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -4343,7 +5502,9 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
           {/* 1. The Master Switch - GST Registration Type */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">1</span>
+              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                1
+              </span>
               Master Switch - GST Registration Type
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4355,28 +5516,39 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   value={form.gst_registration_type}
                   onChange={(e) => {
                     const newType = e.target.value;
-                    setForm({ 
-                      ...form, 
+                    setForm({
+                      ...form,
                       gst_registration_type: newType,
                       // Clear GSTIN if switching to Unregistered/Composition
-                      gst_number: (newType === "Unregistered" || newType === "Composition") ? "" : form.gst_number,
+                      gst_number:
+                        newType === "Unregistered" || newType === "Composition"
+                          ? ""
+                          : form.gst_number,
                       // Clear PAN if switching to Regular (will be auto-extracted from GSTIN)
-                      pan_number: newType === "Regular" ? "" : form.pan_number
+                      pan_number: newType === "Regular" ? "" : form.pan_number,
                     });
                   }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-indigo-50"
                   required
                 >
                   <option value="">Select Type</option>
-                  <option value="Regular">Regular (With GST) - They charge tax, you get credit</option>
-                  <option value="Composition">Composition Scheme (Without GST) - Cannot charge tax</option>
-                  <option value="Unregistered">Unregistered (Without GST) - Small vendors, no tax</option>
+                  <option value="Regular">
+                    Regular (With GST) - They charge tax, you get credit
+                  </option>
+                  <option value="Composition">
+                    Composition Scheme (Without GST) - Cannot charge tax
+                  </option>
+                  <option value="Unregistered">
+                    Unregistered (Without GST) - Small vendors, no tax
+                  </option>
                   <option value="Overseas (Import)">Overseas (Import)</option>
                   <option value="SEZ">SEZ</option>
                 </select>
                 <p className="text-xs text-gray-500 mt-1">
-                  {isWithGst && "✓ Regular vendor - GSTIN and Legal Name required"}
-                  {isWithoutGst && "✓ Unregistered/Composition - PAN Number required, GSTIN disabled"}
+                  {isWithGst &&
+                    "✓ Regular vendor - GSTIN and Legal Name required"}
+                  {isWithoutGst &&
+                    "✓ Unregistered/Composition - PAN Number required, GSTIN disabled"}
                 </p>
               </div>
               <div>
@@ -4399,7 +5571,9 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
           {isWithGst && (
             <div className="border-b border-gray-200 pb-6 bg-green-50 p-4 rounded-lg">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <span className="bg-green-100 text-green-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">2</span>
+                <span className="bg-green-100 text-green-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                  2
+                </span>
                 Properties for "With GST" Vendor (Regular)
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4414,14 +5588,20 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                     placeholder="15 characters: 29ABCDE1234F1Z5"
                     maxLength={15}
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                      form.gst_number && !validateGstin(form.gst_number) ? 'border-red-300' : 'border-gray-300'
+                      form.gst_number && !validateGstin(form.gst_number)
+                        ? "border-red-300"
+                        : "border-gray-300"
                     }`}
                     required
                   />
                   {form.gst_number && !validateGstin(form.gst_number) && (
-                    <p className="text-xs text-red-500 mt-1">Invalid GSTIN format</p>
+                    <p className="text-xs text-red-500 mt-1">
+                      Invalid GSTIN format
+                    </p>
                   )}
-                  <p className="text-xs text-gray-500 mt-1">System validates format automatically</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    System validates format automatically
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4430,12 +5610,16 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <input
                     type="text"
                     value={form.legal_name}
-                    onChange={(e) => setForm({ ...form, legal_name: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, legal_name: e.target.value })
+                    }
                     placeholder="Must match GST Portal exactly"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">For GSTR-2B matching</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    For GSTR-2B matching
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4443,28 +5627,40 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   </label>
                   <select
                     value={form.billing_state}
-                    onChange={(e) => setForm({ ...form, billing_state: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, billing_state: e.target.value })
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     required
                   >
                     <option value="">Select State</option>
                     {indianStates.map((state) => (
-                      <option key={state} value={state}>{state}</option>
+                      <option key={state} value={state}>
+                        {state}
+                      </option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">Determines IGST vs CGST+SGST calculation</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Determines IGST vs CGST+SGST calculation
+                  </p>
                 </div>
                 <div className="flex items-center pt-6">
                   <label className="flex items-center cursor-pointer">
                     <input
                       type="checkbox"
                       checked={form.qmp_scheme}
-                      onChange={(e) => setForm({ ...form, qmp_scheme: e.target.checked })}
+                      onChange={(e) =>
+                        setForm({ ...form, qmp_scheme: e.target.checked })
+                      }
                       className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                     />
-                    <span className="ml-2 text-sm font-medium text-gray-700">QMP Scheme?</span>
+                    <span className="ml-2 text-sm font-medium text-gray-700">
+                      QMP Scheme?
+                    </span>
                   </label>
-                  <span className="ml-2 text-xs text-gray-500">(Quarterly Return Monthly Payment)</span>
+                  <span className="ml-2 text-xs text-gray-500">
+                    (Quarterly Return Monthly Payment)
+                  </span>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4473,13 +5669,20 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <input
                     type="text"
                     value={form.pan_number}
-                    onChange={(e) => setForm({ ...form, pan_number: e.target.value.toUpperCase() })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        pan_number: e.target.value.toUpperCase(),
+                      })
+                    }
                     placeholder="Auto-extracted from GSTIN"
                     maxLength={10}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50"
                     readOnly
                   />
-                  <p className="text-xs text-gray-500 mt-1">Auto-extracted from GSTIN (chars 3-12)</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Auto-extracted from GSTIN (chars 3-12)
+                  </p>
                 </div>
               </div>
             </div>
@@ -4489,8 +5692,11 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
           {isWithoutGst && (
             <div className="border-b border-gray-200 pb-6 bg-orange-50 p-4 rounded-lg">
               <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                <span className="bg-orange-100 text-orange-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">3</span>
-                Properties for "Without GST" Vendor ({form.gst_registration_type})
+                <span className="bg-orange-100 text-orange-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                  3
+                </span>
+                Properties for "Without GST" Vendor (
+                {form.gst_registration_type})
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -4500,13 +5706,20 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <input
                     type="text"
                     value={form.pan_number}
-                    onChange={(e) => setForm({ ...form, pan_number: e.target.value.toUpperCase() })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        pan_number: e.target.value.toUpperCase(),
+                      })
+                    }
                     placeholder="10 characters: ABCDE1234F"
                     maxLength={10}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     required
                   />
-                  <p className="text-xs text-gray-500 mt-1">Mandatory for TDS and annual reporting</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Mandatory for TDS and annual reporting
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4515,31 +5728,44 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <input
                     type="text"
                     value={form.msme_udyam_no}
-                    onChange={(e) => setForm({ ...form, msme_udyam_no: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, msme_udyam_no: e.target.value })
+                    }
                     placeholder="e.g., UDYAM-XX-XXXX-XXXXX"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
-                  <p className="text-xs text-gray-500 mt-1">If entered, enforces "Pay within 45 days" rule</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    If entered, enforces "Pay within 45 days" rule
+                  </p>
                 </div>
                 <div className="md:col-span-2 flex items-center">
                   <label className="flex items-center cursor-pointer">
                     <input
                       type="checkbox"
                       checked={form.rcm_applicable}
-                      onChange={(e) => setForm({ ...form, rcm_applicable: e.target.checked })}
+                      onChange={(e) =>
+                        setForm({ ...form, rcm_applicable: e.target.checked })
+                      }
                       className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                     />
-                    <span className="ml-2 text-sm font-medium text-gray-700">RCM Applicable? <span className="text-red-500">*</span></span>
+                    <span className="ml-2 text-sm font-medium text-gray-700">
+                      RCM Applicable? <span className="text-red-500">*</span>
+                    </span>
                   </label>
                   <span className="ml-2 text-xs text-gray-500">
-                    If Yes: System creates liability for you to pay tax to Govt, but you only pay vendor the base amount
+                    If Yes: System creates liability for you to pay tax to Govt,
+                    but you only pay vendor the base amount
                   </span>
                 </div>
                 <div className="md:col-span-2">
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                     <p className="text-xs text-yellow-800">
-                      <strong>Note:</strong> GSTIN field is disabled for {form.gst_registration_type} vendors. 
-                      System will not add tax to PO total. {form.rcm_applicable ? "RCM will create a separate tax liability entry." : "No tax entry will be created."}
+                      <strong>Note:</strong> GSTIN field is disabled for{" "}
+                      {form.gst_registration_type} vendors. System will not add
+                      tax to PO total.{" "}
+                      {form.rcm_applicable
+                        ? "RCM will create a separate tax liability entry."
+                        : "No tax entry will be created."}
                     </p>
                   </div>
                 </div>
@@ -4550,7 +5776,9 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
           {/* Shared Properties - For All Vendors */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">4</span>
+              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                4
+              </span>
               Shared Properties (For All Vendors)
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4561,7 +5789,9 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                 <input
                   type="text"
                   value={form.company_name}
-                  onChange={(e) => setForm({ ...form, company_name: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, company_name: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
@@ -4573,7 +5803,9 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <input
                     type="text"
                     value={form.legal_name}
-                    onChange={(e) => setForm({ ...form, legal_name: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, legal_name: e.target.value })
+                    }
                     placeholder="Legal business name"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   />
@@ -4585,7 +5817,9 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
           {/* Address & Place of Supply */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">5</span>
+              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                5
+              </span>
               Address & Place of Supply
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -4595,7 +5829,9 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                 </label>
                 <textarea
                   value={form.billing_address}
-                  onChange={(e) => setForm({ ...form, billing_address: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, billing_address: e.target.value })
+                  }
                   rows="3"
                   placeholder="Full address for tax invoice generation"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -4608,16 +5844,22 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                 </label>
                 <select
                   value={form.billing_state}
-                  onChange={(e) => setForm({ ...form, billing_state: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, billing_state: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   required
                 >
                   <option value="">Select State</option>
                   {indianStates.map((state) => (
-                    <option key={state} value={state}>{state}</option>
+                    <option key={state} value={state}>
+                      {state}
+                    </option>
                   ))}
                 </select>
-                <p className="text-xs text-gray-500 mt-1">Determines CGST/SGST vs IGST</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  Determines CGST/SGST vs IGST
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4628,7 +5870,14 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   step="0.01"
                   min="0"
                   value={form.distance_km}
-                  onChange={(e) => setForm({ ...form, distance_km: e.target.value ? parseFloat(e.target.value) : "" })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      distance_km: e.target.value
+                        ? parseFloat(e.target.value)
+                        : "",
+                    })
+                  }
                   placeholder="For E-Way Bill generation"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -4639,7 +5888,9 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                 </label>
                 <textarea
                   value={form.shipping_address}
-                  onChange={(e) => setForm({ ...form, shipping_address: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, shipping_address: e.target.value })
+                  }
                   rows="2"
                   placeholder="Bill To / Ship To model"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -4651,21 +5902,29 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
           {/* Contact Information */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">6</span>
+              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                6
+              </span>
               Contact Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Contact Person
+                </label>
                 <input
                   type="text"
                   value={form.contact_person}
-                  onChange={(e) => setForm({ ...form, contact_person: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, contact_person: e.target.value })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
                 <input
                   type="email"
                   value={form.email}
@@ -4674,7 +5933,9 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone
+                </label>
                 <input
                   type="text"
                   value={form.phone}
@@ -4688,7 +5949,9 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
           {/* C. Compliance Settings */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">C</span>
+              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                C
+              </span>
               Compliance Settings
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -4697,36 +5960,54 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <input
                     type="checkbox"
                     checked={form.is_msme_registered}
-                    onChange={(e) => setForm({ ...form, is_msme_registered: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, is_msme_registered: e.target.checked })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                   />
-                  <span className="ml-2 text-sm font-medium text-gray-700">MSME Registered?</span>
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    MSME Registered?
+                  </span>
                 </label>
-                <span className="ml-2 text-xs text-gray-500">(Pay within 45 days)</span>
+                <span className="ml-2 text-xs text-gray-500">
+                  (Pay within 45 days)
+                </span>
               </div>
               <div className="flex items-center">
                 <label className="flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={form.tds_apply}
-                    onChange={(e) => setForm({ ...form, tds_apply: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, tds_apply: e.target.checked })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                   />
-                  <span className="ml-2 text-sm font-medium text-gray-700">TDS Apply?</span>
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    TDS Apply?
+                  </span>
                 </label>
-                <span className="ml-2 text-xs text-gray-500">(Auto-deduct TDS)</span>
+                <span className="ml-2 text-xs text-gray-500">
+                  (Auto-deduct TDS)
+                </span>
               </div>
               <div className="flex items-center">
                 <label className="flex items-center cursor-pointer">
                   <input
                     type="checkbox"
                     checked={form.rcm_applicable}
-                    onChange={(e) => setForm({ ...form, rcm_applicable: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, rcm_applicable: e.target.checked })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                   />
-                  <span className="ml-2 text-sm font-medium text-gray-700">RCM Applicable?</span>
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    RCM Applicable?
+                  </span>
                 </label>
-                <span className="ml-2 text-xs text-gray-500">(Reverse Charge)</span>
+                <span className="ml-2 text-xs text-gray-500">
+                  (Reverse Charge)
+                </span>
               </div>
             </div>
           </div>
@@ -4734,14 +6015,17 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
           {/* Payment & Banking Details - Critical for ITC Compliance (180-Day Rule) */}
           <div className="border-b border-gray-200 pb-6 bg-blue-50 p-4 rounded-lg">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-blue-100 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">8</span>
+              <span className="bg-blue-100 text-blue-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                8
+              </span>
               Payment & Banking Details
             </h3>
             <p className="text-xs text-blue-700 mb-4 bg-blue-100 p-2 rounded">
-              <strong>GST 180-Day Rule:</strong> To claim ITC, you must pay vendors within 180 days. 
-              Accurate bank details prevent payment delays and protect your tax credit.
+              <strong>GST 180-Day Rule:</strong> To claim ITC, you must pay
+              vendors within 180 days. Accurate bank details prevent payment
+              delays and protect your tax credit.
             </p>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4749,11 +6033,18 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                 </label>
                 <select
                   value={form.preferred_payment_method}
-                  onChange={(e) => setForm({ ...form, preferred_payment_method: e.target.value })}
+                  onChange={(e) =>
+                    setForm({
+                      ...form,
+                      preferred_payment_method: e.target.value,
+                    })
+                  }
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 >
                   <option value="">Select Method</option>
-                  <option value="Bank Transfer">Bank Transfer (NEFT/RTGS)</option>
+                  <option value="Bank Transfer">
+                    Bank Transfer (NEFT/RTGS)
+                  </option>
                   <option value="UPI">UPI</option>
                   <option value="Cheque">Cheque</option>
                   <option value="Cash">Cash</option>
@@ -4764,32 +6055,49 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
             {/* Bank Transfer Details */}
             {form.preferred_payment_method === "Bank Transfer" && (
               <div className="mt-4 space-y-4 border-t border-gray-200 pt-4">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">Bank Account Details (For NEFT/RTGS)</h4>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                  Bank Account Details (For NEFT/RTGS)
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Account Holder Name <span className="text-red-500">*</span>
+                      Account Holder Name{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={form.account_holder_name}
-                      onChange={(e) => setForm({ ...form, account_holder_name: e.target.value })}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          account_holder_name: e.target.value,
+                        })
+                      }
                       placeholder="Should match Legal Name on GST"
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                        form.account_holder_name && form.legal_name && 
-                        form.account_holder_name.toLowerCase() !== form.legal_name.toLowerCase() 
-                          ? 'border-yellow-300 bg-yellow-50' 
-                          : 'border-gray-300'
+                        form.account_holder_name &&
+                        form.legal_name &&
+                        form.account_holder_name.toLowerCase() !==
+                          form.legal_name.toLowerCase()
+                          ? "border-yellow-300 bg-yellow-50"
+                          : "border-gray-300"
                       }`}
-                      required={form.preferred_payment_method === "Bank Transfer"}
+                      required={
+                        form.preferred_payment_method === "Bank Transfer"
+                      }
                     />
-                    {form.account_holder_name && form.legal_name && 
-                     form.account_holder_name.toLowerCase() !== form.legal_name.toLowerCase() && (
-                      <p className="text-xs text-yellow-600 mt-1">
-                        ⚠️ Name mismatch! Account holder should match Legal Name to prevent fraud.
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500 mt-1">Prevents fraud - should match Legal Name</p>
+                    {form.account_holder_name &&
+                      form.legal_name &&
+                      form.account_holder_name.toLowerCase() !==
+                        form.legal_name.toLowerCase() && (
+                        <p className="text-xs text-yellow-600 mt-1">
+                          ⚠️ Name mismatch! Account holder should match Legal
+                          Name to prevent fraud.
+                        </p>
+                      )}
+                    <p className="text-xs text-gray-500 mt-1">
+                      Prevents fraud - should match Legal Name
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4798,10 +6106,14 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                     <input
                       type="text"
                       value={form.bank_name}
-                      onChange={(e) => setForm({ ...form, bank_name: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, bank_name: e.target.value })
+                      }
                       placeholder="e.g., HDFC Bank"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      required={form.preferred_payment_method === "Bank Transfer"}
+                      required={
+                        form.preferred_payment_method === "Bank Transfer"
+                      }
                     />
                   </div>
                   <div>
@@ -4811,43 +6123,70 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                     <input
                       type="text"
                       value={form.account_number}
-                      onChange={(e) => setForm({ ...form, account_number: e.target.value.replace(/\D/g, '') })}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          account_number: e.target.value.replace(/\D/g, ""),
+                        })
+                      }
                       placeholder="9-18 digits"
                       maxLength={18}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                        form.account_number && form.account_number_confirm && 
-                        form.account_number !== form.account_number_confirm 
-                          ? 'border-red-300' 
-                          : 'border-gray-300'
+                        form.account_number &&
+                        form.account_number_confirm &&
+                        form.account_number !== form.account_number_confirm
+                          ? "border-red-300"
+                          : "border-gray-300"
                       }`}
-                      required={form.preferred_payment_method === "Bank Transfer"}
+                      required={
+                        form.preferred_payment_method === "Bank Transfer"
+                      }
                     />
-                    {form.account_number && (form.account_number.length < 9 || form.account_number.length > 18) && (
-                      <p className="text-xs text-red-500 mt-1">Account number must be 9-18 digits</p>
-                    )}
+                    {form.account_number &&
+                      (form.account_number.length < 9 ||
+                        form.account_number.length > 18) && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Account number must be 9-18 digits
+                        </p>
+                      )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Confirm Account Number <span className="text-red-500">*</span>
+                      Confirm Account Number{" "}
+                      <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
                       value={form.account_number_confirm}
-                      onChange={(e) => setForm({ ...form, account_number_confirm: e.target.value.replace(/\D/g, '') })}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          account_number_confirm: e.target.value.replace(
+                            /\D/g,
+                            "",
+                          ),
+                        })
+                      }
                       placeholder="Re-enter account number"
                       maxLength={18}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                        form.account_number && form.account_number_confirm && 
-                        form.account_number !== form.account_number_confirm 
-                          ? 'border-red-300' 
-                          : 'border-gray-300'
+                        form.account_number &&
+                        form.account_number_confirm &&
+                        form.account_number !== form.account_number_confirm
+                          ? "border-red-300"
+                          : "border-gray-300"
                       }`}
-                      required={form.preferred_payment_method === "Bank Transfer"}
+                      required={
+                        form.preferred_payment_method === "Bank Transfer"
+                      }
                     />
-                    {form.account_number && form.account_number_confirm && 
-                     form.account_number !== form.account_number_confirm && (
-                      <p className="text-xs text-red-500 mt-1">Account numbers do not match!</p>
-                    )}
+                    {form.account_number &&
+                      form.account_number_confirm &&
+                      form.account_number !== form.account_number_confirm && (
+                        <p className="text-xs text-red-500 mt-1">
+                          Account numbers do not match!
+                        </p>
+                      )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4857,7 +6196,9 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                       type="text"
                       value={form.ifsc_code}
                       onChange={async (e) => {
-                        const ifsc = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                        const ifsc = e.target.value
+                          .toUpperCase()
+                          .replace(/[^A-Z0-9]/g, "");
                         setForm({ ...form, ifsc_code: ifsc });
                         // Auto-fetch branch name when IFSC is complete (11 chars)
                         if (ifsc.length === 11) {
@@ -4866,7 +6207,10 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                             // For now, we'll just set a placeholder
                             // const branchData = await fetchBranchFromIFSC(ifsc);
                             // setForm(prev => ({ ...prev, branch_name: branchData.branch }));
-                            setForm(prev => ({ ...prev, branch_name: "Auto-fetched from IFSC" }));
+                            setForm((prev) => ({
+                              ...prev,
+                              branch_name: "Auto-fetched from IFSC",
+                            }));
                           } catch (error) {
                             console.error("Error fetching branch:", error);
                           }
@@ -4875,16 +6219,22 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                       placeholder="11 characters: HDFC0001234"
                       maxLength={11}
                       className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                        form.ifsc_code && form.ifsc_code.length !== 11 
-                          ? 'border-yellow-300' 
-                          : 'border-gray-300'
+                        form.ifsc_code && form.ifsc_code.length !== 11
+                          ? "border-yellow-300"
+                          : "border-gray-300"
                       }`}
-                      required={form.preferred_payment_method === "Bank Transfer"}
+                      required={
+                        form.preferred_payment_method === "Bank Transfer"
+                      }
                     />
                     {form.ifsc_code && form.ifsc_code.length !== 11 && (
-                      <p className="text-xs text-yellow-500 mt-1">IFSC code must be exactly 11 characters</p>
+                      <p className="text-xs text-yellow-500 mt-1">
+                        IFSC code must be exactly 11 characters
+                      </p>
                     )}
-                    <p className="text-xs text-gray-500 mt-1">Critical for routing payments</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Critical for routing payments
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4893,12 +6243,16 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                     <input
                       type="text"
                       value={form.branch_name}
-                      onChange={(e) => setForm({ ...form, branch_name: e.target.value })}
+                      onChange={(e) =>
+                        setForm({ ...form, branch_name: e.target.value })
+                      }
                       placeholder="Auto-fetched from IFSC"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50"
                       readOnly
                     />
-                    <p className="text-xs text-gray-500 mt-1">Helpful for verification</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Helpful for verification
+                    </p>
                   </div>
                 </div>
               </div>
@@ -4907,7 +6261,9 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
             {/* UPI Details */}
             {form.preferred_payment_method === "UPI" && (
               <div className="mt-4 space-y-4 border-t border-gray-200 pt-4">
-                <h4 className="text-sm font-semibold text-gray-700 mb-3">UPI Details (For Small/Unregistered Vendors)</h4>
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">
+                  UPI Details (For Small/Unregistered Vendors)
+                </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4916,12 +6272,19 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                     <input
                       type="text"
                       value={form.upi_id}
-                      onChange={(e) => setForm({ ...form, upi_id: e.target.value.toLowerCase() })}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          upi_id: e.target.value.toLowerCase(),
+                        })
+                      }
                       placeholder="e.g., shopname@okhdfcbank"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       required={form.preferred_payment_method === "UPI"}
                     />
-                    <p className="text-xs text-gray-500 mt-1">Allows instant payment via QR code</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Allows instant payment via QR code
+                    </p>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -4930,12 +6293,21 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                     <input
                       type="text"
                       value={form.upi_mobile_number}
-                      onChange={(e) => setForm({ ...form, upi_mobile_number: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          upi_mobile_number: e.target.value
+                            .replace(/\D/g, "")
+                            .slice(0, 10),
+                        })
+                      }
                       placeholder="10 digits"
                       maxLength={10}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Alternative lookup for GPay/Paytm</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Alternative lookup for GPay/Paytm
+                    </p>
                   </div>
                 </div>
               </div>
@@ -4945,16 +6317,22 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
           {/* Additional Information */}
           <div className="border-b border-gray-200 pb-6">
             <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">9</span>
+              <span className="bg-indigo-100 text-indigo-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
+                9
+              </span>
               Additional Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Payment Terms</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Payment Terms
+                </label>
                 <input
                   type="text"
                   value={form.payment_terms}
-                  onChange={(e) => setForm({ ...form, payment_terms: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, payment_terms: e.target.value })
+                  }
                   placeholder="e.g., Net 30, COD"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
@@ -4964,14 +6342,20 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
                   <input
                     type="checkbox"
                     checked={form.is_active}
-                    onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+                    onChange={(e) =>
+                      setForm({ ...form, is_active: e.target.checked })
+                    }
                     className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                   />
-                  <span className="ml-2 text-sm font-medium text-gray-700">Vendor is Active</span>
+                  <span className="ml-2 text-sm font-medium text-gray-700">
+                    Vendor is Active
+                  </span>
                 </label>
               </div>
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
                 <textarea
                   value={form.notes}
                   onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -5004,13 +6388,24 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
 };
 
 // Purchase Form Modal - Smart Purchase Entry Flow
-const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchases, onSubmit, onAddDetail, onRemoveDetail, onClose }) => {
+const PurchaseFormModal = ({
+  form,
+  setForm,
+  items,
+  categories,
+  vendors,
+  purchases,
+  onSubmit,
+  onAddDetail,
+  onRemoveDetail,
+  onClose,
+}) => {
   // Auto-generate PO Number
   const generatePONumber = () => {
     const today = new Date();
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, "");
     const count = purchases.length + 1;
-    return `PO-${dateStr}-${String(count).padStart(4, '0')}`;
+    return `PO-${dateStr}-${String(count).padStart(4, "0")}`;
   };
 
   // Initialize PO number if empty
@@ -5022,7 +6417,7 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
 
   // Auto-fill vendor details when vendor is selected
   const handleVendorSelect = (vendorId) => {
-    const selectedVendor = vendors.find(v => v.id === parseInt(vendorId));
+    const selectedVendor = vendors.find((v) => v.id === parseInt(vendorId));
     if (selectedVendor) {
       setForm({
         ...form,
@@ -5036,11 +6431,15 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
   // Get last purchase price for an item
   const getLastPurchasePrice = (itemId) => {
     if (!purchases || purchases.length === 0) return null;
-    
+
     // Find most recent purchase detail for this item
-    for (const purchase of purchases.sort((a, b) => new Date(b.purchase_date) - new Date(a.purchase_date))) {
+    for (const purchase of purchases.sort(
+      (a, b) => new Date(b.purchase_date) - new Date(a.purchase_date),
+    )) {
       if (purchase.details) {
-        const detail = purchase.details.find(d => d.item_id === parseInt(itemId));
+        const detail = purchase.details.find(
+          (d) => d.item_id === parseInt(itemId),
+        );
         if (detail) return detail.unit_price;
       }
     }
@@ -5087,12 +6486,14 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
 
   // Auto-fill when item is selected
   const handleItemSelect = (index, itemId) => {
-    const selectedItem = items.find(item => item.id === parseInt(itemId));
+    const selectedItem = items.find((item) => item.id === parseInt(itemId));
     if (!selectedItem) return;
 
-    const selectedCategory = categories.find(cat => cat.id === selectedItem.category_id);
+    const selectedCategory = categories.find(
+      (cat) => cat.id === selectedItem.category_id,
+    );
     const newDetails = [...form.details];
-    
+
     newDetails[index] = {
       ...newDetails[index],
       item_id: itemId,
@@ -5109,20 +6510,24 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
   const updateDetail = (index, field, value) => {
     const newDetails = [...form.details];
     newDetails[index] = { ...newDetails[index], [field]: value };
-    
+
     // If tax_inclusive changes, recalculate
-    if (field === 'tax_inclusive' || field === 'unit_price' || field === 'gst_rate') {
+    if (
+      field === "tax_inclusive" ||
+      field === "unit_price" ||
+      field === "gst_rate"
+    ) {
       // Trigger recalculation by updating the detail
     }
-    
+
     setForm({ ...form, details: newDetails });
   };
 
   // Get item details for conditional fields
   const getItemDetails = (itemId) => {
-    const item = items.find(i => i.id === parseInt(itemId));
+    const item = items.find((i) => i.id === parseInt(itemId));
     if (!item) return null;
-    const category = categories.find(c => c.id === item.category_id);
+    const category = categories.find((c) => c.id === item.category_id);
     return { item, category };
   };
 
@@ -5130,67 +6535,96 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-800">New Purchase Order</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-2xl font-bold text-gray-800">
+            New Purchase Order
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
         <form onSubmit={onSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">PO Number *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                PO Number *
+              </label>
               <input
                 type="text"
                 value={form.purchase_number}
-                onChange={(e) => setForm({ ...form, purchase_number: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, purchase_number: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Vendor *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Vendor *
+              </label>
               <select
                 value={form.vendor_id}
-                onChange={(e) => setForm({ ...form, vendor_id: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, vendor_id: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 required
               >
                 <option value="">Select Vendor</option>
                 {vendors.map((v) => (
-                  <option key={v.id} value={v.id}>{v.name}</option>
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Date *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Purchase Date *
+              </label>
               <input
                 type="date"
                 value={form.purchase_date}
-                onChange={(e) => setForm({ ...form, purchase_date: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, purchase_date: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Expected Delivery</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Expected Delivery
+              </label>
               <input
                 type="date"
                 value={form.expected_delivery_date}
-                onChange={(e) => setForm({ ...form, expected_delivery_date: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, expected_delivery_date: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Invoice Number</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Invoice Number
+              </label>
               <input
                 type="text"
                 value={form.invoice_number}
-                onChange={(e) => setForm({ ...form, invoice_number: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, invoice_number: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Status
+              </label>
               <select
                 value={form.status}
                 onChange={(e) => setForm({ ...form, status: e.target.value })}
@@ -5205,7 +6639,9 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
 
           <div className="border-t pt-4">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Purchase Items (Smart Entry)</h3>
+              <h3 className="text-lg font-semibold text-gray-800">
+                Purchase Items (Smart Entry)
+              </h3>
               <button
                 type="button"
                 onClick={onAddDetail}
@@ -5215,38 +6651,71 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
                 Add Item
               </button>
             </div>
-            
+
             {/* Items Grid */}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Action</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Item Name</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Category</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">HSN Code</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Unit</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Serial/Batch</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Expiry Date</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Quantity</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Unit Price</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Tax Inclusive?</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">GST %</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Tax Amount</th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">Net Total</th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      Action
+                    </th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      Item Name
+                    </th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      Category
+                    </th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      HSN Code
+                    </th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      Unit
+                    </th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      Serial/Batch
+                    </th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      Expiry Date
+                    </th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      Quantity
+                    </th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      Unit Price
+                    </th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      Tax Inclusive?
+                    </th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      GST %
+                    </th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      Tax Amount
+                    </th>
+                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                      Net Total
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {form.details.map((detail, index) => {
                     const itemDetails = getItemDetails(detail.item_id);
-                    const isPerishable = itemDetails?.category?.is_perishable || itemDetails?.item?.is_perishable;
-                    const isFixedAsset = itemDetails?.category?.is_asset_fixed || itemDetails?.item?.is_asset_fixed;
+                    const isPerishable =
+                      itemDetails?.category?.is_perishable ||
+                      itemDetails?.item?.is_perishable;
+                    const isFixedAsset =
+                      itemDetails?.category?.is_asset_fixed ||
+                      itemDetails?.item?.is_asset_fixed;
                     const showSerialBatch = isPerishable || isFixedAsset;
                     const showExpiryDate = isPerishable;
                     const { taxAmount, netTotal } = calculateRowTotal(detail);
 
                     return (
-                      <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
+                      <tr
+                        key={index}
+                        className="border-b border-gray-200 hover:bg-gray-50"
+                      >
                         <td className="px-2 py-2">
                           <button
                             type="button"
@@ -5260,13 +6729,17 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
                         <td className="px-2 py-2">
                           <select
                             value={detail.item_id}
-                            onChange={(e) => handleItemSelect(index, e.target.value)}
+                            onChange={(e) =>
+                              handleItemSelect(index, e.target.value)
+                            }
                             className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
                             required
                           >
                             <option value="">Select Item</option>
                             {items.map((item) => (
-                              <option key={item.id} value={item.id}>{item.name}</option>
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                              </option>
                             ))}
                           </select>
                         </td>
@@ -5302,7 +6775,13 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
                             <input
                               type="text"
                               value={detail.serial_batch || ""}
-                              onChange={(e) => updateDetail(index, "serial_batch", e.target.value)}
+                              onChange={(e) =>
+                                updateDetail(
+                                  index,
+                                  "serial_batch",
+                                  e.target.value,
+                                )
+                              }
                               className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
                               placeholder="Serial/Batch"
                             />
@@ -5315,7 +6794,13 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
                             <input
                               type="date"
                               value={detail.expiry_date || ""}
-                              onChange={(e) => updateDetail(index, "expiry_date", e.target.value)}
+                              onChange={(e) =>
+                                updateDetail(
+                                  index,
+                                  "expiry_date",
+                                  e.target.value,
+                                )
+                              }
                               className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
                             />
                           ) : (
@@ -5328,7 +6813,13 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
                             step="0.01"
                             min="0"
                             value={detail.quantity || 0}
-                            onChange={(e) => updateDetail(index, "quantity", parseFloat(e.target.value) || 0)}
+                            onChange={(e) =>
+                              updateDetail(
+                                index,
+                                "quantity",
+                                parseFloat(e.target.value) || 0,
+                              )
+                            }
                             className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
                             required
                           />
@@ -5339,7 +6830,13 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
                             step="0.01"
                             min="0"
                             value={detail.unit_price || 0}
-                            onChange={(e) => updateDetail(index, "unit_price", parseFloat(e.target.value) || 0)}
+                            onChange={(e) =>
+                              updateDetail(
+                                index,
+                                "unit_price",
+                                parseFloat(e.target.value) || 0,
+                              )
+                            }
                             className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
                             required
                           />
@@ -5348,7 +6845,13 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
                           <input
                             type="checkbox"
                             checked={detail.tax_inclusive || false}
-                            onChange={(e) => updateDetail(index, "tax_inclusive", e.target.checked)}
+                            onChange={(e) =>
+                              updateDetail(
+                                index,
+                                "tax_inclusive",
+                                e.target.checked,
+                              )
+                            }
                             className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                             title="Tax Inclusive"
                           />
@@ -5360,7 +6863,13 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
                             min="0"
                             max="100"
                             value={detail.gst_rate || 0}
-                            onChange={(e) => updateDetail(index, "gst_rate", parseFloat(e.target.value) || 0)}
+                            onChange={(e) =>
+                              updateDetail(
+                                index,
+                                "gst_rate",
+                                parseFloat(e.target.value) || 0,
+                              )
+                            }
                             className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
                           />
                         </td>
@@ -5417,7 +6926,9 @@ const PurchaseFormModal = ({ form, setForm, items, categories, vendors, purchase
 // Purchase Details Modal - Shows all purchase information
 const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
   const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [currentStatus, setCurrentStatus] = useState(purchase?.status || "draft");
+  const [currentStatus, setCurrentStatus] = useState(
+    purchase?.status || "draft",
+  );
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
 
   useEffect(() => {
@@ -5438,13 +6949,16 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
     try {
       const token = localStorage.getItem("token");
       const apiBaseUrl = getApiBaseUrl();
-      const response = await fetch(`${apiBaseUrl}/inventory/purchases/${purchase.id}/status?status=${newStatus}`, {
-        method: "PATCH",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `${apiBaseUrl}/inventory/purchases/${purchase.id}/status?status=${newStatus}`,
+        {
+          method: "PATCH",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (response.ok) {
         setCurrentStatus(newStatus);
@@ -5466,7 +6980,9 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
   };
 
   const handlePrint = () => {
-    const printContent = document.getElementById(`purchase-details-${purchase.id}`);
+    const printContent = document.getElementById(
+      `purchase-details-${purchase.id}`,
+    );
     if (!printContent) return;
 
     const printWindow = window.open("", "_blank");
@@ -5508,7 +7024,9 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
 
   const handleExportPDF = async () => {
     try {
-      const printContent = document.getElementById(`purchase-details-${purchase.id}`);
+      const printContent = document.getElementById(
+        `purchase-details-${purchase.id}`,
+      );
       if (!printContent) return;
 
       // Use jsPDF and html2canvas for PDF generation
@@ -5524,7 +7042,7 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
 
       const imgData = canvas.toDataURL("image/png");
       const pdf = new jsPDF("p", "mm", "a4");
-      
+
       const imgWidth = 210; // A4 width in mm
       const pageHeight = 295; // A4 height in mm
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
@@ -5554,9 +7072,21 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
 
   const statusOptions = [
     { value: "draft", label: "Draft", color: "bg-gray-100 text-gray-800" },
-    { value: "confirmed", label: "Confirmed", color: "bg-blue-100 text-blue-800" },
-    { value: "received", label: "Received", color: "bg-green-100 text-green-800" },
-    { value: "cancelled", label: "Cancelled", color: "bg-red-100 text-red-800" },
+    {
+      value: "confirmed",
+      label: "Confirmed",
+      color: "bg-blue-100 text-blue-800",
+    },
+    {
+      value: "received",
+      label: "Received",
+      color: "bg-green-100 text-green-800",
+    },
+    {
+      value: "cancelled",
+      label: "Cancelled",
+      color: "bg-red-100 text-red-800",
+    },
   ];
 
   return (
@@ -5564,8 +7094,12 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
       <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Purchase Order Details</h2>
-            <p className="text-sm text-gray-500 mt-1">PO Number: {purchase.purchase_number}</p>
+            <h2 className="text-2xl font-bold text-gray-800">
+              Purchase Order Details
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              PO Number: {purchase.purchase_number}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             {/* Status Update Dropdown */}
@@ -5576,13 +7110,19 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
                 className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
               >
                 <span>Status:</span>
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                  currentStatus === "received" ? "bg-green-100 text-green-800" :
-                  currentStatus === "confirmed" ? "bg-blue-100 text-blue-800" :
-                  currentStatus === "cancelled" ? "bg-red-100 text-red-800" :
-                  "bg-gray-100 text-gray-800"
-                }`}>
-                  {statusOptions.find(s => s.value === currentStatus)?.label || currentStatus}
+                <span
+                  className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                    currentStatus === "received"
+                      ? "bg-green-100 text-green-800"
+                      : currentStatus === "confirmed"
+                        ? "bg-blue-100 text-blue-800"
+                        : currentStatus === "cancelled"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-gray-100 text-gray-800"
+                  }`}
+                >
+                  {statusOptions.find((s) => s.value === currentStatus)
+                    ?.label || currentStatus}
                 </span>
                 {updatingStatus ? "..." : "▼"}
               </button>
@@ -5592,12 +7132,16 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
                     <button
                       key={option.value}
                       onClick={() => handleStatusUpdate(option.value)}
-                      disabled={updatingStatus || option.value === currentStatus}
+                      disabled={
+                        updatingStatus || option.value === currentStatus
+                      }
                       className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed ${
                         option.value === currentStatus ? "bg-indigo-50" : ""
                       }`}
                     >
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${option.color}`}>
+                      <span
+                        className={`px-2 py-1 text-xs font-semibold rounded-full ${option.color}`}
+                      >
                         {option.label}
                       </span>
                     </button>
@@ -5627,15 +7171,17 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
             <button
               onClick={() => {
                 if (navigator.share) {
-                  navigator.share({
-                    title: `Purchase Order ${purchase.purchase_number}`,
-                    text: `Purchase Order ${purchase.purchase_number} - ${purchase.vendor_name}`,
-                    url: window.location.href,
-                  }).catch(() => {});
+                  navigator
+                    .share({
+                      title: `Purchase Order ${purchase.purchase_number}`,
+                      text: `Purchase Order ${purchase.purchase_number} - ${purchase.vendor_name}`,
+                      url: window.location.href,
+                    })
+                    .catch(() => {});
                 } else {
                   // Fallback: copy to clipboard
                   navigator.clipboard.writeText(
-                    `Purchase Order: ${purchase.purchase_number}\nVendor: ${purchase.vendor_name}\nTotal: ${formatCurrency(purchase.total_amount)}`
+                    `Purchase Order: ${purchase.purchase_number}\nVendor: ${purchase.vendor_name}\nTotal: ${formatCurrency(purchase.total_amount)}`,
                   );
                   alert("Purchase details copied to clipboard!");
                 }
@@ -5645,7 +7191,10 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
             >
               <Share2 className="w-4 h-4" />
             </button>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -5655,36 +7204,56 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
           {/* Purchase Header Information */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 rounded-lg">
             <div>
-              <label className="text-xs font-medium text-gray-500">Vendor</label>
-              <p className="text-sm font-semibold text-gray-900 mt-1">{purchase.vendor_name || "-"}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Vendor
+              </label>
+              <p className="text-sm font-semibold text-gray-900 mt-1">
+                {purchase.vendor_name || "-"}
+              </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Purchase Date</label>
+              <label className="text-xs font-medium text-gray-500">
+                Purchase Date
+              </label>
               <p className="text-sm text-gray-900 mt-1">
                 {new Date(purchase.purchase_date).toLocaleDateString()}
               </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Status</label>
+              <label className="text-xs font-medium text-gray-500">
+                Status
+              </label>
               <p className="mt-1">
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                  currentStatus === "received" ? "bg-green-100 text-green-800" :
-                  currentStatus === "confirmed" ? "bg-blue-100 text-blue-800" :
-                  currentStatus === "cancelled" ? "bg-red-100 text-red-800" :
-                  "bg-gray-100 text-gray-800"
-                }`}>
-                  {statusOptions.find(s => s.value === currentStatus)?.label || currentStatus}
+                <span
+                  className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                    currentStatus === "received"
+                      ? "bg-green-100 text-green-800"
+                      : currentStatus === "confirmed"
+                        ? "bg-blue-100 text-blue-800"
+                        : currentStatus === "cancelled"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-gray-100 text-gray-800"
+                  }`}
+                >
+                  {statusOptions.find((s) => s.value === currentStatus)
+                    ?.label || currentStatus}
                 </span>
               </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Payment Status</label>
+              <label className="text-xs font-medium text-gray-500">
+                Payment Status
+              </label>
               <p className="mt-1">
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                  purchase.payment_status === "paid" ? "bg-green-100 text-green-800" :
-                  purchase.payment_status === "partial" ? "bg-yellow-100 text-yellow-800" :
-                  "bg-gray-100 text-gray-800"
-                }`}>
+                <span
+                  className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                    purchase.payment_status === "paid"
+                      ? "bg-green-100 text-green-800"
+                      : purchase.payment_status === "partial"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : "bg-gray-100 text-gray-800"
+                  }`}
+                >
                   {purchase.payment_status}
                 </span>
               </p>
@@ -5695,7 +7264,9 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             {purchase.expected_delivery_date && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Expected Delivery</label>
+                <label className="text-xs font-medium text-gray-500">
+                  Expected Delivery
+                </label>
                 <p className="text-sm text-gray-900 mt-1">
                   {formatDateIST(purchase.expected_delivery_date)}
                 </p>
@@ -5703,13 +7274,19 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
             )}
             {purchase.invoice_number && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Invoice Number</label>
-                <p className="text-sm text-gray-900 mt-1">{purchase.invoice_number}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Invoice Number
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {purchase.invoice_number}
+                </p>
               </div>
             )}
             {purchase.invoice_date && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Invoice Date</label>
+                <label className="text-xs font-medium text-gray-500">
+                  Invoice Date
+                </label>
                 <p className="text-sm text-gray-900 mt-1">
                   {new Date(purchase.invoice_date).toLocaleDateString()}
                 </p>
@@ -5717,58 +7294,114 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
             )}
             {purchase.gst_number && (
               <div>
-                <label className="text-xs font-medium text-gray-500">GST Number</label>
-                <p className="text-sm text-gray-900 mt-1">{purchase.gst_number}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  GST Number
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {purchase.gst_number}
+                </p>
               </div>
             )}
             {purchase.payment_terms && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Payment Terms</label>
-                <p className="text-sm text-gray-900 mt-1">{purchase.payment_terms}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Payment Terms
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {purchase.payment_terms}
+                </p>
               </div>
             )}
             {purchase.created_by_name && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Created By</label>
-                <p className="text-sm text-gray-900 mt-1">{purchase.created_by_name}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Created By
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {purchase.created_by_name}
+                </p>
               </div>
             )}
           </div>
 
           {/* Purchase Items Table */}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Purchase Items</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              Purchase Items
+            </h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">HSN Code</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">GST %</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Discount</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">CGST</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">SGST</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">IGST</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Item
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      HSN Code
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Quantity
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Unit
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Unit Price
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      GST %
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Discount
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      CGST
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      SGST
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      IGST
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Total
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {purchase.details && purchase.details.length > 0 ? (
                     purchase.details.map((detail, index) => (
                       <tr key={detail.id || index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 text-sm text-gray-900">{detail.item_name || "-"}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{detail.hsn_code || "-"}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{detail.quantity || 0}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{detail.unit || "-"}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{formatCurrency(detail.unit_price || 0)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{detail.gst_rate || 0}%</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{formatCurrency(detail.discount || 0)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{formatCurrency(detail.cgst_amount || 0)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{formatCurrency(detail.sgst_amount || 0)}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{formatCurrency(detail.igst_amount || 0)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          {detail.item_name || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {detail.hsn_code || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {detail.quantity || 0}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {detail.unit || "-"}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {formatCurrency(detail.unit_price || 0)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {detail.gst_rate || 0}%
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {formatCurrency(detail.discount || 0)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {formatCurrency(detail.cgst_amount || 0)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {formatCurrency(detail.sgst_amount || 0)}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {formatCurrency(detail.igst_amount || 0)}
+                        </td>
                         <td className="px-4 py-3 text-sm font-semibold text-gray-900">
                           {formatCurrency(detail.total_amount || 0)}
                         </td>
@@ -5776,7 +7409,10 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan="11" className="px-4 py-8 text-center text-gray-500">
+                      <td
+                        colSpan="11"
+                        className="px-4 py-8 text-center text-gray-500"
+                      >
                         No items found
                       </td>
                     </tr>
@@ -5792,35 +7428,47 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
               <div className="w-full max-w-md space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Sub Total:</span>
-                  <span className="font-medium text-gray-900">{formatCurrency(purchase.sub_total || 0)}</span>
+                  <span className="font-medium text-gray-900">
+                    {formatCurrency(purchase.sub_total || 0)}
+                  </span>
                 </div>
                 {purchase.cgst > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">CGST:</span>
-                    <span className="font-medium text-gray-900">{formatCurrency(purchase.cgst || 0)}</span>
+                    <span className="font-medium text-gray-900">
+                      {formatCurrency(purchase.cgst || 0)}
+                    </span>
                   </div>
                 )}
                 {purchase.sgst > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">SGST:</span>
-                    <span className="font-medium text-gray-900">{formatCurrency(purchase.sgst || 0)}</span>
+                    <span className="font-medium text-gray-900">
+                      {formatCurrency(purchase.sgst || 0)}
+                    </span>
                   </div>
                 )}
                 {purchase.igst > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">IGST:</span>
-                    <span className="font-medium text-gray-900">{formatCurrency(purchase.igst || 0)}</span>
+                    <span className="font-medium text-gray-900">
+                      {formatCurrency(purchase.igst || 0)}
+                    </span>
                   </div>
                 )}
                 {purchase.discount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-gray-600">Discount:</span>
-                    <span className="font-medium text-red-600">-{formatCurrency(purchase.discount || 0)}</span>
+                    <span className="font-medium text-red-600">
+                      -{formatCurrency(purchase.discount || 0)}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between text-lg font-bold pt-2 border-t">
                   <span className="text-gray-900">Grand Total:</span>
-                  <span className="text-indigo-600">{formatCurrency(purchase.total_amount || 0)}</span>
+                  <span className="text-indigo-600">
+                    {formatCurrency(purchase.total_amount || 0)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -5830,7 +7478,9 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
           {purchase.notes && (
             <div className="border-t pt-4">
               <label className="text-sm font-medium text-gray-700">Notes</label>
-              <p className="text-sm text-gray-600 mt-1 bg-gray-50 p-3 rounded-lg">{purchase.notes}</p>
+              <p className="text-sm text-gray-600 mt-1 bg-gray-50 p-3 rounded-lg">
+                {purchase.notes}
+              </p>
             </div>
           )}
 
@@ -5855,7 +7505,10 @@ const UnitFormModal = ({ unit, setUnit, onSubmit, onClose }) => {
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-800">Add New Unit</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -5872,7 +7525,9 @@ const UnitFormModal = ({ unit, setUnit, onSubmit, onClose }) => {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               required
             />
-            <p className="text-xs text-gray-500 mt-1">Short code (will be converted to lowercase)</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Short code (will be converted to lowercase)
+            </p>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -5886,7 +7541,9 @@ const UnitFormModal = ({ unit, setUnit, onSubmit, onClose }) => {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               required
             />
-            <p className="text-xs text-gray-500 mt-1">Full display name shown in dropdown</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Full display name shown in dropdown
+            </p>
           </div>
           <div className="flex justify-end gap-4 pt-4">
             <button
@@ -5910,13 +7567,26 @@ const UnitFormModal = ({ unit, setUnit, onSubmit, onClose }) => {
 };
 
 // Requisition Form Modal
-const IssueFormModal = ({ form, setForm, items, locations, requisitions, onSubmit, onAddDetail, onRemoveDetail, onClose }) => {
+const IssueFormModal = ({
+  form,
+  setForm,
+  items,
+  locations,
+  requisitions,
+  onSubmit,
+  onAddDetail,
+  onRemoveDetail,
+  onClose,
+}) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-2xl font-bold text-gray-800">New Stock Issue</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -5925,75 +7595,110 @@ const IssueFormModal = ({ form, setForm, items, locations, requisitions, onSubmi
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Linked Requisition (Optional)
-                <span className="ml-2 text-xs text-gray-500 font-normal">(Link to a pending requisition if issuing from a request)</span>
+                <span className="ml-2 text-xs text-gray-500 font-normal">
+                  (Link to a pending requisition if issuing from a request)
+                </span>
               </label>
               <select
                 value={form.requisition_id}
-                onChange={(e) => setForm({ ...form, requisition_id: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, requisition_id: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">None - Direct Issue</option>
-                {requisitions.filter(r => r.status === "pending" || r.status === "approved").map((req) => (
-                  <option key={req.id} value={req.id}>{req.requisition_number} - {req.destination_department}</option>
-                ))}
+                {requisitions
+                  .filter(
+                    (r) => r.status === "pending" || r.status === "approved",
+                  )
+                  .map((req) => (
+                    <option key={req.id} value={req.id}>
+                      {req.requisition_number} - {req.destination_department}
+                    </option>
+                  ))}
               </select>
-              {requisitions.filter(r => r.status === "pending" || r.status === "approved").length === 0 && (
+              {requisitions.filter(
+                (r) => r.status === "pending" || r.status === "approved",
+              ).length === 0 && (
                 <p className="mt-1 text-xs text-gray-500">
-                  No pending requisitions. Create one in the "Requisitions" tab first.
+                  No pending requisitions. Create one in the "Requisitions" tab
+                  first.
                 </p>
               )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Source Location *
-                <span className="ml-2 text-xs text-gray-500 font-normal">(Where stock is coming FROM - must be an Inventory Point)</span>
+                <span className="ml-2 text-xs text-gray-500 font-normal">
+                  (Where stock is coming FROM - must be an Inventory Point)
+                </span>
               </label>
               <select
                 value={form.source_location_id}
-                onChange={(e) => setForm({ ...form, source_location_id: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, source_location_id: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 required
               >
                 <option value="">Select Source</option>
-                {locations.filter(loc => loc.is_inventory_point).map((loc) => (
-                  <option key={loc.id} value={loc.id}>{loc.name || `${loc.building} - ${loc.room_area}`}</option>
-                ))}
+                {locations
+                  .filter((loc) => loc.is_inventory_point)
+                  .map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name || `${loc.building} - ${loc.room_area}`}
+                    </option>
+                  ))}
               </select>
-              {locations.filter(loc => loc.is_inventory_point).length === 0 && (
+              {locations.filter((loc) => loc.is_inventory_point).length ===
+                0 && (
                 <p className="mt-1 text-xs text-red-600">
-                  ⚠️ No inventory points found! Create a warehouse location with "Is Inventory Point" = Yes in the Locations tab.
+                  ⚠️ No inventory points found! Create a warehouse location with
+                  "Is Inventory Point" = Yes in the Locations tab.
                 </p>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Destination Location *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Destination Location *
+              </label>
               <select
                 value={form.destination_location_id}
-                onChange={(e) => setForm({ ...form, destination_location_id: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, destination_location_id: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 required
               >
                 <option value="">Select Destination</option>
                 {locations.map((loc) => (
-                  <option key={loc.id} value={loc.id}>{loc.name || `${loc.building} - ${loc.room_area}`}</option>
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name || `${loc.building} - ${loc.room_area}`}
+                  </option>
                 ))}
               </select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Issue Date *
+              </label>
               <input
                 type="date"
                 value={form.issue_date}
-                onChange={(e) => setForm({ ...form, issue_date: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, issue_date: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 required
               />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Notes
+            </label>
             <textarea
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -6004,7 +7709,9 @@ const IssueFormModal = ({ form, setForm, items, locations, requisitions, onSubmi
 
           <div>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Issued Items</h3>
+              <h3 className="text-lg font-semibold text-gray-800">
+                Issued Items
+              </h3>
               <button
                 type="button"
                 onClick={onAddDetail}
@@ -6018,18 +7725,34 @@ const IssueFormModal = ({ form, setForm, items, locations, requisitions, onSubmi
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Issued Qty</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Batch/Lot No</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Cost</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Item
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Issued Qty
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Unit
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Batch/Lot No
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Cost
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Notes
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {form.details.map((detail, index) => {
-                    const item = items.find(i => i.id === parseInt(detail.item_id));
+                    const item = items.find(
+                      (i) => i.id === parseInt(detail.item_id),
+                    );
                     return (
                       <tr key={index}>
                         <td className="px-3 py-2">
@@ -6038,10 +7761,14 @@ const IssueFormModal = ({ form, setForm, items, locations, requisitions, onSubmi
                             onChange={(e) => {
                               const newDetails = [...form.details];
                               newDetails[index].item_id = e.target.value;
-                              const selectedItem = items.find(i => i.id === parseInt(e.target.value));
+                              const selectedItem = items.find(
+                                (i) => i.id === parseInt(e.target.value),
+                              );
                               if (selectedItem) {
-                                newDetails[index].unit = selectedItem.unit || "pcs";
-                                newDetails[index].cost = selectedItem.unit_price || 0;
+                                newDetails[index].unit =
+                                  selectedItem.unit || "pcs";
+                                newDetails[index].cost =
+                                  selectedItem.unit_price || 0;
                               }
                               setForm({ ...form, details: newDetails });
                             }}
@@ -6050,7 +7777,9 @@ const IssueFormModal = ({ form, setForm, items, locations, requisitions, onSubmi
                           >
                             <option value="">Select Item</option>
                             {items.map((item) => (
-                              <option key={item.id} value={item.id}>{item.name}</option>
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                              </option>
                             ))}
                           </select>
                         </td>
@@ -6061,7 +7790,8 @@ const IssueFormModal = ({ form, setForm, items, locations, requisitions, onSubmi
                             value={detail.issued_quantity}
                             onChange={(e) => {
                               const newDetails = [...form.details];
-                              newDetails[index].issued_quantity = parseFloat(e.target.value) || 0;
+                              newDetails[index].issued_quantity =
+                                parseFloat(e.target.value) || 0;
                               setForm({ ...form, details: newDetails });
                             }}
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
@@ -6082,7 +7812,8 @@ const IssueFormModal = ({ form, setForm, items, locations, requisitions, onSubmi
                             value={detail.batch_lot_number}
                             onChange={(e) => {
                               const newDetails = [...form.details];
-                              newDetails[index].batch_lot_number = e.target.value;
+                              newDetails[index].batch_lot_number =
+                                e.target.value;
                               setForm({ ...form, details: newDetails });
                             }}
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
@@ -6096,7 +7827,8 @@ const IssueFormModal = ({ form, setForm, items, locations, requisitions, onSubmi
                             value={detail.cost}
                             onChange={(e) => {
                               const newDetails = [...form.details];
-                              newDetails[index].cost = parseFloat(e.target.value) || 0;
+                              newDetails[index].cost =
+                                parseFloat(e.target.value) || 0;
                               setForm({ ...form, details: newDetails });
                             }}
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
@@ -6154,45 +7886,76 @@ const IssueFormModal = ({ form, setForm, items, locations, requisitions, onSubmi
   );
 };
 
-const RequisitionFormModal = ({ form, setForm, items, onSubmit, onAddDetail, onRemoveDetail, onClose }) => {
-  const departments = ["Kitchen Main", "Housekeeping", "Office", "Restaurant", "Facility", "Security", "Fire & Safety"];
+const RequisitionFormModal = ({
+  form,
+  setForm,
+  items,
+  onSubmit,
+  onAddDetail,
+  onRemoveDetail,
+  onClose,
+}) => {
+  const departments = [
+    "Kitchen Main",
+    "Housekeeping",
+    "Office",
+    "Restaurant",
+    "Facility",
+    "Security",
+    "Fire & Safety",
+  ];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-2xl font-bold text-gray-800">New Requisition</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
         <form onSubmit={onSubmit} className="p-6 space-y-6">
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Destination Department *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Destination Department *
+              </label>
               <select
                 value={form.destination_department}
-                onChange={(e) => setForm({ ...form, destination_department: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, destination_department: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 required
               >
                 <option value="">Select Department</option>
                 {departments.map((dept) => (
-                  <option key={dept} value={dept}>{dept}</option>
+                  <option key={dept} value={dept}>
+                    {dept}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Date Needed</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date Needed
+              </label>
               <input
                 type="date"
                 value={form.date_needed}
-                onChange={(e) => setForm({ ...form, date_needed: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, date_needed: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Priority *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Priority *
+              </label>
               <select
                 value={form.priority}
                 onChange={(e) => setForm({ ...form, priority: e.target.value })}
@@ -6206,7 +7969,9 @@ const RequisitionFormModal = ({ form, setForm, items, onSubmit, onAddDetail, onR
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Notes
+            </label>
             <textarea
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -6217,7 +7982,9 @@ const RequisitionFormModal = ({ form, setForm, items, onSubmit, onAddDetail, onR
 
           <div>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Requested Items</h3>
+              <h3 className="text-lg font-semibold text-gray-800">
+                Requested Items
+              </h3>
               <button
                 type="button"
                 onClick={onAddDetail}
@@ -6231,18 +7998,34 @@ const RequisitionFormModal = ({ form, setForm, items, onSubmit, onAddDetail, onR
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Current Stock</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Requested Qty</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Approved Qty</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Item
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Current Stock
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Requested Qty
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Approved Qty
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Unit
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Notes
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {form.details.map((detail, index) => {
-                    const item = items.find(i => i.id === parseInt(detail.item_id));
+                    const item = items.find(
+                      (i) => i.id === parseInt(detail.item_id),
+                    );
                     return (
                       <tr key={index}>
                         <td className="px-3 py-2">
@@ -6251,9 +8034,12 @@ const RequisitionFormModal = ({ form, setForm, items, onSubmit, onAddDetail, onR
                             onChange={(e) => {
                               const newDetails = [...form.details];
                               newDetails[index].item_id = e.target.value;
-                              const selectedItem = items.find(i => i.id === parseInt(e.target.value));
+                              const selectedItem = items.find(
+                                (i) => i.id === parseInt(e.target.value),
+                              );
                               if (selectedItem) {
-                                newDetails[index].unit = selectedItem.unit || "pcs";
+                                newDetails[index].unit =
+                                  selectedItem.unit || "pcs";
                               }
                               setForm({ ...form, details: newDetails });
                             }}
@@ -6262,14 +8048,16 @@ const RequisitionFormModal = ({ form, setForm, items, onSubmit, onAddDetail, onR
                           >
                             <option value="">Select Item</option>
                             {items.map((item) => (
-                              <option key={item.id} value={item.id}>{item.name}</option>
+                              <option key={item.id} value={item.id}>
+                                {item.name}
+                              </option>
                             ))}
                           </select>
                         </td>
                         <td className="px-3 py-2">
                           <input
                             type="text"
-                            value={item ? (item.current_stock || 0) : "N/A"}
+                            value={item ? item.current_stock || 0 : "N/A"}
                             disabled
                             className="w-full px-2 py-1 text-sm border border-gray-200 rounded bg-gray-50 text-gray-600"
                           />
@@ -6281,7 +8069,8 @@ const RequisitionFormModal = ({ form, setForm, items, onSubmit, onAddDetail, onR
                             value={detail.requested_quantity}
                             onChange={(e) => {
                               const newDetails = [...form.details];
-                              newDetails[index].requested_quantity = parseFloat(e.target.value) || 0;
+                              newDetails[index].requested_quantity =
+                                parseFloat(e.target.value) || 0;
                               setForm({ ...form, details: newDetails });
                             }}
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
@@ -6295,7 +8084,10 @@ const RequisitionFormModal = ({ form, setForm, items, onSubmit, onAddDetail, onR
                             value={detail.approved_quantity || ""}
                             onChange={(e) => {
                               const newDetails = [...form.details];
-                              newDetails[index].approved_quantity = e.target.value ? parseFloat(e.target.value) : null;
+                              newDetails[index].approved_quantity = e.target
+                                .value
+                                ? parseFloat(e.target.value)
+                                : null;
                               setForm({ ...form, details: newDetails });
                             }}
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
@@ -6362,29 +8154,45 @@ const RequisitionFormModal = ({ form, setForm, items, onSubmit, onAddDetail, onR
 };
 
 // Waste Log Form Modal
-const WasteLogFormModal = ({ form, setForm, items = [], locations = [], onSubmit, onClose }) => {
+const WasteLogFormModal = ({
+  form,
+  setForm,
+  items = [],
+  locations = [],
+  onSubmit,
+  onClose,
+}) => {
   const wasteReasons = ["Expired", "Damaged", "Spilled", "Theft", "Taste Test"];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-800">Report Waste / Spoilage</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-2xl font-bold text-gray-800">
+            Report Waste / Spoilage
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
         <form onSubmit={onSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Item *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Item *
+            </label>
             <select
               value={form.item_id}
               onChange={(e) => {
-                const item = items.find(i => i.id === parseInt(e.target.value));
+                const item = items.find(
+                  (i) => i.id === parseInt(e.target.value),
+                );
                 setForm({
                   ...form,
                   item_id: e.target.value,
-                  unit: item?.unit || "pcs"
+                  unit: item?.unit || "pcs",
                 });
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
@@ -6392,27 +8200,37 @@ const WasteLogFormModal = ({ form, setForm, items = [], locations = [], onSubmit
             >
               <option value="">Select Item</option>
               {items.map((item) => (
-                <option key={item.id} value={item.id}>{item.name}</option>
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
               ))}
             </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Batch Number</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Batch Number
+              </label>
               <input
                 type="text"
                 value={form.batch_number}
-                onChange={(e) => setForm({ ...form, batch_number: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, batch_number: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Expiry Date
+              </label>
               <input
                 type="date"
                 value={form.expiry_date}
-                onChange={(e) => setForm({ ...form, expiry_date: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, expiry_date: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               />
             </div>
@@ -6420,18 +8238,27 @@ const WasteLogFormModal = ({ form, setForm, items = [], locations = [], onSubmit
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Quantity *
+              </label>
               <input
                 type="number"
                 step="0.01"
                 value={form.quantity}
-                onChange={(e) => setForm({ ...form, quantity: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    quantity: parseFloat(e.target.value) || 0,
+                  })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Unit
+              </label>
               <input
                 type="text"
                 value={form.unit}
@@ -6442,25 +8269,35 @@ const WasteLogFormModal = ({ form, setForm, items = [], locations = [], onSubmit
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Reason Code *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Reason Code *
+            </label>
             <select
               value={form.reason_code}
-              onChange={(e) => setForm({ ...form, reason_code: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, reason_code: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               required
             >
               <option value="">Select Reason</option>
               {wasteReasons.map((reason) => (
-                <option key={reason} value={reason}>{reason}</option>
+                <option key={reason} value={reason}>
+                  {reason}
+                </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Action Taken</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Action Taken
+            </label>
             <select
               value={form.action_taken || ""}
-              onChange={(e) => setForm({ ...form, action_taken: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, action_taken: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
             >
               <option value="">Select Action</option>
@@ -6471,10 +8308,14 @@ const WasteLogFormModal = ({ form, setForm, items = [], locations = [], onSubmit
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Location
+              </label>
               <select
                 value={form.location_id || ""}
-                onChange={(e) => setForm({ ...form, location_id: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, location_id: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">Select Location</option>
@@ -6486,18 +8327,24 @@ const WasteLogFormModal = ({ form, setForm, items = [], locations = [], onSubmit
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Waste Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Waste Date
+              </label>
               <input
                 type="date"
                 value={form.waste_date || ""}
-                onChange={(e) => setForm({ ...form, waste_date: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, waste_date: e.target.value })
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Photo (Proof)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Photo (Proof)
+            </label>
             <input
               type="file"
               accept="image/*"
@@ -6507,7 +8354,9 @@ const WasteLogFormModal = ({ form, setForm, items = [], locations = [], onSubmit
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Notes
+            </label>
             <textarea
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -6546,7 +8395,7 @@ const LocationFormModal = ({ form, setForm, locations, onSubmit, onClose }) => {
     { value: "PUBLIC_AREA", label: "Public Area" },
     { value: "CENTRAL_WAREHOUSE", label: "Central Warehouse" },
     { value: "BRANCH_STORE", label: "Branch Store" },
-    { value: "SUB_STORE", label: "Sub Store" }
+    { value: "SUB_STORE", label: "Sub Store" },
   ];
 
   return (
@@ -6554,13 +8403,18 @@ const LocationFormModal = ({ form, setForm, locations, onSubmit, onClose }) => {
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">Add Location</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
         <form onSubmit={onSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Location Name *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Location Name *
+            </label>
             <input
               type="text"
               value={form.name || ""}
@@ -6569,11 +8423,15 @@ const LocationFormModal = ({ form, setForm, locations, onSubmit, onClose }) => {
               placeholder="e.g., Main Warehouse, Kitchen Store, Room 101"
               required
             />
-            <p className="mt-1 text-xs text-gray-500">A friendly name for this location</p>
+            <p className="mt-1 text-xs text-gray-500">
+              A friendly name for this location
+            </p>
           </div>
-          
+
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Building *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Building *
+            </label>
             <input
               type="text"
               value={form.building}
@@ -6585,7 +8443,9 @@ const LocationFormModal = ({ form, setForm, locations, onSubmit, onClose }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Floor</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Floor
+            </label>
             <input
               type="text"
               value={form.floor}
@@ -6596,7 +8456,9 @@ const LocationFormModal = ({ form, setForm, locations, onSubmit, onClose }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Room/Area *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Room/Area *
+            </label>
             <input
               type="text"
               value={form.room_area}
@@ -6608,60 +8470,99 @@ const LocationFormModal = ({ form, setForm, locations, onSubmit, onClose }) => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Location Type *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Location Type *
+            </label>
             <select
               value={form.location_type}
-              onChange={(e) => setForm({ ...form, location_type: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, location_type: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               required
             >
               <option value="">Select Type</option>
               {locationTypes.map((type) => (
-                <option key={type.value} value={type.value}>{type.label}</option>
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
               ))}
             </select>
           </div>
-          
+
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <div className="flex items-start">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                <svg
+                  className="h-5 w-5 text-blue-400"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z"
+                    clipRule="evenodd"
+                  />
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-blue-800">Creating a Source Location (Warehouse)</h3>
+                <h3 className="text-sm font-medium text-blue-800">
+                  Creating a Source Location (Warehouse)
+                </h3>
                 <div className="mt-2 text-sm text-blue-700">
-                  <p>To create a location that can be used as a <strong>Source Location</strong> in stock issues:</p>
+                  <p>
+                    To create a location that can be used as a{" "}
+                    <strong>Source Location</strong> in stock issues:
+                  </p>
                   <ul className="list-disc list-inside mt-2 space-y-1">
-                    <li>Select <strong>Location Type</strong>: "Warehouse", "Central Warehouse", or "Branch Store"</li>
-                    <li>Check <strong>"Is Inventory Point"</strong> = Yes (this makes it available as a source)</li>
-                    <li>Example: Name = "Main Warehouse", Type = "Central Warehouse", Is Inventory Point = Yes</li>
+                    <li>
+                      Select <strong>Location Type</strong>: "Warehouse",
+                      "Central Warehouse", or "Branch Store"
+                    </li>
+                    <li>
+                      Check <strong>"Is Inventory Point"</strong> = Yes (this
+                      makes it available as a source)
+                    </li>
+                    <li>
+                      Example: Name = "Main Warehouse", Type = "Central
+                      Warehouse", Is Inventory Point = Yes
+                    </li>
                   </ul>
                 </div>
               </div>
             </div>
           </div>
-          
+
           <div className="flex items-center">
             <input
               type="checkbox"
               id="is_inventory_point"
               checked={form.is_inventory_point}
-              onChange={(e) => setForm({ ...form, is_inventory_point: e.target.checked })}
+              onChange={(e) =>
+                setForm({ ...form, is_inventory_point: e.target.checked })
+              }
               className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
             />
-            <label htmlFor="is_inventory_point" className="ml-2 block text-sm text-gray-700">
+            <label
+              htmlFor="is_inventory_point"
+              className="ml-2 block text-sm text-gray-700"
+            >
               <span className="font-medium">Is Inventory Point?</span>
-              <span className="ml-2 text-xs text-gray-500">(Check this to use as Source Location in stock issues)</span>
+              <span className="ml-2 text-xs text-gray-500">
+                (Check this to use as Source Location in stock issues)
+              </span>
             </label>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
             <textarea
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
               rows={3}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
             />
@@ -6689,10 +8590,18 @@ const LocationFormModal = ({ form, setForm, locations, onSubmit, onClose }) => {
 };
 
 // Asset Mapping Form Modal
-const AssetMappingFormModal = ({ form, setForm, items, locations, categories, onSubmit, onClose }) => {
+const AssetMappingFormModal = ({
+  form,
+  setForm,
+  items,
+  locations,
+  categories,
+  onSubmit,
+  onClose,
+}) => {
   // Filter items to show only fixed assets
-  const fixedAssets = items.filter(item => {
-    const category = categories.find(c => c.id === item.category_id);
+  const fixedAssets = items.filter((item) => {
+    const category = categories.find((c) => c.id === item.category_id);
     return category?.is_asset_fixed || false;
   });
 
@@ -6700,14 +8609,21 @@ const AssetMappingFormModal = ({ form, setForm, items, locations, categories, on
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-2xl font-bold text-gray-800">Assign Asset to Location</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-2xl font-bold text-gray-800">
+            Assign Asset to Location
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
         <form onSubmit={onSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Asset (Fixed Item) *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Asset (Fixed Item) *
+            </label>
             <select
               value={form.item_id}
               onChange={(e) => setForm({ ...form, item_id: e.target.value })}
@@ -6716,41 +8632,54 @@ const AssetMappingFormModal = ({ form, setForm, items, locations, categories, on
             >
               <option value="">Select Asset</option>
               {fixedAssets.map((item) => (
-                <option key={item.id} value={item.id}>{item.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Location *</label>
-            <select
-              value={form.location_id}
-              onChange={(e) => setForm({ ...form, location_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            >
-              <option value="">Select Location</option>
-              {locations.map((loc) => (
-                <option key={loc.id} value={loc.id}>
-                  {loc.building} - {loc.room_area} {loc.floor ? `(${loc.floor})` : ""}
+                <option key={item.id} value={item.id}>
+                  {item.name}
                 </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Location *
+            </label>
+            <select
+              value={form.location_id}
+              onChange={(e) =>
+                setForm({ ...form, location_id: e.target.value })
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              required
+            >
+              <option value="">Select Location</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.building} - {loc.room_area}{" "}
+                  {loc.floor ? `(${loc.floor})` : ""}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Serial Number
+            </label>
             <input
               type="text"
               value={form.serial_number}
-              onChange={(e) => setForm({ ...form, serial_number: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, serial_number: e.target.value })
+              }
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               placeholder="e.g., SN: 998877"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Notes
+            </label>
             <textarea
               value={form.notes}
               onChange={(e) => setForm({ ...form, notes: e.target.value })}
@@ -6786,55 +8715,88 @@ const RequisitionDetailsModal = ({ requisition, items, onClose }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Requisition Details</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+            Requisition Details
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs font-medium text-gray-500">Requisition Number</label>
-              <p className="text-sm font-semibold text-gray-900 mt-1">{requisition.requisition_number}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Requisition Number
+              </label>
+              <p className="text-sm font-semibold text-gray-900 mt-1">
+                {requisition.requisition_number}
+              </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Department</label>
-              <p className="text-sm text-gray-900 mt-1">{requisition.destination_department}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Department
+              </label>
+              <p className="text-sm text-gray-900 mt-1">
+                {requisition.destination_department}
+              </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Status</label>
+              <label className="text-xs font-medium text-gray-500">
+                Status
+              </label>
               <p className="mt-1">
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                  requisition.status === "approved" ? "bg-green-100 text-green-800" :
-                  requisition.status === "rejected" ? "bg-red-100 text-red-800" :
-                  "bg-yellow-100 text-yellow-800"
-                }`}>
+                <span
+                  className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                    requisition.status === "approved"
+                      ? "bg-green-100 text-green-800"
+                      : requisition.status === "rejected"
+                        ? "bg-red-100 text-red-800"
+                        : "bg-yellow-100 text-yellow-800"
+                  }`}
+                >
                   {requisition.status}
                 </span>
               </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Priority</label>
+              <label className="text-xs font-medium text-gray-500">
+                Priority
+              </label>
               <p className="mt-1">
-                <span className={`px-2 py-1 text-xs rounded-full ${
-                  requisition.priority === "urgent" ? "bg-red-100 text-red-800" :
-                  requisition.priority === "critical" ? "bg-purple-100 text-purple-800" :
-                  "bg-blue-100 text-blue-800"
-                }`}>
+                <span
+                  className={`px-2 py-1 text-xs rounded-full ${
+                    requisition.priority === "urgent"
+                      ? "bg-red-100 text-red-800"
+                      : requisition.priority === "critical"
+                        ? "bg-purple-100 text-purple-800"
+                        : "bg-blue-100 text-blue-800"
+                  }`}
+                >
                   {requisition.priority}
                 </span>
               </p>
             </div>
             {requisition.date_needed && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Date Needed</label>
-                <p className="text-sm text-gray-900 mt-1">{new Date(requisition.date_needed).toLocaleDateString()}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Date Needed
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {new Date(requisition.date_needed).toLocaleDateString()}
+                </p>
               </div>
             )}
             {requisition.requested_by_name && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Requested By</label>
-                <p className="text-sm text-gray-900 mt-1">{requisition.requested_by_name}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Requested By
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {requisition.requested_by_name}
+                </p>
               </div>
             )}
           </div>
@@ -6845,28 +8807,50 @@ const RequisitionDetailsModal = ({ requisition, items, onClose }) => {
             </div>
           )}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Requested Items</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">
+              Requested Items
+            </h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Requested Qty</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Approved Qty</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Notes</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Item
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Requested Qty
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Approved Qty
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Unit
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Notes
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {requisition.details?.map((detail, index) => {
-                    const item = items.find(i => i.id === detail.item_id);
+                    const item = items.find((i) => i.id === detail.item_id);
                     return (
                       <tr key={index}>
-                        <td className="px-3 py-2 text-sm text-gray-900">{item?.name || "N/A"}</td>
-                        <td className="px-3 py-2 text-sm text-gray-600">{detail.requested_quantity || detail.quantity || 0}</td>
-                        <td className="px-3 py-2 text-sm text-gray-600">{detail.approved_quantity || "-"}</td>
-                        <td className="px-3 py-2 text-sm text-gray-600">{detail.unit}</td>
-                        <td className="px-3 py-2 text-sm text-gray-600">{detail.notes || "-"}</td>
+                        <td className="px-3 py-2 text-sm text-gray-900">
+                          {item?.name || "N/A"}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600">
+                          {detail.requested_quantity || detail.quantity || 0}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600">
+                          {detail.approved_quantity || "-"}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600">
+                          {detail.unit}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600">
+                          {detail.notes || "-"}
+                        </td>
                       </tr>
                     );
                   })}
@@ -6894,39 +8878,70 @@ const IssueDetailsModal = ({ issue, items, locations, onClose }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Issue Details</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+            Issue Details
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="text-xs font-medium text-gray-500">Issue Number</label>
-              <p className="text-sm font-semibold text-gray-900 mt-1">{issue.issue_number}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Issue Number
+              </label>
+              <p className="text-sm font-semibold text-gray-900 mt-1">
+                {issue.issue_number}
+              </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Source Location</label>
-              <p className="text-sm text-gray-900 mt-1">{issue.source_location_name || "Main Store"}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Source Location
+              </label>
+              <p className="text-sm text-gray-900 mt-1">
+                {issue.source_location_name || "Main Store"}
+              </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Destination Location</label>
-              <p className="text-sm text-gray-900 mt-1">{issue.destination_location_name || "-"}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Destination Location
+              </label>
+              <p className="text-sm text-gray-900 mt-1">
+                {issue.destination_location_name || "-"}
+              </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Issue Date</label>
-              <p className="text-sm text-gray-900 mt-1">{new Date(issue.issue_date || issue.created_at).toLocaleDateString()}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Issue Date
+              </label>
+              <p className="text-sm text-gray-900 mt-1">
+                {new Date(
+                  issue.issue_date || issue.created_at,
+                ).toLocaleDateString()}
+              </p>
             </div>
             {issue.requisition_number && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Linked Requisition</label>
-                <p className="text-sm text-gray-900 mt-1">{issue.requisition_number}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Linked Requisition
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {issue.requisition_number}
+                </p>
               </div>
             )}
             {issue.issued_by_name && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Issued By</label>
-                <p className="text-sm text-gray-900 mt-1">{issue.issued_by_name}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Issued By
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {issue.issued_by_name}
+                </p>
               </div>
             )}
           </div>
@@ -6937,28 +8952,50 @@ const IssueDetailsModal = ({ issue, items, locations, onClose }) => {
             </div>
           )}
           <div>
-            <h3 className="text-lg font-semibold text-gray-800 mb-3">Issued Items</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">
+              Issued Items
+            </h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Batch/Lot</th>
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Cost</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Item
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Quantity
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                      Unit
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
+                      Batch/Lot
+                    </th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">
+                      Cost
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {issue.details?.map((detail, index) => {
-                    const item = items.find(i => i.id === detail.item_id);
+                    const item = items.find((i) => i.id === detail.item_id);
                     return (
                       <tr key={index}>
-                        <td className="px-3 py-2 text-sm text-gray-900">{item?.name || "N/A"}</td>
-                        <td className="px-3 py-2 text-sm text-gray-600">{detail.issued_quantity || detail.quantity || 0}</td>
-                        <td className="px-3 py-2 text-sm text-gray-600">{detail.unit}</td>
-                        <td className="px-3 py-2 text-sm text-gray-600 hidden md:table-cell">{detail.batch_lot_number || "-"}</td>
-                        <td className="px-3 py-2 text-sm text-gray-600 hidden lg:table-cell">{detail.cost ? `₹${detail.cost.toFixed(2)}` : "-"}</td>
+                        <td className="px-3 py-2 text-sm text-gray-900">
+                          {item?.name || "N/A"}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600">
+                          {detail.issued_quantity || detail.quantity || 0}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600">
+                          {detail.unit}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600 hidden md:table-cell">
+                          {detail.batch_lot_number || "-"}
+                        </td>
+                        <td className="px-3 py-2 text-sm text-gray-600 hidden lg:table-cell">
+                          {detail.cost ? `₹${detail.cost.toFixed(2)}` : "-"}
+                        </td>
                       </tr>
                     );
                   })}
@@ -6982,81 +9019,129 @@ const IssueDetailsModal = ({ issue, items, locations, onClose }) => {
 
 // Waste Log Details Modal
 const WasteLogDetailsModal = ({ wasteLog, items, locations, onClose }) => {
-  const item = items.find(i => i.id === wasteLog.item_id);
-  const location = locations.find(l => l.id === wasteLog.location_id);
-  
+  const item = items.find((i) => i.id === wasteLog.item_id);
+  const location = locations.find((l) => l.id === wasteLog.location_id);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Waste Log Details</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+            Waste Log Details
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium text-gray-500">Log Number</label>
-              <p className="text-sm font-semibold text-gray-900 mt-1">{wasteLog.log_number || `WL-${wasteLog.id}`}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Log Number
+              </label>
+              <p className="text-sm font-semibold text-gray-900 mt-1">
+                {wasteLog.log_number || `WL-${wasteLog.id}`}
+              </p>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-500">Item</label>
-              <p className="text-sm text-gray-900 mt-1">{item?.name || wasteLog.item_name || "N/A"}</p>
+              <p className="text-sm text-gray-900 mt-1">
+                {item?.name || wasteLog.item_name || "N/A"}
+              </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Quantity</label>
-              <p className="text-sm text-gray-900 mt-1">{wasteLog.quantity} {wasteLog.unit}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Quantity
+              </label>
+              <p className="text-sm text-gray-900 mt-1">
+                {wasteLog.quantity} {wasteLog.unit}
+              </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Reason Code</label>
-              <p className="text-sm text-gray-900 mt-1">{wasteLog.reason_code || wasteLog.reason || "N/A"}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Reason Code
+              </label>
+              <p className="text-sm text-gray-900 mt-1">
+                {wasteLog.reason_code || wasteLog.reason || "N/A"}
+              </p>
             </div>
             {wasteLog.batch_number && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Batch Number</label>
-                <p className="text-sm text-gray-900 mt-1">{wasteLog.batch_number}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Batch Number
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {wasteLog.batch_number}
+                </p>
               </div>
             )}
             {wasteLog.expiry_date && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Expiry Date</label>
-                <p className="text-sm text-gray-900 mt-1">{new Date(wasteLog.expiry_date).toLocaleDateString()}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Expiry Date
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {new Date(wasteLog.expiry_date).toLocaleDateString()}
+                </p>
               </div>
             )}
             {wasteLog.action_taken && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Action Taken</label>
-                <p className="text-sm text-gray-900 mt-1">{wasteLog.action_taken}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Action Taken
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {wasteLog.action_taken}
+                </p>
               </div>
             )}
             {location && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Location</label>
-                <p className="text-sm text-gray-900 mt-1">{location.name || `${location.building} - ${location.room_area}`}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Location
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {location.name ||
+                    `${location.building} - ${location.room_area}`}
+                </p>
               </div>
             )}
             <div>
-              <label className="text-xs font-medium text-gray-500">Waste Date</label>
-              <p className="text-sm text-gray-900 mt-1">{new Date(wasteLog.waste_date || wasteLog.created_at).toLocaleDateString()}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Waste Date
+              </label>
+              <p className="text-sm text-gray-900 mt-1">
+                {new Date(
+                  wasteLog.waste_date || wasteLog.created_at,
+                ).toLocaleDateString()}
+              </p>
             </div>
             {wasteLog.reported_by_name && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Reported By</label>
-                <p className="text-sm text-gray-900 mt-1">{wasteLog.reported_by_name}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Reported By
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {wasteLog.reported_by_name}
+                </p>
               </div>
             )}
           </div>
           {wasteLog.photo_path && (
             <div>
-              <label className="text-xs font-medium text-gray-500">Photo Proof</label>
+              <label className="text-xs font-medium text-gray-500">
+                Photo Proof
+              </label>
               <div className="mt-2">
-                <img 
-                  src={`http://localhost:8011${wasteLog.photo_path}`} 
-                  alt="Waste proof" 
+                <img
+                  src={`http://localhost:8011${wasteLog.photo_path}`}
+                  alt="Waste proof"
                   className="max-w-full h-auto rounded-lg border border-gray-200"
                   onError={(e) => {
-                    e.target.style.display = 'none';
+                    e.target.style.display = "none";
                   }}
                 />
               </div>
@@ -7084,22 +9169,33 @@ const WasteLogDetailsModal = ({ wasteLog, items, locations, onClose }) => {
 
 // Location Details Modal
 const LocationDetailsModal = ({ location, locations, onClose }) => {
-  const parentLocation = locations.find(l => l.id === location.parent_location_id);
-  
+  const parentLocation = locations.find(
+    (l) => l.id === location.parent_location_id,
+  );
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Location Details</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+            Location Details
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium text-gray-500">Location Code</label>
-              <p className="text-sm font-semibold text-gray-900 mt-1">{location.location_code || `LOC-${location.id}`}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Location Code
+              </label>
+              <p className="text-sm font-semibold text-gray-900 mt-1">
+                {location.location_code || `LOC-${location.id}`}
+              </p>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-500">Name</label>
@@ -7107,57 +9203,90 @@ const LocationDetailsModal = ({ location, locations, onClose }) => {
             </div>
             {location.building && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Building</label>
-                <p className="text-sm text-gray-900 mt-1">{location.building}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Building
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {location.building}
+                </p>
               </div>
             )}
             {location.floor && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Floor</label>
+                <label className="text-xs font-medium text-gray-500">
+                  Floor
+                </label>
                 <p className="text-sm text-gray-900 mt-1">{location.floor}</p>
               </div>
             )}
             {location.room_area && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Room/Area</label>
-                <p className="text-sm text-gray-900 mt-1">{location.room_area}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Room/Area
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {location.room_area}
+                </p>
               </div>
             )}
             <div>
               <label className="text-xs font-medium text-gray-500">Type</label>
-              <p className="text-sm text-gray-900 mt-1">{location.location_type}</p>
+              <p className="text-sm text-gray-900 mt-1">
+                {location.location_type}
+              </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Inventory Point</label>
+              <label className="text-xs font-medium text-gray-500">
+                Inventory Point
+              </label>
               <p className="mt-1">
                 {location.is_inventory_point ? (
-                  <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Yes</span>
+                  <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                    Yes
+                  </span>
                 ) : (
-                  <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">No</span>
+                  <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">
+                    No
+                  </span>
                 )}
               </p>
             </div>
             {parentLocation && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Parent Location</label>
-                <p className="text-sm text-gray-900 mt-1">{parentLocation.name || `${parentLocation.building} - ${parentLocation.room_area}`}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Parent Location
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {parentLocation.name ||
+                    `${parentLocation.building} - ${parentLocation.room_area}`}
+                </p>
               </div>
             )}
             <div>
-              <label className="text-xs font-medium text-gray-500">Status</label>
+              <label className="text-xs font-medium text-gray-500">
+                Status
+              </label>
               <p className="mt-1">
                 {location.is_active ? (
-                  <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Active</span>
+                  <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">
+                    Active
+                  </span>
                 ) : (
-                  <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">Inactive</span>
+                  <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">
+                    Inactive
+                  </span>
                 )}
               </p>
             </div>
           </div>
           {location.description && (
             <div>
-              <label className="text-xs font-medium text-gray-500">Description</label>
-              <p className="text-sm text-gray-900 mt-1">{location.description}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Description
+              </label>
+              <p className="text-sm text-gray-900 mt-1">
+                {location.description}
+              </p>
             </div>
           )}
           <div className="flex justify-end pt-4 border-t">
@@ -7176,79 +9305,127 @@ const LocationDetailsModal = ({ location, locations, onClose }) => {
 
 // Asset Details Modal
 const AssetDetailsModal = ({ asset, items, locations, onClose }) => {
-  const item = items.find(i => i.id === asset.item_id);
-  const location = locations.find(l => l.id === asset.current_location_id);
-  
+  const item = items.find((i) => i.id === asset.item_id);
+  const location = locations.find((l) => l.id === asset.current_location_id);
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Asset Details</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+            Asset Details
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
         </div>
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs font-medium text-gray-500">Asset Tag ID</label>
-              <p className="text-sm font-semibold text-gray-900 mt-1">{asset.asset_tag_id || `AST-${asset.id}`}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Asset Tag ID
+              </label>
+              <p className="text-sm font-semibold text-gray-900 mt-1">
+                {asset.asset_tag_id || `AST-${asset.id}`}
+              </p>
             </div>
             <div>
               <label className="text-xs font-medium text-gray-500">Item</label>
-              <p className="text-sm text-gray-900 mt-1">{item?.name || asset.item_name || "N/A"}</p>
+              <p className="text-sm text-gray-900 mt-1">
+                {item?.name || asset.item_name || "N/A"}
+              </p>
             </div>
             {asset.serial_number && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Serial Number</label>
-                <p className="text-sm text-gray-900 mt-1">{asset.serial_number}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Serial Number
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {asset.serial_number}
+                </p>
               </div>
             )}
             <div>
-              <label className="text-xs font-medium text-gray-500">Current Location</label>
-              <p className="text-sm text-gray-900 mt-1">{location?.name || asset.location_name || "-"}</p>
+              <label className="text-xs font-medium text-gray-500">
+                Current Location
+              </label>
+              <p className="text-sm text-gray-900 mt-1">
+                {location?.name || asset.location_name || "-"}
+              </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Status</label>
+              <label className="text-xs font-medium text-gray-500">
+                Status
+              </label>
               <p className="mt-1">
-                <span className={`px-2 py-1 text-xs rounded-full ${
-                  asset.status === "Active" ? "bg-green-100 text-green-800" :
-                  asset.status === "In Repair" ? "bg-yellow-100 text-yellow-800" :
-                  asset.status === "Damaged" ? "bg-red-100 text-red-800" :
-                  "bg-gray-100 text-gray-800"
-                }`}>
+                <span
+                  className={`px-2 py-1 text-xs rounded-full ${
+                    asset.status === "Active"
+                      ? "bg-green-100 text-green-800"
+                      : asset.status === "In Repair"
+                        ? "bg-yellow-100 text-yellow-800"
+                        : asset.status === "Damaged"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-gray-100 text-gray-800"
+                  }`}
+                >
                   {asset.status}
                 </span>
               </p>
             </div>
             {asset.purchase_date && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Purchase Date</label>
-                <p className="text-sm text-gray-900 mt-1">{new Date(asset.purchase_date).toLocaleDateString()}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Purchase Date
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {new Date(asset.purchase_date).toLocaleDateString()}
+                </p>
               </div>
             )}
             {asset.warranty_expiry_date && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Warranty Expiry</label>
-                <p className="text-sm text-gray-900 mt-1">{new Date(asset.warranty_expiry_date).toLocaleDateString()}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Warranty Expiry
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {new Date(asset.warranty_expiry_date).toLocaleDateString()}
+                </p>
               </div>
             )}
             {asset.last_maintenance_date && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Last Maintenance</label>
-                <p className="text-sm text-gray-900 mt-1">{new Date(asset.last_maintenance_date).toLocaleDateString()}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Last Maintenance
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {new Date(asset.last_maintenance_date).toLocaleDateString()}
+                </p>
               </div>
             )}
             {asset.next_maintenance_due_date && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Next Maintenance Due</label>
-                <p className="text-sm text-gray-900 mt-1">{new Date(asset.next_maintenance_due_date).toLocaleDateString()}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Next Maintenance Due
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {new Date(
+                    asset.next_maintenance_due_date,
+                  ).toLocaleDateString()}
+                </p>
               </div>
             )}
             {asset.assigned_date && (
               <div>
-                <label className="text-xs font-medium text-gray-500">Assigned Date</label>
-                <p className="text-sm text-gray-900 mt-1">{new Date(asset.assigned_date).toLocaleDateString()}</p>
+                <label className="text-xs font-medium text-gray-500">
+                  Assigned Date
+                </label>
+                <p className="text-sm text-gray-900 mt-1">
+                  {new Date(asset.assigned_date).toLocaleDateString()}
+                </p>
               </div>
             )}
           </div>
@@ -7273,18 +9450,29 @@ const AssetDetailsModal = ({ asset, items, locations, onClose }) => {
 };
 
 // Recipe Form Modal
-const RecipeFormModal = ({ form, setForm, foodItems, items, editingRecipe, onSubmit, onClose }) => {
+const RecipeFormModal = ({
+  form,
+  setForm,
+  foodItems,
+  items,
+  editingRecipe,
+  onSubmit,
+  onClose,
+}) => {
   const addIngredient = () => {
     setForm({
       ...form,
-      ingredients: [...form.ingredients, { inventory_item_id: "", quantity: 0, unit: "pcs", notes: "" }]
+      ingredients: [
+        ...form.ingredients,
+        { inventory_item_id: "", quantity: 0, unit: "pcs", notes: "" },
+      ],
     });
   };
 
   const removeIngredient = (index) => {
     setForm({
       ...form,
-      ingredients: form.ingredients.filter((_, i) => i !== index)
+      ingredients: form.ingredients.filter((_, i) => i !== index),
     });
   };
 
@@ -7297,7 +9485,9 @@ const RecipeFormModal = ({ form, setForm, foodItems, items, editingRecipe, onSub
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!form.food_item_id || !form.name || form.ingredients.length === 0) {
-      alert("Please fill in all required fields and add at least one ingredient");
+      alert(
+        "Please fill in all required fields and add at least one ingredient",
+      );
       return;
     }
     onSubmit(form);
@@ -7310,28 +9500,39 @@ const RecipeFormModal = ({ form, setForm, foodItems, items, editingRecipe, onSub
           <h2 className="text-2xl font-bold text-gray-800">
             {editingRecipe ? "Edit Recipe" : "Add Recipe"}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Food Item *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Food Item *
+            </label>
             <select
               value={form.food_item_id}
-              onChange={(e) => setForm({ ...form, food_item_id: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, food_item_id: e.target.value })
+              }
               className="w-full border border-gray-300 rounded-lg px-3 py-2"
               required
             >
               <option value="">Select Food Item</option>
               {foodItems.map((item) => (
-                <option key={item.id} value={item.id}>{item.name}</option>
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
               ))}
             </select>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Recipe Name *</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Recipe Name *
+            </label>
             <input
               type="text"
               value={form.name}
@@ -7342,10 +9543,14 @@ const RecipeFormModal = ({ form, setForm, foodItems, items, editingRecipe, onSub
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Description
+            </label>
             <textarea
               value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              onChange={(e) =>
+                setForm({ ...form, description: e.target.value })
+              }
               className="w-full border border-gray-300 rounded-lg px-3 py-2"
               rows="3"
             />
@@ -7353,32 +9558,54 @@ const RecipeFormModal = ({ form, setForm, foodItems, items, editingRecipe, onSub
 
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Servings *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Servings *
+              </label>
               <input
                 type="number"
                 value={form.servings}
-                onChange={(e) => setForm({ ...form, servings: parseInt(e.target.value) || 1 })}
+                onChange={(e) =>
+                  setForm({ ...form, servings: parseInt(e.target.value) || 1 })
+                }
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
                 min="1"
                 required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Prep Time (minutes)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Prep Time (minutes)
+              </label>
               <input
                 type="number"
                 value={form.prep_time_minutes}
-                onChange={(e) => setForm({ ...form, prep_time_minutes: e.target.value ? parseInt(e.target.value) : "" })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    prep_time_minutes: e.target.value
+                      ? parseInt(e.target.value)
+                      : "",
+                  })
+                }
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
                 min="0"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Cook Time (minutes)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cook Time (minutes)
+              </label>
               <input
                 type="number"
                 value={form.cook_time_minutes}
-                onChange={(e) => setForm({ ...form, cook_time_minutes: e.target.value ? parseInt(e.target.value) : "" })}
+                onChange={(e) =>
+                  setForm({
+                    ...form,
+                    cook_time_minutes: e.target.value
+                      ? parseInt(e.target.value)
+                      : "",
+                  })
+                }
                 className="w-full border border-gray-300 rounded-lg px-3 py-2"
                 min="0"
               />
@@ -7387,7 +9614,9 @@ const RecipeFormModal = ({ form, setForm, foodItems, items, editingRecipe, onSub
 
           <div>
             <div className="flex justify-between items-center mb-2">
-              <label className="block text-sm font-medium text-gray-700">Ingredients *</label>
+              <label className="block text-sm font-medium text-gray-700">
+                Ingredients *
+              </label>
               <button
                 type="button"
                 onClick={addIngredient}
@@ -7397,31 +9626,54 @@ const RecipeFormModal = ({ form, setForm, foodItems, items, editingRecipe, onSub
               </button>
             </div>
             {form.ingredients.length === 0 ? (
-              <p className="text-sm text-gray-500 italic">No ingredients added. Click "Add Ingredient" to add one.</p>
+              <p className="text-sm text-gray-500 italic">
+                No ingredients added. Click "Add Ingredient" to add one.
+              </p>
             ) : (
               <div className="space-y-2">
                 {form.ingredients.map((ingredient, index) => (
-                  <div key={index} className="flex gap-2 items-end p-3 border border-gray-200 rounded-lg">
+                  <div
+                    key={index}
+                    className="flex gap-2 items-end p-3 border border-gray-200 rounded-lg"
+                  >
                     <div className="flex-1">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Inventory Item</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Inventory Item
+                      </label>
                       <select
                         value={ingredient.inventory_item_id}
-                        onChange={(e) => updateIngredient(index, "inventory_item_id", e.target.value)}
+                        onChange={(e) =>
+                          updateIngredient(
+                            index,
+                            "inventory_item_id",
+                            e.target.value,
+                          )
+                        }
                         className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         required
                       >
                         <option value="">Select Item</option>
                         {items.map((item) => (
-                          <option key={item.id} value={item.id}>{item.name} ({item.unit})</option>
+                          <option key={item.id} value={item.id}>
+                            {item.name} ({item.unit})
+                          </option>
                         ))}
                       </select>
                     </div>
                     <div className="w-24">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Quantity</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Quantity
+                      </label>
                       <input
                         type="number"
                         value={ingredient.quantity}
-                        onChange={(e) => updateIngredient(index, "quantity", parseFloat(e.target.value) || 0)}
+                        onChange={(e) =>
+                          updateIngredient(
+                            index,
+                            "quantity",
+                            parseFloat(e.target.value) || 0,
+                          )
+                        }
                         className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         step="0.01"
                         min="0"
@@ -7429,21 +9681,29 @@ const RecipeFormModal = ({ form, setForm, foodItems, items, editingRecipe, onSub
                       />
                     </div>
                     <div className="w-24">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Unit</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Unit
+                      </label>
                       <input
                         type="text"
                         value={ingredient.unit}
-                        onChange={(e) => updateIngredient(index, "unit", e.target.value)}
+                        onChange={(e) =>
+                          updateIngredient(index, "unit", e.target.value)
+                        }
                         className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         required
                       />
                     </div>
                     <div className="w-32">
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Notes</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Notes
+                      </label>
                       <input
                         type="text"
                         value={ingredient.notes}
-                        onChange={(e) => updateIngredient(index, "notes", e.target.value)}
+                        onChange={(e) =>
+                          updateIngredient(index, "notes", e.target.value)
+                        }
                         className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         placeholder="e.g., chopped"
                       />
@@ -7483,4 +9743,3 @@ const RecipeFormModal = ({ form, setForm, foodItems, items, editingRecipe, onSub
 };
 
 export default Inventory;
-

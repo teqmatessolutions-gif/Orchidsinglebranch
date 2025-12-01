@@ -186,6 +186,46 @@ def get_checkout_request(
     }
 
 
+@router.put("/checkout-request/{request_id}/status")
+def update_checkout_request_status(
+    request_id: int,
+    status: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Update checkout request status directly.
+    Allowed transitions: pending -> in_progress/inventory_checked/completed
+    """
+    checkout_request = db.query(CheckoutRequestModel).filter(CheckoutRequestModel.id == request_id).first()
+    if not checkout_request:
+        raise HTTPException(status_code=404, detail="Checkout request not found")
+    
+    valid_statuses = ["pending", "in_progress", "inventory_checked", "completed", "cancelled"]
+    if status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+    
+    # Update status
+    checkout_request.status = status
+    
+    # If moving to completed, mark inventory as checked
+    if status == "completed":
+        checkout_request.inventory_checked = True
+        checkout_request.inventory_checked_by = getattr(current_user, 'name', None) or getattr(current_user, 'email', None) or "system"
+        checkout_request.inventory_checked_at = datetime.utcnow()
+        checkout_request.completed_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(checkout_request)
+    
+    return {
+        "message": f"Checkout request status updated to {status}",
+        "request_id": checkout_request.id,
+        "status": checkout_request.status,
+        "inventory_checked": checkout_request.inventory_checked
+    }
+
+
 @router.put("/checkout-request/{request_id}/assign")
 def assign_employee_to_checkout_request(
     request_id: int,

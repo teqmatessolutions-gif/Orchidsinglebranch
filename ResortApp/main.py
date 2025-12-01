@@ -35,7 +35,7 @@ from app.api import (
     service_request,
     account,
     gst_reports,
-    lost_found,
+    notification,
 )
 from app.api import reports_module
 
@@ -245,7 +245,7 @@ app.include_router(account.router, prefix="/api", tags=["Accounts"])
 app.include_router(gst_reports.router, prefix="/api", tags=["GST Reports"])
 app.include_router(reports_module.router, prefix="/api", tags=["Reports Module"])
 app.include_router(attendance.router, prefix="/api", tags=["Attendance"])
-app.include_router(lost_found.router, prefix="/api", tags=["Lost & Found"])
+app.include_router(notification.router, prefix="/api", tags=["Notifications"])
 
 # Include comprehensive reports router if it was imported successfully
 if comprehensive_reports is not None:

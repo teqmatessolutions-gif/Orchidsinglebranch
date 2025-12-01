@@ -42,23 +42,11 @@ class GuestServiceHistory(BaseModel):
     status: str
     assigned_at: datetime
 
-class GuestInventoryItem(BaseModel):
-    item_name: str
-    quantity: float
-    unit: str
-    issue_date: datetime
-    room_number: Optional[str]
-    is_payable: Optional[bool] = False
-    unit_price: Optional[float] = None
-    total_value: Optional[float] = None
-    notes: Optional[str] = None
-
 class GuestProfileOut(BaseModel):
     guest_details: Dict[str, str]
     bookings: List[GuestBookingHistory]
     food_orders: List[GuestFoodOrderHistory]
     services: List[GuestServiceHistory]
-    inventory_items: List[GuestInventoryItem] = []
 
     class Config:
         from_attributes = True
@@ -651,88 +639,6 @@ def _get_guest_profile_data(db: Session, email: Optional[str], mobile: Optional[
                 assigned_at=service.assigned_at
             ))
 
-    # 6. Fetch inventory items issued to guest rooms
-    inventory_items_history = []
-    if all_room_ids:
-        try:
-            from app.models.inventory import StockIssue, StockIssueDetail, Location, InventoryItem
-            
-            # Get room to location mapping
-            rooms = db.query(models.Room).filter(models.Room.id.in_(all_room_ids)).all()
-            room_to_location = {room.id: room.inventory_location_id for room in rooms if room.inventory_location_id}
-            location_ids = list(room_to_location.values())
-            
-            if location_ids:
-                # Get booking date ranges for filtering
-                booking_date_ranges = []
-                for b in regular_bookings:
-                    if b.check_in and b.check_out:
-                        booking_date_ranges.append((b.check_in, b.check_out))
-                for pb in package_bookings:
-                    if pb.check_in and pb.check_out:
-                        booking_date_ranges.append((pb.check_in, pb.check_out))
-                
-                # Fetch stock issues to guest room locations
-                stock_issues = db.query(StockIssue).options(
-                    joinedload(StockIssue.details).joinedload(StockIssueDetail.item),
-                    joinedload(StockIssue.destination_location)
-                ).filter(
-                    StockIssue.destination_location_id.in_(location_ids)
-                ).all()
-                
-                # Filter by booking dates and collect items
-                for issue in stock_issues:
-                    issue_date = issue.issue_date.date() if issue.issue_date else None
-                    
-                    # Check if issue date falls within any booking period
-                    is_in_booking_period = False
-                    if issue_date and booking_date_ranges:
-                        for check_in, check_out in booking_date_ranges:
-                            if check_in <= issue_date <= check_out:
-                                is_in_booking_period = True
-                                break
-                    elif not booking_date_ranges:
-                        # If no booking dates, include all issues
-                        is_in_booking_period = True
-                    
-                    if is_in_booking_period or not booking_date_ranges:
-                        # Find which room this location belongs to
-                        room_id = None
-                        room_number = None
-                        for rid, loc_id in room_to_location.items():
-                            if loc_id == issue.destination_location_id:
-                                room_id = rid
-                                room = next((r for r in rooms if r.id == rid), None)
-                                room_number = room.number if room else None
-                                break
-                        
-                        # Add items from this issue
-                        for detail in issue.details:
-                            if detail.item:
-                                # Check if item is payable (from notes or default)
-                                is_payable = False
-                                if detail.notes:
-                                    is_payable = "payable" in detail.notes.lower() or "chargeable" in detail.notes.lower()
-                                
-                                total_value = float(detail.cost or 0) if detail.cost else (float(detail.unit_price or 0) * float(detail.issued_quantity or 0))
-                                
-                                inventory_items_history.append(GuestInventoryItem(
-                                    item_name=detail.item.name if detail.item else "Unknown",
-                                    quantity=float(detail.issued_quantity) if detail.issued_quantity else 0,
-                                    unit=detail.unit if detail.unit else (detail.item.unit if detail.item else "pcs"),
-                                    issue_date=issue.issue_date if issue.issue_date else datetime.utcnow(),
-                                    room_number=room_number,
-                                    is_payable=is_payable,
-                                    unit_price=float(detail.unit_price) if detail.unit_price else None,
-                                    total_value=total_value,
-                                    notes=detail.notes
-                                ))
-        except Exception as e:
-            import traceback
-            print(f"Error fetching inventory items for guest profile: {str(e)}")
-            print(traceback.format_exc())
-            # Continue without inventory items if there's an error
-
     # 5. Assemble the final profile
     return GuestProfileOut(
         guest_details={
@@ -742,6 +648,5 @@ def _get_guest_profile_data(db: Session, email: Optional[str], mobile: Optional[
         },
         bookings=sorted(booking_history, key=lambda b: b.check_in, reverse=True),
         food_orders=sorted(food_orders_history, key=lambda o: o.created_at, reverse=True),
-        services=sorted(services_history, key=lambda s: s.assigned_at, reverse=True),
-        inventory_items=sorted(inventory_items_history, key=lambda i: i.issue_date, reverse=True)
+        services=sorted(services_history, key=lambda s: s.assigned_at, reverse=True)
     )

@@ -34,105 +34,61 @@ router = APIRouter(prefix="/reports", tags=["Reports"])
 def get_daily_arrival_report(
     report_date: Optional[date] = Query(None, description="Date for arrival report (default: today)"),
     skip: int = Query(0, ge=0),
-    limit: int = Query(100, ge=1, le=1000),
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
     """Daily Arrival Report: List of guests checking in today"""
-    try:
-        if not report_date:
-            report_date = date.today()
-        
-        # Query regular bookings
-        bookings = db.query(Booking).filter(
-            Booking.check_in == report_date
-        ).options(
-            joinedload(Booking.booking_rooms).joinedload(BookingRoom.room),
-            joinedload(Booking.user)
-        ).all()
-        
-        # Query package bookings
-        package_bookings = db.query(PackageBooking).filter(
-            PackageBooking.check_in == report_date
-        ).options(
-            joinedload(PackageBooking.rooms).joinedload(PackageBookingRoom.room),
-            joinedload(PackageBooking.package),
-            joinedload(PackageBooking.user)
-        ).all()
-        
-        result = []
-        
-        # Process regular bookings
-        for booking in bookings:
-            if booking.booking_rooms:
-                for br in booking.booking_rooms:
-                    result.append({
-                        "guest_name": booking.guest_name or "N/A",
-                        "guest_mobile": booking.guest_mobile or "-",
-                        "guest_email": booking.guest_email or "-",
-                        "room_number": br.room.number if br.room and br.room.number else "N/A",
-                        "room_type": br.room.type if br.room and br.room.type else "N/A",
-                        "adults": booking.adults or 0,
-                        "children": booking.children or 0,
-                        "advance_paid": float(booking.advance_deposit or 0),
-                        "total_amount": float(booking.total_amount or 0),
-                        "special_requests": booking.guest_email or "-",
-                        "booking_type": "Regular"
-                    })
-            else:
-                # Booking without rooms
-                result.append({
-                    "guest_name": booking.guest_name or "N/A",
-                    "guest_mobile": booking.guest_mobile or "-",
-                    "guest_email": booking.guest_email or "-",
-                    "room_number": "N/A",
-                    "room_type": "N/A",
-                    "adults": booking.adults or 0,
-                    "children": booking.children or 0,
-                    "advance_paid": float(booking.advance_deposit or 0),
-                    "total_amount": float(booking.total_amount or 0),
-                    "special_requests": booking.guest_email or "-",
-                    "booking_type": "Regular"
-                })
-        
-        # Process package bookings
-        for pkg_booking in package_bookings:
-            if pkg_booking.rooms:
-                for pbr in pkg_booking.rooms:
-                    result.append({
-                        "guest_name": pkg_booking.guest_name or "N/A",
-                        "guest_mobile": pkg_booking.guest_mobile or "-",
-                        "guest_email": pkg_booking.guest_email or "-",
-                        "room_number": pbr.room.number if pbr.room and pbr.room.number else "N/A",
-                        "room_type": pbr.room.type if pbr.room and pbr.room.type else "N/A",
-                        "adults": pkg_booking.adults or 0,
-                        "children": pkg_booking.children or 0,
-                        "advance_paid": float(pkg_booking.advance_deposit or 0),
-                        "total_amount": float(pkg_booking.package.price if pkg_booking.package and pkg_booking.package.price else 0),
-                        "special_requests": f"Package: {pkg_booking.package.title if pkg_booking.package and pkg_booking.package.title else 'N/A'}",
-                        "booking_type": "Package"
-                    })
-            else:
-                # Package booking without rooms
-                result.append({
-                    "guest_name": pkg_booking.guest_name or "N/A",
-                    "guest_mobile": pkg_booking.guest_mobile or "-",
-                    "guest_email": pkg_booking.guest_email or "-",
-                    "room_number": "N/A",
-                    "room_type": "N/A",
-                    "adults": pkg_booking.adults or 0,
-                    "children": pkg_booking.children or 0,
-                    "advance_paid": float(pkg_booking.advance_deposit or 0),
-                    "total_amount": float(pkg_booking.package.price if pkg_booking.package and pkg_booking.package.price else 0),
-                    "special_requests": f"Package: {pkg_booking.package.title if pkg_booking.package and pkg_booking.package.title else 'N/A'}",
-                    "booking_type": "Package"
-                })
-        
-        return {"date": report_date.isoformat(), "arrivals": result, "total": len(result)}
-    except Exception as e:
-        import traceback
-        print(f"Error in daily-arrival report: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error generating daily arrival report: {str(e)}")
+    if not report_date:
+        report_date = date.today()
+    
+    bookings = db.query(Booking).filter(
+        Booking.check_in == report_date
+    ).options(
+        joinedload(Booking.booking_rooms).joinedload(BookingRoom.room),
+        joinedload(Booking.user)
+    ).offset(skip).limit(limit).all()
+    
+    package_bookings = db.query(PackageBooking).filter(
+        PackageBooking.check_in == report_date
+    ).options(
+        joinedload(PackageBooking.package_booking_rooms).joinedload(PackageBookingRoom.room),
+        joinedload(PackageBooking.user)
+    ).offset(skip).limit(limit).all()
+    
+    result = []
+    for booking in bookings:
+        for br in booking.booking_rooms:
+            result.append({
+                "guest_name": booking.guest_name,
+                "guest_mobile": booking.guest_mobile,
+                "guest_email": booking.guest_email,
+                "room_number": br.room.number if br.room else "N/A",
+                "room_type": br.room.type if br.room else "N/A",
+                "adults": booking.adults,
+                "children": booking.children,
+                "advance_paid": booking.advance_deposit,
+                "total_amount": booking.total_amount,
+                "special_requests": booking.guest_email,  # Can be enhanced with a notes field
+                "booking_type": "Regular"
+            })
+    
+    for pkg_booking in package_bookings:
+        for pbr in pkg_booking.package_booking_rooms:
+            result.append({
+                "guest_name": pkg_booking.guest_name,
+                "guest_mobile": pkg_booking.guest_mobile,
+                "guest_email": pkg_booking.guest_email,
+                "room_number": pbr.room.number if pbr.room else "N/A",
+                "room_type": pbr.room.type if pbr.room else "N/A",
+                "adults": pkg_booking.adults,
+                "children": pkg_booking.children,
+                "advance_paid": pkg_booking.advance_deposit,
+                "total_amount": pkg_booking.total_amount,
+                "special_requests": f"Package: {pkg_booking.package.name if pkg_booking.package else 'N/A'}",
+                "booking_type": "Package"
+            })
+    
+    return {"date": report_date.isoformat(), "arrivals": result, "total": len(result)}
 
 
 @router.get("/front-office/daily-departure")
@@ -224,135 +180,38 @@ def get_police_c_form_report(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(1000, ge=1, le=10000),
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """Police / C-Form Report: List of foreign nationals (Legal Requirement) - Currently checked-in guests"""
-    try:
-        today = date.today()
-        result = []
-        
-        # Query currently checked-in regular bookings
-        booking_query = db.query(Booking).filter(
-            and_(
-                Booking.check_in <= today,
-                Booking.check_out > today,
-                Booking.status == "checked-in"
-            )
-        )
-        
-        if start_date:
-            booking_query = booking_query.filter(Booking.check_in >= start_date)
-        if end_date:
-            booking_query = booking_query.filter(Booking.check_in <= end_date)
-        
-        bookings = booking_query.options(
-            joinedload(Booking.booking_rooms).joinedload(BookingRoom.room)
-        ).all()
-        
-        # Query currently checked-in package bookings
-        package_query = db.query(PackageBooking).filter(
-            and_(
-                PackageBooking.check_in <= today,
-                PackageBooking.check_out > today,
-                PackageBooking.status == "checked-in"
-            )
-        )
-        
-        if start_date:
-            package_query = package_query.filter(PackageBooking.check_in >= start_date)
-        if end_date:
-            package_query = package_query.filter(PackageBooking.check_in <= end_date)
-        
-        package_bookings = package_query.options(
-            joinedload(PackageBooking.rooms).joinedload(PackageBookingRoom.room),
-            joinedload(PackageBooking.package)
-        ).all()
-        
-        # Process regular bookings
-        for booking in bookings:
-            room_numbers = []
-            if booking.booking_rooms:
-                for br in booking.booking_rooms:
-                    if br.room:
-                        room_numbers.append(br.room.number)
-            
-            # Extract passport/visa info from id_card_image_url if available, or use placeholder
-            # In a real system, these would be separate fields
-            passport_number = "N/A"
-            visa_number = "N/A"
-            nationality = "N/A"
-            
-            # If id_card_image_url exists, it might contain passport info
-            # For now, we'll use placeholder values until proper fields are added
-            if booking.id_card_image_url:
-                passport_number = "See ID Card"
-            
-            result.append({
-                "guest_name": booking.guest_name or "N/A",
-                "guest_mobile": booking.guest_mobile or "-",
-                "guest_email": booking.guest_email or "-",
-                "check_in": booking.check_in.isoformat() if booking.check_in else None,
-                "check_out": booking.check_out.isoformat() if booking.check_out else None,
-                "passport_number": passport_number,
-                "visa_number": visa_number,
-                "nationality": nationality,
-                "room_numbers": room_numbers if room_numbers else ["N/A"],
-                "adults": booking.adults or 0,
-                "children": booking.children or 0,
-                "booking_type": "Regular",
-                "booking_id": booking.id
-            })
-        
-        # Process package bookings
-        for pkg_booking in package_bookings:
-            room_numbers = []
-            if pkg_booking.rooms:
-                for pbr in pkg_booking.rooms:
-                    if pbr.room:
-                        room_numbers.append(pbr.room.number)
-            
-            passport_number = "N/A"
-            visa_number = "N/A"
-            nationality = "N/A"
-            
-            if pkg_booking.id_card_image_url:
-                passport_number = "See ID Card"
-            
-            result.append({
-                "guest_name": pkg_booking.guest_name or "N/A",
-                "guest_mobile": pkg_booking.guest_mobile or "-",
-                "guest_email": pkg_booking.guest_email or "-",
-                "check_in": pkg_booking.check_in.isoformat() if pkg_booking.check_in else None,
-                "check_out": pkg_booking.check_out.isoformat() if pkg_booking.check_out else None,
-                "passport_number": passport_number,
-                "visa_number": visa_number,
-                "nationality": nationality,
-                "room_numbers": room_numbers if room_numbers else ["N/A"],
-                "adults": pkg_booking.adults or 0,
-                "children": pkg_booking.children or 0,
-                "booking_type": "Package",
-                "booking_id": pkg_booking.id
-            })
-        
-        # Apply skip and limit
-        total = len(result)
-        result = result[skip:skip+limit]
-        
-        return {
-            "foreign_nationals": result,
-            "total": total,
-            "showing": len(result),
-            "date_range": {
-                "start": start_date.isoformat() if start_date else None,
-                "end": end_date.isoformat() if end_date else None
-            }
-        }
-    except Exception as e:
-        import traceback
-        print(f"Error in police-c-form report: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error generating police C-form report: {str(e)}")
+    """Police / C-Form Report: List of foreign nationals (Legal Requirement)"""
+    # Note: This requires passport/visa fields in Booking model
+    # For now, returning all bookings - can be filtered by nationality when field is added
+    query = db.query(Booking).filter(Booking.status.in_(["checked-in", "booked"]))
+    
+    if start_date:
+        query = query.filter(Booking.check_in >= start_date)
+    if end_date:
+        query = query.filter(Booking.check_in <= end_date)
+    
+    bookings = query.options(
+        joinedload(Booking.booking_rooms).joinedload(BookingRoom.room)
+    ).offset(skip).limit(limit).all()
+    
+    result = []
+    for booking in bookings:
+        result.append({
+            "guest_name": booking.guest_name,
+            "guest_mobile": booking.guest_mobile,
+            "guest_email": booking.guest_email,
+            "check_in": booking.check_in.isoformat(),
+            "check_out": booking.check_out.isoformat(),
+            "passport_number": "N/A",  # Add passport field to Booking model
+            "visa_number": "N/A",  # Add visa field to Booking model
+            "nationality": "N/A",  # Add nationality field to Booking model
+            "rooms": [br.room.number if br.room else "N/A" for br in booking.booking_rooms]
+        })
+    
+    return {"foreign_nationals": result, "total": len(result)}
 
 
 @router.get("/front-office/night-audit")
@@ -453,142 +312,61 @@ def get_no_show_cancellation_report(
 @router.get("/front-office/in-house-guests")
 @apply_api_optimizations
 def get_in_house_guest_list(
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(1000, ge=1, le=10000),
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
     """In-House Guest List: Currently checked-in guests (Emergency evacuation list)"""
-    try:
-        today = date.today()
-        result = []
-        
-        # Query regular bookings that are currently checked in
-        # Include bookings where check_in <= today and check_out > today
-        # Exclude only cancelled and checked-out bookings
-        booking_query = db.query(Booking).filter(
-            and_(
-                Booking.check_in <= today,
-                Booking.check_out > today,
-                ~func.lower(func.coalesce(Booking.status, '')).in_(["cancelled", "checked-out", "checked_out", "checkedout"])
-            )
+    today = date.today()
+    
+    bookings = db.query(Booking).filter(
+        and_(
+            Booking.check_in <= today,
+            Booking.check_out > today,
+            Booking.status == "checked-in"
         )
-        
-        if start_date:
-            booking_query = booking_query.filter(Booking.check_in >= start_date)
-        if end_date:
-            booking_query = booking_query.filter(Booking.check_in <= end_date)
-        
-        bookings = booking_query.options(
-            joinedload(Booking.booking_rooms).joinedload(BookingRoom.room)
-        ).all()
-        
-        # Query package bookings that are currently checked in
-        package_query = db.query(PackageBooking).filter(
-            and_(
-                PackageBooking.check_in <= today,
-                PackageBooking.check_out > today,
-                ~func.lower(func.coalesce(PackageBooking.status, '')).in_(["cancelled", "checked-out", "checked_out", "checkedout"])
-            )
+    ).options(
+        joinedload(Booking.booking_rooms).joinedload(BookingRoom.room)
+    ).offset(skip).limit(limit).all()
+    
+    package_bookings = db.query(PackageBooking).filter(
+        and_(
+            PackageBooking.check_in <= today,
+            PackageBooking.check_out > today,
+            PackageBooking.status == "checked-in"
         )
-        
-        if start_date:
-            package_query = package_query.filter(PackageBooking.check_in >= start_date)
-        if end_date:
-            package_query = package_query.filter(PackageBooking.check_in <= end_date)
-        
-        package_bookings = package_query.options(
-            joinedload(PackageBooking.rooms).joinedload(PackageBookingRoom.room),
-            joinedload(PackageBooking.package)
-        ).all()
-        
-        # Process regular bookings
-        for booking in bookings:
-            if booking.booking_rooms:
-                for br in booking.booking_rooms:
-                    if br.room:
-                        result.append({
-                            "guest_name": booking.guest_name or "N/A",
-                            "guest_mobile": booking.guest_mobile or "-",
-                            "guest_email": booking.guest_email or "-",
-                            "room_number": br.room.number if br.room else "N/A",
-                            "check_in": booking.check_in.isoformat() if booking.check_in else None,
-                            "check_out": booking.check_out.isoformat() if booking.check_out else None,
-                            "adults": booking.adults or 0,
-                            "children": booking.children or 0,
-                            "booking_type": "Regular",
-                            "booking_id": booking.id,
-                            "status": booking.status
-                        })
-            else:
-                # Booking without rooms
-                result.append({
-                    "guest_name": booking.guest_name or "N/A",
-                    "guest_mobile": booking.guest_mobile or "-",
-                    "guest_email": booking.guest_email or "-",
-                    "room_number": "N/A",
-                    "check_in": booking.check_in.isoformat() if booking.check_in else None,
-                    "check_out": booking.check_out.isoformat() if booking.check_out else None,
-                    "adults": booking.adults or 0,
-                    "children": booking.children or 0,
-                    "booking_type": "Regular",
-                    "booking_id": booking.id,
-                    "status": booking.status
-                })
-        
-        # Process package bookings
-        for pkg_booking in package_bookings:
-            if pkg_booking.rooms:
-                for pbr in pkg_booking.rooms:
-                    if pbr.room:
-                        result.append({
-                            "guest_name": pkg_booking.guest_name or "N/A",
-                            "guest_mobile": pkg_booking.guest_mobile or "-",
-                            "guest_email": pkg_booking.guest_email or "-",
-                            "room_number": pbr.room.number if pbr.room else "N/A",
-                            "check_in": pkg_booking.check_in.isoformat() if pkg_booking.check_in else None,
-                            "check_out": pkg_booking.check_out.isoformat() if pkg_booking.check_out else None,
-                            "adults": pkg_booking.adults or 0,
-                            "children": pkg_booking.children or 0,
-                            "booking_type": "Package",
-                            "booking_id": pkg_booking.id,
-                            "status": pkg_booking.status
-                        })
-            else:
-                # Package booking without rooms
-                result.append({
-                    "guest_name": pkg_booking.guest_name or "N/A",
-                    "guest_mobile": pkg_booking.guest_mobile or "-",
-                    "guest_email": pkg_booking.guest_email or "-",
-                    "room_number": "N/A",
-                    "check_in": pkg_booking.check_in.isoformat() if pkg_booking.check_in else None,
-                    "check_out": pkg_booking.check_out.isoformat() if pkg_booking.check_out else None,
-                    "adults": pkg_booking.adults or 0,
-                    "children": pkg_booking.children or 0,
-                    "booking_type": "Package",
-                    "booking_id": pkg_booking.id,
-                    "status": pkg_booking.status
-                })
-        
-        # Apply skip and limit
-        total = len(result)
-        result = result[skip:skip+limit]
-        
-        return {
-            "in_house_guests": result,
-            "total": total,
-            "showing": len(result),
-            "date_range": {
-                "start": start_date.isoformat() if start_date else None,
-                "end": end_date.isoformat() if end_date else None
-            }
-        }
-    except Exception as e:
-        import traceback
-        print(f"Error in in-house-guests report: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error generating in-house guest list: {str(e)}")
+    ).options(
+        joinedload(PackageBooking.package_booking_rooms).joinedload(PackageBookingRoom.room)
+    ).offset(skip).limit(limit).all()
+    
+    result = []
+    for booking in bookings:
+        for br in booking.booking_rooms:
+            result.append({
+                "guest_name": booking.guest_name,
+                "guest_mobile": booking.guest_mobile,
+                "room_number": br.room.number if br.room else "N/A",
+                "check_in": booking.check_in.isoformat(),
+                "check_out": booking.check_out.isoformat(),
+                "adults": booking.adults,
+                "children": booking.children,
+                "booking_type": "Regular"
+            })
+    
+    for pkg_booking in package_bookings:
+        for pbr in pkg_booking.package_booking_rooms:
+            result.append({
+                "guest_name": pkg_booking.guest_name,
+                "guest_mobile": pkg_booking.guest_mobile,
+                "room_number": pbr.room.number if pbr.room else "N/A",
+                "check_in": pkg_booking.check_in.isoformat(),
+                "check_out": pkg_booking.check_out.isoformat(),
+                "adults": pkg_booking.adults,
+                "children": pkg_booking.children,
+                "booking_type": "Package"
+            })
+    
+    return {"in_house_guests": result, "total": len(result)}
 
 
 # ============================================
@@ -757,79 +535,41 @@ def get_void_cancellation_report(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(1000, ge=1, le=10000),
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """Void / Cancellation Report: Tracks orders cancelled or voided after being created (Security)"""
-    try:
-        # Query orders with cancelled, voided, or similar statuses
-        # Handle different status formats
-        query = db.query(FoodOrder).filter(
-            func.lower(func.coalesce(FoodOrder.status, '')).in_([
-                'cancelled', 'canceled', 'voided', 'void', 'deleted'
-            ])
-        )
-        
-        if start_date:
-            query = query.filter(func.date(FoodOrder.created_at) >= start_date)
-        if end_date:
-            query = query.filter(func.date(FoodOrder.created_at) <= end_date)
-        
-        orders = query.options(
-            joinedload(FoodOrder.room),
-            joinedload(FoodOrder.employee),
-            joinedload(FoodOrder.items).joinedload(FoodOrderItem.food_item)
-        ).order_by(FoodOrder.created_at.desc()).all()
-        
-        result = []
-        total_amount = 0.0
-        
-        for order in orders:
-            # Get item details
-            items_detail = []
-            for item in order.items:
-                item_name = item.food_item.name if item.food_item else f"Item #{item.food_item_id}"
-                items_detail.append(f"{item_name} (x{item.quantity})")
-            
-            order_amount = float(order.amount or 0)
-            total_amount += order_amount
-            
-            result.append({
-                "order_id": order.id,
-                "room_number": order.room.number if order.room and order.room.number else "Dine-in",
-                "guest_name": getattr(order, 'guest_name', None) or "N/A",
-                "order_time": order.created_at.isoformat() if order.created_at else None,
-                "order_date": order.created_at.date().isoformat() if order.created_at else None,
-                "amount": order_amount,
-                "status": order.status or "N/A",
-                "employee_name": order.employee.name if order.employee and order.employee.name else "N/A",
-                "employee_id": order.assigned_employee_id,
-                "items_count": len(order.items) if order.items else 0,
-                "items_detail": ", ".join(items_detail) if items_detail else "N/A",
-                "order_type": order.order_type or "dine_in",
-                "billing_status": order.billing_status or "unbilled",
-                "void_reason": "N/A"  # Can be added as a field later
-            })
-        
-        # Apply skip and limit
-        total = len(result)
-        result = result[skip:skip+limit]
-        
-        return {
-            "voided_orders": result,
-            "total": total,
-            "showing": len(result),
-            "total_amount": float(total_amount),
-            "date_range": {
-                "start": start_date.isoformat() if start_date else None,
-                "end": end_date.isoformat() if end_date else None
-            }
-        }
-    except Exception as e:
-        import traceback
-        print(f"Error in void-cancellation report: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error generating void/cancellation report: {str(e)}")
+    """Void / Cancellation Report: Tracks orders deleted after being punched (Security)"""
+    # Note: Requires a deleted_at or voided_at field in FoodOrder
+    # For now, checking status == "cancelled" or "voided"
+    query = db.query(FoodOrder).filter(
+        FoodOrder.status.in_(["cancelled", "voided"])
+    )
+    
+    if start_date:
+        query = query.filter(func.date(FoodOrder.created_at) >= start_date)
+    if end_date:
+        query = query.filter(func.date(FoodOrder.created_at) <= end_date)
+    
+    orders = query.options(
+        joinedload(FoodOrder.room),
+        joinedload(FoodOrder.employee),
+        joinedload(FoodOrder.items)
+    ).offset(skip).limit(limit).all()
+    
+    result = []
+    for order in orders:
+        result.append({
+            "order_id": order.id,
+            "room_number": order.room.number if order.room else "Dine-in",
+            "order_time": order.created_at.isoformat() if order.created_at else None,
+            "amount": order.amount,
+            "status": order.status,
+            "employee_name": order.employee.name if order.employee else "N/A",
+            "items_count": len(order.items),
+            "void_reason": getattr(order, 'void_reason', 'N/A')  # Add void_reason field
+        })
+    
+    return {"voided_orders": result, "total": len(result)}
 
 
 @router.get("/restaurant/discount-complimentary")
@@ -838,125 +578,43 @@ def get_discount_complimentary_report(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(1000, ge=1, le=10000),
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
     """Discount & Complimentary Report: Free meals given (Manager approval tracking)"""
-    try:
-        # Get all orders and calculate original amount from items
-        query = db.query(FoodOrder)
-        
-        if start_date:
-            query = query.filter(func.date(FoodOrder.created_at) >= start_date)
-        if end_date:
-            query = query.filter(func.date(FoodOrder.created_at) <= end_date)
-        
-        orders = query.options(
-            joinedload(FoodOrder.room),
-            joinedload(FoodOrder.employee),
-            joinedload(FoodOrder.items).joinedload(FoodOrderItem.food_item)
-        ).order_by(FoodOrder.created_at.desc()).all()
-        
-        result = []
-        total_complimentary = 0.0
-        total_discount = 0.0
-        
-        for order in orders:
-            # Calculate original amount from items
-            original_amount = 0.0
-            items_detail = []
-            
-            if order.items:
-                for item in order.items:
-                    if item.food_item and item.food_item.price:
-                        item_total = float(item.food_item.price) * (item.quantity or 0)
-                        original_amount += item_total
-                        item_name = item.food_item.name or f"Item #{item.food_item_id}"
-                        items_detail.append(f"{item_name} (x{item.quantity})")
-            
-            final_amount = float(order.amount or 0)
-            discount_amount = original_amount - final_amount if original_amount > final_amount else 0.0
-            is_complimentary = final_amount == 0 and original_amount > 0
-            
-            # Only include orders with discounts or complimentary
-            if discount_amount > 0 or is_complimentary:
-                # Get guest name from room booking
-                guest_name = "N/A"
-                if order.room:
-                    # Try to find active booking for this room
-                    today = date.today()
-                    booking = db.query(Booking).join(BookingRoom).filter(
-                        and_(
-                            BookingRoom.room_id == order.room.id,
-                            Booking.check_in <= today,
-                            Booking.check_out > today,
-                            ~func.lower(func.coalesce(Booking.status, '')).in_(["cancelled", "checked-out", "checked_out", "checkedout"])
-                        )
-                    ).first()
-                    
-                    if booking:
-                        guest_name = booking.guest_name or "N/A"
-                    else:
-                        # Try package booking
-                        pkg_booking = db.query(PackageBooking).join(PackageBookingRoom).filter(
-                            and_(
-                                PackageBookingRoom.room_id == order.room.id,
-                                PackageBooking.check_in <= today,
-                                PackageBooking.check_out > today,
-                                ~func.lower(func.coalesce(PackageBooking.status, '')).in_(["cancelled", "checked-out", "checked_out", "checkedout"])
-                            )
-                        ).first()
-                        
-                        if pkg_booking:
-                            guest_name = pkg_booking.guest_name or "N/A"
-                
-                if is_complimentary:
-                    total_complimentary += original_amount
-                else:
-                    total_discount += discount_amount
-                
-                result.append({
-                    "order_id": order.id,
-                    "room_number": order.room.number if order.room and order.room.number else "Dine-in",
-                    "guest_name": guest_name,
-                    "order_time": order.created_at.isoformat() if order.created_at else None,
-                    "order_date": order.created_at.date().isoformat() if order.created_at else None,
-                    "original_amount": float(original_amount),
-                    "discount_amount": float(discount_amount),
-                    "final_amount": final_amount,
-                    "is_complimentary": is_complimentary,
-                    "employee_name": order.employee.name if order.employee and order.employee.name else "N/A",
-                    "employee_id": order.assigned_employee_id,
-                    "items_count": len(order.items) if order.items else 0,
-                    "items_detail": ", ".join(items_detail) if items_detail else "N/A",
-                    "order_type": order.order_type or "dine_in",
-                    "billing_status": order.billing_status or "unbilled",
-                    "approved_by": "N/A",  # Can be added as a field later
-                    "reason": "Complimentary" if is_complimentary else f"Discount: {discount_amount:.2f}"
-                })
-        
-        # Apply skip and limit
-        total = len(result)
-        result = result[skip:skip+limit]
-        
-        return {
-            "discounts_complimentary": result,
-            "total": total,
-            "showing": len(result),
-            "total_complimentary_amount": float(total_complimentary),
-            "total_discount_amount": float(total_discount),
-            "complimentary_count": len([r for r in result if r.get("is_complimentary", False)]),
-            "discount_count": len([r for r in result if not r.get("is_complimentary", False)]),
-            "date_range": {
-                "start": start_date.isoformat() if start_date else None,
-                "end": end_date.isoformat() if end_date else None
-            }
-        }
-    except Exception as e:
-        import traceback
-        print(f"Error in discount-complimentary report: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error generating discount/complimentary report: {str(e)}")
+    # Get orders with amount = 0 or discount > 0
+    query = db.query(FoodOrder).filter(
+        or_(
+            FoodOrder.amount == 0,
+            # Add discount_amount field check when available
+        )
+    )
+    
+    if start_date:
+        query = query.filter(func.date(FoodOrder.created_at) >= start_date)
+    if end_date:
+        query = query.filter(func.date(FoodOrder.created_at) <= end_date)
+    
+    orders = query.options(
+        joinedload(FoodOrder.room),
+        joinedload(FoodOrder.employee),
+        joinedload(FoodOrder.items)
+    ).offset(skip).limit(limit).all()
+    
+    result = []
+    for order in orders:
+        result.append({
+            "order_id": order.id,
+            "room_number": order.room.number if order.room else "Dine-in",
+            "order_time": order.created_at.isoformat() if order.created_at else None,
+            "original_amount": getattr(order, 'original_amount', order.amount),
+            "discount_amount": getattr(order, 'discount_amount', 0),
+            "final_amount": order.amount,
+            "approved_by": getattr(order, 'approved_by', 'N/A'),  # Add approved_by field
+            "reason": getattr(order, 'complimentary_reason', 'N/A')  # Add reason field
+        })
+    
+    return {"discounts_complimentary": result, "total": len(result)}
 
 
 @router.get("/restaurant/nc-report")
@@ -965,119 +623,45 @@ def get_nc_report(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(1000, ge=1, le=10000),
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """NC (Non-Chargeable) Report: Food given to Staff or Owners (No revenue, but inventory reduced)"""
-    try:
-        # Get orders with amount = 0 (complimentary) or billing_status indicating non-chargeable
-        # Also check if order has no room (staff meal) or specific indicators
-        query = db.query(FoodOrder).filter(
-            or_(
-                FoodOrder.amount == 0,
-                FoodOrder.billing_status.in_(["non_chargeable", "non-chargeable", "nc", "staff_meal"]),
-                FoodOrder.room_id.is_(None)  # Orders without room assignment (likely staff meals)
+    """NC (Non-Chargeable) Report: Food given to Staff or Owners"""
+    # Get orders marked as non-chargeable
+    query = db.query(FoodOrder).filter(
+        FoodOrder.billing_status == "non_chargeable"  # Add this status
+    )
+    
+    if start_date:
+        query = query.filter(func.date(FoodOrder.created_at) >= start_date)
+    if end_date:
+        query = query.filter(func.date(FoodOrder.created_at) <= end_date)
+    
+    orders = query.options(
+        joinedload(FoodOrder.employee),
+        joinedload(FoodOrder.items)
+    ).offset(skip).limit(limit).all()
+    
+    result = []
+    for order in orders:
+        result.append({
+            "order_id": order.id,
+            "employee_name": order.employee.name if order.employee else "Owner/Staff",
+            "order_time": order.created_at.isoformat() if order.created_at else None,
+            "items": [
+                {
+                    "item_name": item.food_item.name if item.food_item else "N/A",
+                    "quantity": item.quantity
+                }
+                for item in order.items
+            ],
+            "total_value": sum(
+                (item.food_item.price or 0) * (item.quantity or 0)
+                for item in order.items if item.food_item
             )
-        )
-        
-        if start_date:
-            query = query.filter(func.date(FoodOrder.created_at) >= start_date)
-        if end_date:
-            query = query.filter(func.date(FoodOrder.created_at) <= end_date)
-        
-        orders = query.options(
-            joinedload(FoodOrder.room),
-            joinedload(FoodOrder.employee),
-            joinedload(FoodOrder.items).joinedload(FoodOrderItem.food_item)
-        ).order_by(FoodOrder.created_at.desc()).all()
-        
-        result = []
-        total_value = 0.0
-        
-        for order in orders:
-            # Calculate total value from items
-            items_detail = []
-            order_value = 0.0
-            
-            if order.items:
-                for item in order.items:
-                    if item.food_item:
-                        item_price = float(item.food_item.price or 0)
-                        item_qty = item.quantity or 0
-                        item_total = item_price * item_qty
-                        order_value += item_total
-                        item_name = item.food_item.name or f"Item #{item.food_item_id}"
-                        items_detail.append({
-                            "item_name": item_name,
-                            "quantity": item_qty,
-                            "unit_price": item_price,
-                            "total": item_total
-                        })
-            
-            total_value += order_value
-            
-            # Determine recipient type
-            recipient_type = "Staff"
-            recipient_name = "N/A"
-            
-            if order.employee:
-                recipient_name = order.employee.name or "Staff Member"
-                recipient_type = "Staff"
-            elif not order.room:
-                recipient_type = "Staff/Owner"
-                recipient_name = "Staff/Owner"
-            elif order.room:
-                # If order has room but amount is 0, might be guest complimentary
-                recipient_type = "Guest (Complimentary)"
-                # Try to get guest name
-                today = date.today()
-                booking = db.query(Booking).join(BookingRoom).filter(
-                    and_(
-                        BookingRoom.room_id == order.room.id,
-                        Booking.check_in <= today,
-                        Booking.check_out > today
-                    )
-                ).first()
-                if booking:
-                    recipient_name = booking.guest_name or "Guest"
-                else:
-                    recipient_name = "Guest"
-            
-            result.append({
-                "order_id": order.id,
-                "recipient_name": recipient_name,
-                "recipient_type": recipient_type,
-                "employee_name": order.employee.name if order.employee and order.employee.name else "N/A",
-                "employee_id": order.assigned_employee_id,
-                "room_number": order.room.number if order.room and order.room.number else "N/A",
-                "order_time": order.created_at.isoformat() if order.created_at else None,
-                "order_date": order.created_at.date().isoformat() if order.created_at else None,
-                "items": items_detail,
-                "items_count": len(items_detail),
-                "total_value": float(order_value),
-                "billing_status": order.billing_status or "unbilled",
-                "order_type": order.order_type or "dine_in"
-            })
-        
-        # Apply skip and limit
-        total = len(result)
-        result = result[skip:skip+limit]
-        
-        return {
-            "nc_orders": result,
-            "total": total,
-            "showing": len(result),
-            "total_value": float(total_value),
-            "date_range": {
-                "start": start_date.isoformat() if start_date else None,
-                "end": end_date.isoformat() if end_date else None
-            }
-        }
-    except Exception as e:
-        import traceback
-        print(f"Error in nc-report: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error generating NC report: {str(e)}")
+        })
+    
+    return {"nc_orders": result, "total": len(result)}
 
 
 # ============================================
@@ -1207,12 +791,8 @@ def get_stock_movement_register(
     db: Session = Depends(get_db)
 ):
     """Stock Movement Register: History of item (In -> Move -> Out)"""
-    from app.models.inventory import StockIssue, StockIssueDetail, Location
-    
     query = db.query(InventoryTransaction).options(
-        joinedload(InventoryTransaction.item),
-        joinedload(InventoryTransaction.user),
-        joinedload(InventoryTransaction.purchase_master)
+        joinedload(InventoryTransaction.item)
     )
     
     if item_id:
@@ -1226,77 +806,17 @@ def get_stock_movement_register(
     
     result = []
     for trans in transactions:
-        # Try to get location info from related StockIssue records
-        from_location = "-"
-        to_location = "-"
-        
-        # Check if transaction notes reference a stock issue
-        if trans.notes:
-            # Try to find related stock issue by matching item and date
-            stock_issue = db.query(StockIssue).join(StockIssueDetail).filter(
-                StockIssueDetail.item_id == trans.item_id,
-                func.date(StockIssue.issue_date) == func.date(trans.created_at)
-            ).options(
-                joinedload(StockIssue.source_location),
-                joinedload(StockIssue.destination_location)
-            ).first()
-            
-            if stock_issue:
-                if stock_issue.source_location:
-                    from_location = stock_issue.source_location.name or f"{stock_issue.source_location.building} - {stock_issue.source_location.room_area}" if stock_issue.source_location.building else "-"
-                if stock_issue.destination_location:
-                    to_location = stock_issue.destination_location.name or f"{stock_issue.destination_location.building} - {stock_issue.destination_location.room_area}" if stock_issue.destination_location.building else "-"
-        
-        # If still no location, try to extract from notes
-        if from_location == "-" and to_location == "-" and trans.notes:
-            notes_lower = trans.notes.lower()
-            if "location:" in notes_lower or "to" in notes_lower:
-                # Try to extract location from notes
-                if "location:" in notes_lower:
-                    parts = trans.notes.split("Location:")
-                    if len(parts) > 1:
-                        location_info = parts[1].strip()
-                        if "to" in location_info.lower():
-                            loc_parts = location_info.split("to")
-                            if len(loc_parts) >= 2:
-                                from_location = loc_parts[0].strip() or "-"
-                                to_location = loc_parts[1].strip() or "-"
-                            else:
-                                to_location = location_info.strip() or "-"
-                        else:
-                            to_location = location_info.strip() or "-"
-        
-        # Fallback to item's default location
-        if from_location == "-" and trans.item and trans.item.location:
-            from_location = trans.item.location
-        
-        # Get reference from purchase_master or reference_number
-        reference = "-"
-        if trans.reference_number:
-            reference = trans.reference_number
-        elif trans.purchase_master:
-            reference = f"PO-{trans.purchase_master.purchase_number}" if hasattr(trans.purchase_master, 'purchase_number') else f"Purchase-{trans.purchase_master.id}"
-        elif trans.id:
-            reference = f"TXN-{trans.id}"
-        
-        # Get user name
-        created_by_name = "-"
-        if trans.user:
-            created_by_name = trans.user.name or trans.user.email or f"User-{trans.created_by}"
-        elif trans.created_by:
-            created_by_name = f"User-{trans.created_by}"
-        
         result.append({
             "transaction_id": trans.id,
-            "item_name": trans.item.name if trans.item else "-",
-            "transaction_type": trans.transaction_type or "-",
-            "quantity": float(trans.quantity) if trans.quantity else 0,
-            "unit": trans.item.unit if trans.item else "-",
-            "from_location": from_location,
-            "to_location": to_location,
-            "reference": reference,
+            "item_name": trans.item.name if trans.item else "N/A",
+            "transaction_type": trans.transaction_type,  # purchase, consumption, transfer, etc.
+            "quantity": float(trans.quantity),
+            "unit": trans.item.unit if trans.item else "N/A",
+            "from_location": getattr(trans, 'from_location', 'N/A'),
+            "to_location": getattr(trans, 'to_location', 'N/A'),
+            "reference": getattr(trans, 'reference', 'N/A'),  # Purchase ID, Requisition ID, etc.
             "created_at": trans.created_at.isoformat() if trans.created_at else None,
-            "created_by": created_by_name
+            "created_by": getattr(trans, 'created_by', 'N/A')
         })
     
     return {"stock_movements": result, "total": len(result)}
@@ -1312,68 +832,37 @@ def get_waste_spoilage_report(
     db: Session = Depends(get_db)
 ):
     """Waste & Spoilage Report: Value of items thrown away"""
-    try:
-        query = db.query(WasteLog).options(
-            joinedload(WasteLog.item),
-            joinedload(WasteLog.location),
-            joinedload(WasteLog.reporter)
-        )
-        
-        if start_date:
-            query = query.filter(func.date(WasteLog.waste_date) >= start_date)
-        if end_date:
-            query = query.filter(func.date(WasteLog.waste_date) <= end_date)
-        
-        waste_logs = query.order_by(WasteLog.waste_date.desc()).offset(skip).limit(limit).all()
-        
-        result = []
-        total_waste_value = 0
-        for waste in waste_logs:
-            # Calculate value lost
-            unit_price = waste.item.unit_price if waste.item and waste.item.unit_price else 0
-            waste_value = float(waste.quantity) * unit_price
-            total_waste_value += waste_value
-            
-            # Get location name
-            location_name = "-"
-            if waste.location:
-                if hasattr(waste.location, 'name') and waste.location.name:
-                    location_name = waste.location.name
-                elif hasattr(waste.location, 'building') and waste.location.building:
-                    room_area = getattr(waste.location, 'room_area', '') or ''
-                    location_name = f"{waste.location.building} - {room_area}".strip() if room_area else waste.location.building
-            
-            # Get reporter name
-            reported_by_name = "-"
-            if waste.reporter:
-                reported_by_name = waste.reporter.name or waste.reporter.email or f"User-{waste.reported_by}"
-            elif waste.reported_by:
-                reported_by_name = f"User-{waste.reported_by}"
-            
-            result.append({
-                "item_name": waste.item.name if waste.item else "-",
-                "quantity": float(waste.quantity) if waste.quantity else 0,
-                "unit": waste.item.unit if waste.item else "-",
-                "waste_value": round(waste_value, 2),
-                "reason_code": waste.reason_code if waste.reason_code else "-",
-                "action_taken": waste.action_taken if waste.action_taken else "-",
-                "location": location_name,
-                "batch_number": waste.batch_number if waste.batch_number else "-",
-                "expiry_date": waste.expiry_date.isoformat() if waste.expiry_date else None,
-                "waste_date": waste.waste_date.isoformat() if waste.waste_date else None,
-                "reported_by": reported_by_name,
-                "notes": waste.notes if waste.notes else "-"
-            })
-        
-        return {
-            "waste_logs": result,
-            "total_waste_value": round(total_waste_value, 2),
-            "total": len(result)
-        }
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error generating waste & spoilage report: {str(e)}")
+    query = db.query(WasteLog).options(
+        joinedload(WasteLog.item)
+    )
+    
+    if start_date:
+        query = query.filter(func.date(WasteLog.created_at) >= start_date)
+    if end_date:
+        query = query.filter(func.date(WasteLog.created_at) <= end_date)
+    
+    waste_logs = query.order_by(WasteLog.created_at.desc()).offset(skip).limit(limit).all()
+    
+    result = []
+    total_waste_value = 0
+    for waste in waste_logs:
+        waste_value = waste.quantity * (waste.item.unit_price if waste.item else 0)
+        total_waste_value += waste_value
+        result.append({
+            "item_name": waste.item.name if waste.item else "N/A",
+            "quantity": float(waste.quantity),
+            "unit": waste.item.unit if waste.item else "N/A",
+            "waste_value": float(waste_value),
+            "reason": waste.reason,
+            "waste_date": waste.created_at.isoformat() if waste.created_at else None,
+            "reported_by": getattr(waste, 'reported_by', 'N/A')
+        })
+    
+    return {
+        "waste_logs": result,
+        "total_waste_value": float(total_waste_value),
+        "total": len(result)
+    }
 
 
 @router.get("/inventory/purchase-register")
@@ -1387,52 +876,34 @@ def get_purchase_register(
     db: Session = Depends(get_db)
 ):
     """Purchase Register: List of all Vendor Bills entered"""
-    try:
-        query = db.query(PurchaseMaster).options(
-            joinedload(PurchaseMaster.vendor),
-            joinedload(PurchaseMaster.details).joinedload(PurchaseDetail.item),
-            joinedload(PurchaseMaster.user)
-        )
-        
-        if start_date:
-            query = query.filter(PurchaseMaster.purchase_date >= start_date)
-        if end_date:
-            query = query.filter(PurchaseMaster.purchase_date <= end_date)
-        if vendor_id:
-            query = query.filter(PurchaseMaster.vendor_id == vendor_id)
-        
-        purchases = query.order_by(PurchaseMaster.purchase_date.desc()).offset(skip).limit(limit).all()
-        
-        result = []
-        for purchase in purchases:
-            # Calculate total tax amount
-            tax_amount = float(purchase.cgst or 0) + float(purchase.sgst or 0) + float(purchase.igst or 0)
-            
-            result.append({
-                "purchase_id": purchase.id,
-                "purchase_number": purchase.purchase_number if purchase.purchase_number else "-",
-                "invoice_number": purchase.invoice_number if purchase.invoice_number else "-",
-                "vendor_name": purchase.vendor.name if purchase.vendor else "-",
-                "purchase_date": purchase.purchase_date.isoformat() if purchase.purchase_date else None,
-                "invoice_date": purchase.invoice_date.isoformat() if purchase.invoice_date else None,
-                "sub_total": float(purchase.sub_total or 0),
-                "cgst": float(purchase.cgst or 0),
-                "sgst": float(purchase.sgst or 0),
-                "igst": float(purchase.igst or 0),
-                "tax_amount": round(tax_amount, 2),
-                "discount": float(purchase.discount or 0),
-                "total_amount": float(purchase.total_amount or 0),
-                "payment_status": purchase.payment_status if purchase.payment_status else "-",
-                "status": purchase.status if purchase.status else "-",
-                "items_count": len(purchase.details) if purchase.details else 0,
-                "created_by": purchase.user.name if purchase.user else (f"User-{purchase.created_by}" if purchase.created_by else "-")
-            })
-        
-        return {"purchases": result, "total": len(result)}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error generating purchase register: {str(e)}")
+    query = db.query(PurchaseMaster).options(
+        joinedload(PurchaseMaster.vendor),
+        joinedload(PurchaseMaster.details).joinedload(PurchaseDetail.item)
+    )
+    
+    if start_date:
+        query = query.filter(PurchaseMaster.purchase_date >= start_date)
+    if end_date:
+        query = query.filter(PurchaseMaster.purchase_date <= end_date)
+    if vendor_id:
+        query = query.filter(PurchaseMaster.vendor_id == vendor_id)
+    
+    purchases = query.order_by(PurchaseMaster.purchase_date.desc()).offset(skip).limit(limit).all()
+    
+    result = []
+    for purchase in purchases:
+        result.append({
+            "purchase_id": purchase.id,
+            "invoice_number": purchase.invoice_number,
+            "vendor_name": purchase.vendor.name if purchase.vendor else "N/A",
+            "purchase_date": purchase.purchase_date.isoformat() if purchase.purchase_date else None,
+            "total_amount": float(purchase.total_amount),
+            "tax_amount": float(purchase.tax_amount),
+            "payment_status": purchase.payment_status,
+            "items_count": len(purchase.details)
+        })
+    
+    return {"purchases": result, "total": len(result)}
 
 
 @router.get("/inventory/variance")
@@ -1618,58 +1089,19 @@ def get_minibar_consumption_report(
 @apply_api_optimizations
 def get_lost_found_register(
     status: Optional[str] = Query(None, description="Filter by status: found, claimed, disposed"),
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
     """Lost & Found Register: Items left behind by guests"""
-    try:
-        from app.models.lost_found import LostFound
-        
-        query = db.query(LostFound).options(
-            joinedload(LostFound.employee)
-        )
-        
-        if status:
-            query = query.filter(LostFound.status == status)
-        
-        if start_date:
-            query = query.filter(LostFound.found_date >= start_date)
-        if end_date:
-            query = query.filter(LostFound.found_date <= end_date)
-        
-        total = query.count()
-        items = query.order_by(LostFound.found_date.desc(), LostFound.created_at.desc()).offset(skip).limit(limit).all()
-        
-        result = []
-        for item in items:
-            result.append({
-                "id": item.id,
-                "item_description": item.item_description,
-                "found_date": item.found_date.isoformat() if item.found_date else None,
-                "found_by": item.found_by,
-                "found_by_employee": item.employee.name if item.employee else None,
-                "room_number": item.room_number,
-                "location": item.location,
-                "status": item.status,
-                "claimed_by": item.claimed_by,
-                "claimed_date": item.claimed_date.isoformat() if item.claimed_date else None,
-                "claimed_contact": item.claimed_contact,
-                "notes": item.notes,
-                "image_url": item.image_url,
-                "created_at": item.created_at.isoformat() if item.created_at else None
-            })
-        
-        return {
-            "lost_found_items": result,
-            "total": total
-        }
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error generating lost & found report: {str(e)}")
+    # Note: Requires LostFound model - creating placeholder response
+    # This would need a new model: LostFound(id, item_description, found_date, found_by, room_number, status, claimed_by, claimed_date)
+    
+    return {
+        "message": "Lost & Found model not yet implemented",
+        "lost_found_items": [],
+        "total": 0
+    }
 
 
 @router.get("/housekeeping/maintenance-tickets")
@@ -1718,22 +1150,11 @@ def get_asset_audit_report(
         mapped_location = getattr(asset, 'mapped_location', asset.location)
         actual_location = getattr(asset, 'actual_location', None)  # From audit
         
-        # Get location_id if location exists
-        location_id = None
-        if asset.location:
-            from app.models.inventory import Location
-            location_obj = db.query(Location).filter(Location.name == asset.location).first()
-            if location_obj:
-                location_id = location_obj.id
-        
         result.append({
-            "asset_id": asset.id,
             "asset_name": asset.name,
             "asset_code": asset.item_code,
             "mapped_location": mapped_location,
             "actual_location": actual_location,
-            "location": asset.location,
-            "location_id": location_id,
             "status": "Match" if mapped_location == actual_location else "Mismatch",
             "category": asset.category.name if asset.category else "N/A"
         })
@@ -1758,137 +1179,18 @@ def get_visitor_log(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(1000, ge=1, le=10000),
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """Visitor Log: Non-resident guests entering premises (Based on check-in/checkout data)"""
-    try:
-        result = []
-        
-        # Get all checkouts (guests who visited and left)
-        checkout_query = db.query(Checkout).options(
-            joinedload(Checkout.booking).joinedload(Booking.booking_rooms).joinedload(BookingRoom.room),
-            joinedload(Checkout.package_booking).joinedload(PackageBooking.rooms).joinedload(PackageBookingRoom.room)
-        )
-        
-        if start_date:
-            checkout_query = checkout_query.filter(func.date(Checkout.checkout_date) >= start_date)
-        if end_date:
-            checkout_query = checkout_query.filter(func.date(Checkout.checkout_date) <= end_date)
-        
-        checkouts = checkout_query.order_by(Checkout.checkout_date.desc()).all()
-        
-        for checkout in checkouts:
-            # Get booking details
-            booking = None
-            pkg_booking = None
-            room_numbers = []
-            check_in_date = None
-            check_out_date = None
-            
-            if checkout.booking_id:
-                booking = db.query(Booking).options(
-                    joinedload(Booking.booking_rooms).joinedload(BookingRoom.room)
-                ).filter(Booking.id == checkout.booking_id).first()
-                if booking:
-                    room_numbers = [br.room.number for br in booking.booking_rooms if br.room and br.room.number]
-                    check_in_date = booking.check_in
-                    check_out_date = booking.check_out
-            
-            if checkout.package_booking_id:
-                pkg_booking = db.query(PackageBooking).options(
-                    joinedload(PackageBooking.rooms).joinedload(PackageBookingRoom.room)
-                ).filter(PackageBooking.id == checkout.package_booking_id).first()
-                if pkg_booking:
-                    room_numbers = [pbr.room.number for pbr in pkg_booking.rooms if pbr.room and pbr.room.number]
-                    check_in_date = pkg_booking.check_in
-                    check_out_date = pkg_booking.check_out
-            
-            # Get guest details
-            guest_name = checkout.guest_name or "N/A"
-            guest_mobile = None
-            guest_email = None
-            
-            if booking:
-                guest_mobile = booking.guest_mobile
-                guest_email = booking.guest_email
-            elif pkg_booking:
-                guest_mobile = pkg_booking.guest_mobile
-                guest_email = pkg_booking.guest_email
-            
-            result.append({
-                "visitor_name": guest_name,
-                "visitor_mobile": guest_mobile or "-",
-                "visitor_email": guest_email or "-",
-                "purpose": "Guest Stay",
-                "time_in": check_in_date.isoformat() if check_in_date else None,
-                "time_out": checkout.checkout_date.isoformat() if checkout.checkout_date else None,
-                "room_visited": ", ".join(room_numbers) if room_numbers else checkout.room_number or "N/A",
-                "host_name": "Resort Guest",
-                "checkout_id": checkout.id,
-                "booking_type": "Regular" if booking else ("Package" if pkg_booking else "N/A"),
-                "duration_days": (check_out_date - check_in_date).days if check_in_date and check_out_date else None
-            })
-        
-        # Also include service requests (visitors for services)
-        service_query = db.query(AssignedService).options(
-            joinedload(AssignedService.room),
-            joinedload(AssignedService.employee),
-            joinedload(AssignedService.service)
-        )
-        
-        if start_date:
-            service_query = service_query.filter(func.date(AssignedService.assigned_at) >= start_date)
-        if end_date:
-            service_query = service_query.filter(func.date(AssignedService.assigned_at) <= end_date)
-        
-        services = service_query.all()
-        
-        for service in services:
-            if service.room:
-                # Get guest from room booking
-                today = date.today()
-                booking = db.query(Booking).join(BookingRoom).filter(
-                    and_(
-                        BookingRoom.room_id == service.room.id,
-                        Booking.check_in <= today,
-                        Booking.check_out > today
-                    )
-                ).first()
-                
-                if booking:
-                    result.append({
-                        "visitor_name": booking.guest_name or "Service Visitor",
-                        "visitor_mobile": booking.guest_mobile or "-",
-                        "visitor_email": booking.guest_email or "-",
-                        "purpose": f"Service: {service.service.name if service.service else 'N/A'}",
-                        "time_in": service.assigned_at.isoformat() if service.assigned_at else None,
-                        "time_out": None,
-                        "room_visited": service.room.number if service.room else "N/A",
-                        "host_name": booking.guest_name or "Guest",
-                        "checkout_id": None,
-                        "booking_type": "Service Request",
-                        "duration_days": None
-                    })
-        
-        # Apply skip and limit
-        total = len(result)
-        result = result[skip:skip+limit]
-        
-        return {
-            "visitors": result,
-            "total": total,
-            "showing": len(result),
-            "date_range": {
-                "start": start_date.isoformat() if start_date else None,
-                "end": end_date.isoformat() if end_date else None
-            }
-        }
-    except Exception as e:
-        import traceback
-        print(f"Error in visitor-log report: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error generating visitor log: {str(e)}")
+    """Visitor Log: Non-resident guests entering premises"""
+    # Note: Requires VisitorLog model - creating placeholder response
+    # This would need a new model: VisitorLog(id, visitor_name, purpose, time_in, time_out, room_visited, host_name)
+    
+    return {
+        "message": "Visitor Log model not yet implemented",
+        "visitors": [],
+        "total": 0
+    }
 
 
 @router.get("/security/key-card-audit")
@@ -1898,185 +1200,18 @@ def get_key_card_audit(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(1000, ge=1, le=10000),
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """Key Card Audit: Who opened which room? (Based on check-in/checkout and service assignments)"""
-    try:
-        result = []
-        
-        # Get check-ins (room access events)
-        booking_query = db.query(Booking).options(
-            joinedload(Booking.booking_rooms).joinedload(BookingRoom.room),
-            joinedload(Booking.user)
-        )
-        
-        if room_number:
-            booking_query = booking_query.join(BookingRoom).join(Room).filter(Room.number == room_number)
-        
-        if start_date:
-            booking_query = booking_query.filter(Booking.check_in >= start_date)
-        if end_date:
-            booking_query = booking_query.filter(Booking.check_in <= end_date)
-        
-        bookings = booking_query.filter(
-            func.lower(func.coalesce(Booking.status, '')).in_(['checked-in', 'checked_in', 'checked in', 'checked-out', 'checked_out', 'checkedout'])
-        ).order_by(Booking.check_in.desc()).all()
-        
-        for booking in bookings:
-            for br in booking.booking_rooms:
-                if br.room:
-                    # Get employee who checked in (from user if available)
-                    staff_name = "Front Desk"
-                    if booking.user:
-                        staff_name = booking.user.name or booking.user.email or "Front Desk"
-                    
-                    result.append({
-                        "room_number": br.room.number,
-                        "staff_name": staff_name,
-                        "access_time": booking.check_in.isoformat() if booking.check_in else None,
-                        "access_type": "Check-in",
-                        "guest_name": booking.guest_name,
-                        "card_number": f"BK-{str(booking.id).zfill(6)}",
-                        "booking_id": booking.id,
-                        "status": booking.status
-                    })
-        
-        # Get package bookings
-        pkg_query = db.query(PackageBooking).options(
-            joinedload(PackageBooking.rooms).joinedload(PackageBookingRoom.room),
-            joinedload(PackageBooking.user)
-        )
-        
-        if room_number:
-            pkg_query = pkg_query.join(PackageBookingRoom).join(Room).filter(Room.number == room_number)
-        
-        if start_date:
-            pkg_query = pkg_query.filter(PackageBooking.check_in >= start_date)
-        if end_date:
-            pkg_query = pkg_query.filter(PackageBooking.check_in <= end_date)
-        
-        pkg_bookings = pkg_query.filter(
-            func.lower(func.coalesce(PackageBooking.status, '')).in_(['checked-in', 'checked_in', 'checked in', 'checked-out', 'checked_out', 'checkedout'])
-        ).order_by(PackageBooking.check_in.desc()).all()
-        
-        for pkg_booking in pkg_bookings:
-            for pbr in pkg_booking.rooms:
-                if pbr.room:
-                    staff_name = "Front Desk"
-                    if pkg_booking.user:
-                        staff_name = pkg_booking.user.name or pkg_booking.user.email or "Front Desk"
-                    
-                    result.append({
-                        "room_number": pbr.room.number,
-                        "staff_name": staff_name,
-                        "access_time": pkg_booking.check_in.isoformat() if pkg_booking.check_in else None,
-                        "access_type": "Check-in",
-                        "guest_name": pkg_booking.guest_name,
-                        "card_number": f"PK-{str(pkg_booking.id).zfill(6)}",
-                        "booking_id": pkg_booking.id,
-                        "status": pkg_booking.status
-                    })
-        
-        # Get service assignments (staff accessing rooms for services)
-        service_query = db.query(AssignedService).options(
-            joinedload(AssignedService.room),
-            joinedload(AssignedService.employee),
-            joinedload(AssignedService.service)
-        )
-        
-        if room_number:
-            service_query = service_query.join(Room).filter(Room.number == room_number)
-        
-        if start_date:
-            service_query = service_query.filter(func.date(AssignedService.assigned_at) >= start_date)
-        if end_date:
-            service_query = service_query.filter(func.date(AssignedService.assigned_at) <= end_date)
-        
-        services = service_query.order_by(AssignedService.assigned_at.desc()).all()
-        
-        for service in services:
-            if service.room and service.employee:
-                result.append({
-                    "room_number": service.room.number,
-                    "staff_name": service.employee.name if service.employee else "Staff",
-                    "access_time": service.assigned_at.isoformat() if service.assigned_at else None,
-                    "access_type": f"Service: {service.service.name if service.service else 'N/A'}",
-                    "guest_name": "Service Access",
-                    "card_number": f"SRV-{service.id}",
-                    "booking_id": None,
-                    "status": service.status or "N/A"
-                })
-        
-        # Get checkouts (room access end)
-        checkout_query = db.query(Checkout).options(
-            joinedload(Checkout.booking),
-            joinedload(Checkout.package_booking)
-        )
-        
-        if room_number:
-            checkout_query = checkout_query.filter(Checkout.room_number == room_number)
-        
-        if start_date:
-            checkout_query = checkout_query.filter(func.date(Checkout.checkout_date) >= start_date)
-        if end_date:
-            checkout_query = checkout_query.filter(func.date(Checkout.checkout_date) <= end_date)
-        
-        checkouts = checkout_query.order_by(Checkout.checkout_date.desc()).all()
-        
-        for checkout in checkouts:
-            booking = checkout.booking
-            pkg_booking = checkout.package_booking
-            
-            if booking:
-                for br in booking.booking_rooms:
-                    if br.room:
-                        result.append({
-                            "room_number": br.room.number,
-                            "staff_name": "Front Desk",
-                            "access_time": checkout.checkout_date.isoformat() if checkout.checkout_date else None,
-                            "access_type": "Check-out",
-                            "guest_name": checkout.guest_name or booking.guest_name,
-                            "card_number": f"BK-{str(booking.id).zfill(6)}",
-                            "booking_id": booking.id,
-                            "status": "Checked Out"
-                        })
-            
-            if pkg_booking:
-                for pbr in pkg_booking.rooms:
-                    if pbr.room:
-                        result.append({
-                            "room_number": pbr.room.number,
-                            "staff_name": "Front Desk",
-                            "access_time": checkout.checkout_date.isoformat() if checkout.checkout_date else None,
-                            "access_type": "Check-out",
-                            "guest_name": checkout.guest_name or pkg_booking.guest_name,
-                            "card_number": f"PK-{str(pkg_booking.id).zfill(6)}",
-                            "booking_id": pkg_booking.id,
-                            "status": "Checked Out"
-                        })
-        
-        # Sort by access time
-        result.sort(key=lambda x: x.get("access_time") or "", reverse=True)
-        
-        # Apply skip and limit
-        total = len(result)
-        result = result[skip:skip+limit]
-        
-        return {
-            "access_logs": result,
-            "total": total,
-            "showing": len(result),
-            "date_range": {
-                "start": start_date.isoformat() if start_date else None,
-                "end": end_date.isoformat() if end_date else None
-            }
-        }
-    except Exception as e:
-        import traceback
-        print(f"Error in key-card-audit report: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error generating key card audit: {str(e)}")
+    """Key Card Audit: Who opened which room? (Staff Name + Timestamp)"""
+    # Note: Requires KeyCardLog model - creating placeholder response
+    # This would need a new model: KeyCardLog(id, room_number, staff_name, access_time, access_type, card_number)
+    
+    return {
+        "message": "Key Card Audit model not yet implemented",
+        "access_logs": [],
+        "total": 0
+    }
 
 
 @router.get("/hr/staff-attendance")
@@ -2086,84 +1221,43 @@ def get_staff_attendance_report(
     end_date: Optional[date] = Query(None),
     employee_id: Optional[int] = Query(None),
     skip: int = Query(0, ge=0),
-    limit: int = Query(1000, ge=1, le=10000),
+    limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db)
 ):
-    """Staff Attendance: Shift In/Out times (Based on WorkingLog and service assignments)"""
-    try:
-        result = []
+    """Staff Attendance: Shift In/Out times"""
+    query = db.query(WorkingLog).options(
+        joinedload(WorkingLog.employee)
+    )
+    
+    if employee_id:
+        query = query.filter(WorkingLog.employee_id == employee_id)
+    if start_date:
+        query = query.filter(WorkingLog.date >= start_date)
+    if end_date:
+        query = query.filter(WorkingLog.date <= end_date)
+    
+    logs = query.order_by(WorkingLog.date.desc()).offset(skip).limit(limit).all()
+    
+    result = []
+    for log in logs:
+        hours_worked = 0
+        if log.check_in_time and log.check_out_time:
+            # Calculate hours
+            check_in = datetime.combine(log.date, log.check_in_time)
+            check_out = datetime.combine(log.date, log.check_out_time)
+            hours_worked = (check_out - check_in).total_seconds() / 3600
         
-        # Get working logs
-        query = db.query(WorkingLog).options(
-            joinedload(WorkingLog.employee)
-        )
-        
-        if employee_id:
-            query = query.filter(WorkingLog.employee_id == employee_id)
-        if start_date:
-            query = query.filter(WorkingLog.date >= start_date)
-        if end_date:
-            query = query.filter(WorkingLog.date <= end_date)
-        
-        logs = query.order_by(WorkingLog.date.desc(), WorkingLog.check_in_time.desc()).all()
-        
-        for log in logs:
-            hours_worked = 0.0
-            check_in_datetime = None
-            check_out_datetime = None
-            
-            if log.check_in_time and log.check_out_time:
-                # Calculate hours
-                check_in = datetime.combine(log.date, log.check_in_time)
-                check_out = datetime.combine(log.date, log.check_out_time)
-                if check_out > check_in:
-                    hours_worked = (check_out - check_in).total_seconds() / 3600
-                check_in_datetime = check_in
-                check_out_datetime = check_out
-            elif log.check_in_time:
-                check_in_datetime = datetime.combine(log.date, log.check_in_time)
-            elif log.check_out_time:
-                check_out_datetime = datetime.combine(log.date, log.check_out_time)
-            
-            # Get additional activity from service assignments
-            service_count = db.query(AssignedService).filter(
-                and_(
-                    AssignedService.employee_id == log.employee_id,
-                    func.date(AssignedService.assigned_at) == log.date
-                )
-            ).count()
-            
-            result.append({
-                "employee_name": log.employee.name if log.employee else "-",
-                "employee_id": log.employee_id,
-                "employee_code": f"EMP-{log.employee.id}" if log.employee else None,
-                "date": log.date.isoformat() if log.date else None,
-                "check_in_time": check_in_datetime.isoformat() if check_in_datetime else None,
-                "check_out_time": check_out_datetime.isoformat() if check_out_datetime else None,
-                "hours_worked": round(hours_worked, 2) if hours_worked > 0 else None,
-                "location": log.location or "Office",
-                "services_assigned": service_count,
-                "status": "Present" if log.check_in_time else "Absent"
-            })
-        
-        # Apply skip and limit
-        total = len(result)
-        result = result[skip:skip+limit]
-        
-        return {
-            "attendance_logs": result,
-            "total": total,
-            "showing": len(result),
-            "date_range": {
-                "start": start_date.isoformat() if start_date else None,
-                "end": end_date.isoformat() if end_date else None
-            }
-        }
-    except Exception as e:
-        import traceback
-        print(f"Error in staff-attendance report: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error generating staff attendance report: {str(e)}")
+        result.append({
+            "employee_name": log.employee.name if log.employee else "N/A",
+            "employee_id": log.employee_id,
+            "date": log.date.isoformat(),
+            "check_in_time": log.check_in_time.isoformat() if log.check_in_time else None,
+            "check_out_time": log.check_out_time.isoformat() if log.check_out_time else None,
+            "hours_worked": round(hours_worked, 2),
+            "location": log.location
+        })
+    
+    return {"attendance_logs": result, "total": len(result)}
 
 
 @router.get("/hr/payroll-register")
@@ -2176,126 +1270,78 @@ def get_payroll_register(
     db: Session = Depends(get_db)
 ):
     """Payroll Register: Salary calculation (Basic + OT - Deductions)"""
-    try:
-        if not year:
-            year = date.today().year
-        if not month:
-            month = date.today().month
+    if not year:
+        year = date.today().year
+    if not month:
+        month = date.today().month
+    
+    # Get employees
+    employees = db.query(Employee).offset(skip).limit(limit).all()
+    
+    result = []
+    for employee in employees:
+        # Get attendance for the month
+        attendance_count = db.query(Attendance).filter(
+            and_(
+                Attendance.employee_id == employee.id,
+                extract('month', Attendance.date) == month,
+                extract('year', Attendance.date) == year,
+                Attendance.status == "Present"
+            )
+        ).count()
         
-        # Calculate month boundaries
-        from calendar import monthrange
-        _, days_in_month = monthrange(year, month)
-        month_start = date(year, month, 1)
-        month_end = date(year, month, days_in_month)
+        # Get working logs for OT calculation
+        working_logs = db.query(WorkingLog).filter(
+            and_(
+                WorkingLog.employee_id == employee.id,
+                extract('month', WorkingLog.date) == month,
+                extract('year', WorkingLog.date) == year
+            )
+        ).all()
         
-        # Get all employees (process all, then apply skip/limit to results)
-        employees = db.query(Employee).all()
+        total_hours = sum(
+            (datetime.combine(log.date, log.check_out_time) - datetime.combine(log.date, log.check_in_time)).total_seconds() / 3600
+            for log in working_logs
+            if log.check_in_time and log.check_out_time
+        )
         
-        result = []
-        for employee in employees:
-            # Get attendance for the month
-            attendance_count = db.query(Attendance).filter(
-                and_(
-                    Attendance.employee_id == employee.id,
-                    Attendance.date >= month_start,
-                    Attendance.date <= month_end,
-                    Attendance.status == "Present"
-                )
-            ).count()
-            
-            # Get working logs for OT calculation
-            working_logs = db.query(WorkingLog).filter(
-                and_(
-                    WorkingLog.employee_id == employee.id,
-                    WorkingLog.date >= month_start,
-                    WorkingLog.date <= month_end
-                )
-            ).all()
-            
-            total_hours = 0.0
-            for log in working_logs:
-                if log.check_in_time and log.check_out_time:
-                    try:
-                        check_in_dt = datetime.combine(log.date, log.check_in_time)
-                        check_out_dt = datetime.combine(log.date, log.check_out_time)
-                        if check_out_dt > check_in_dt:
-                            hours = (check_out_dt - check_in_dt).total_seconds() / 3600
-                            total_hours += hours
-                    except:
-                        pass
-            
-            # Calculate salary components
-            basic_salary = float(employee.salary or 0)
-            # Assuming 8 hours per day standard
-            standard_hours = attendance_count * 8
-            ot_hours = max(0, total_hours - standard_hours)
-            hourly_rate = (basic_salary / (30 * 8)) if (30 * 8) > 0 else 0
-            ot_amount = (ot_hours * hourly_rate) * 1.5  # 1.5x for OT
-            
-            # Deductions from Leave model (handle date ranges)
-            leaves = db.query(Leave).filter(
-                and_(
-                    Leave.employee_id == employee.id,
-                    Leave.from_date <= month_end,
-                    Leave.to_date >= month_start,
-                    Leave.status == "approved",
-                    Leave.leave_type == "Unpaid"
-                )
-            ).all()
-            
-            # Calculate leave days in this month
-            leave_days = 0
-            for leave in leaves:
-                overlap_start = max(leave.from_date, month_start)
-                overlap_end = min(leave.to_date, month_end)
-                if overlap_end >= overlap_start:
-                    leave_days += (overlap_end - overlap_start).days + 1
-            
-            leave_deduction = (leave_days * (basic_salary / 30)) if basic_salary > 0 else 0
-            other_deductions = 0.0
-            net_salary = max(0, basic_salary + ot_amount - leave_deduction - other_deductions)
-            
-            result.append({
-                "employee_name": employee.name or "N/A",
-                "employee_id": employee.id,
-                "employee_code": f"EMP-{employee.id}",
-                "role": employee.role.name if hasattr(employee.role, 'name') else (employee.role if isinstance(employee.role, str) else "N/A"),
-                "basic_salary": basic_salary,
-                "attendance_days": attendance_count,
-                "total_hours": round(total_hours, 2),
-                "ot_hours": round(ot_hours, 2),
-                "ot_amount": round(ot_amount, 2),
-                "leave_days": leave_days,
-                "leave_deduction": round(leave_deduction, 2),
-                "other_deductions": other_deductions,
-                "net_salary": round(net_salary, 2),
-                "month": month,
-                "year": year
-            })
+        # Calculate salary components
+        basic_salary = employee.salary or 0
+        # Assuming 8 hours per day standard
+        standard_hours = attendance_count * 8
+        ot_hours = max(0, total_hours - standard_hours)
+        ot_amount = (ot_hours * (basic_salary / (30 * 8))) * 1.5  # 1.5x for OT
         
-        # Sort by employee name
-        result.sort(key=lambda x: x.get("employee_name", ""))
+        # Deductions (requires Leave model)
+        leaves = db.query(Leave).filter(
+            and_(
+                Leave.employee_id == employee.id,
+                extract('month', Leave.from_date) == month,
+                extract('year', Leave.from_date) == year,
+                Leave.status == "approved",
+                Leave.leave_type == "Unpaid"
+            )
+        ).count()
         
-        total_payroll = sum(r["net_salary"] for r in result)
+        leave_deduction = (leaves * (basic_salary / 30))
         
-        # Apply skip and limit
-        total = len(result)
-        result = result[skip:skip+limit]
+        net_salary = basic_salary + ot_amount - leave_deduction
         
-        return {
-            "payroll": result,
-            "total": total,
-            "showing": len(result),
-            "total_payroll": round(total_payroll, 2),
+        result.append({
+            "employee_name": employee.name,
+            "employee_id": employee.id,
+            "role": employee.role,
+            "basic_salary": float(basic_salary),
+            "attendance_days": attendance_count,
+            "ot_hours": round(ot_hours, 2),
+            "ot_amount": round(ot_amount, 2),
+            "leave_deduction": float(leave_deduction),
+            "net_salary": round(net_salary, 2),
             "month": month,
-            "year": year,
-            "month_name": date(year, month, 1).strftime("%B %Y")
-        }
-    except Exception as e:
-        import traceback
-        print(f"Error in payroll-register report: {str(e)}")
-        print(traceback.format_exc())
-        raise HTTPException(status_code=500, detail=f"Error generating payroll register: {str(e)}")
+            "year": year
+        })
+    
+    return {"payroll": result, "total": len(result)}
 
 
 # ============================================

@@ -13,6 +13,7 @@ class ServiceRequestUpdate(BaseModel):
     status: Optional[str] = None
     employee_id: Optional[int] = None
     description: Optional[str] = None
+    billing_status: Optional[str] = None  # "paid" or "unpaid" for food orders
 
 class ServiceRequestOut(BaseModel):
     id: int

@@ -85,7 +85,8 @@ class InventoryReturnItem(BaseModel):
     notes: Optional[str] = None
 
 class AssignedServiceUpdate(BaseModel):
-    status: ServiceStatus
+    status: Optional[ServiceStatus] = None
+    employee_id: Optional[int] = None  # Allow employee reassignment
     inventory_returns: Optional[List[InventoryReturnItem]] = None  # Optional inventory items to return when completing
 
 class AssignedServiceOut(BaseModel):

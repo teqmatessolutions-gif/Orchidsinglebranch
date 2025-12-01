@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { formatCurrency } from '../utils/currency';
+import { formatCurrency } from "../utils/currency";
 import DashboardLayout from "../layout/DashboardLayout";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import CountUp from "react-countup";
 import { Pie } from "react-chartjs-2";
 import { useInfiniteScroll } from "./useInfiniteScroll";
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 import BannerMessage from "../components/BannerMessage";
 import Packages from "./Package";
 import Rooms from "./CreateRooms";
@@ -21,7 +21,9 @@ const KPI_Card = React.memo(({ title, value, unit = "", duration = 1.5 }) => (
     whileHover={{ scale: 1.02 }}
     className="bg-white p-6 rounded-2xl shadow-lg flex flex-col items-center transition-transform duration-200 cursor-pointer"
   >
-    <span className="text-gray-500 font-medium text-sm sm:text-base">{title}</span>
+    <span className="text-gray-500 font-medium text-sm sm:text-base">
+      {title}
+    </span>
     <CountUp
       end={value}
       duration={duration}
@@ -31,7 +33,7 @@ const KPI_Card = React.memo(({ title, value, unit = "", duration = 1.5 }) => (
     />
   </motion.div>
 ));
-KPI_Card.displayName = 'KPI_Card';
+KPI_Card.displayName = "KPI_Card";
 
 const BookingStatusBadge = React.memo(({ status }) => {
   const statusClasses = {
@@ -40,7 +42,8 @@ const BookingStatusBadge = React.memo(({ status }) => {
     "checked-in": "bg-blue-100 text-blue-700",
     "checked-out": "bg-gray-200 text-gray-700",
   };
-  const badgeClass = statusClasses[status.toLowerCase()] || "bg-yellow-100 text-yellow-700";
+  const badgeClass =
+    statusClasses[status.toLowerCase()] || "bg-yellow-100 text-yellow-700";
 
   return (
     <span
@@ -50,7 +53,7 @@ const BookingStatusBadge = React.memo(({ status }) => {
     </span>
   );
 });
-BookingStatusBadge.displayName = 'BookingStatusBadge';
+BookingStatusBadge.displayName = "BookingStatusBadge";
 
 const ImageModal = ({ imageUrl, onClose }) => {
   if (!imageUrl) return null;
@@ -73,33 +76,48 @@ const ImageModal = ({ imageUrl, onClose }) => {
     </div>
   );
 };
-const BookingDetailsModal = ({ booking, onClose, onImageClick, roomIdToRoom, onAddAllocation, inventoryItems = [], inventoryLocations = [] }) => {
+const BookingDetailsModal = ({
+  booking,
+  onClose,
+  onImageClick,
+  roomIdToRoom,
+  onAddAllocation,
+  inventoryItems = [],
+  inventoryLocations = [],
+}) => {
   if (!booking) return null;
 
-  const roomInfo = booking.rooms && booking.rooms.length > 0
-    ? booking.rooms.map(room => {
-        // Handle package bookings (nested room structure) vs regular bookings
-        if (booking.is_package) {
-          // Package bookings: room has nested room object or only room_id
-          if (room?.room?.number) return `${room.room.number} (${room.room.type})`;
-          if (room?.room_id && roomIdToRoom && roomIdToRoom[room.room_id]) {
-            const r = roomIdToRoom[room.room_id];
-            return `${r.number} (${r.type})`;
-          }
-          return '-';
-        } else {
-          // Regular bookings: room has number and type directly
-          if (room?.number) return `${room.number} (${room.type})`;
-          if (room?.room_id && roomIdToRoom && roomIdToRoom[room.room_id]) {
-            const r = roomIdToRoom[room.room_id];
-            return `${r.number} (${r.type})`;
-          }
-          return '-';
-        }
-      }).filter(Boolean).join(", ") || '-'
-    : "-";
+  const roomInfo =
+    booking.rooms && booking.rooms.length > 0
+      ? booking.rooms
+          .map((room) => {
+            // Handle package bookings (nested room structure) vs regular bookings
+            if (booking.is_package) {
+              // Package bookings: room has nested room object or only room_id
+              if (room?.room?.number)
+                return `${room.room.number} (${room.room.type})`;
+              if (room?.room_id && roomIdToRoom && roomIdToRoom[room.room_id]) {
+                const r = roomIdToRoom[room.room_id];
+                return `${r.number} (${r.type})`;
+              }
+              return "-";
+            } else {
+              // Regular bookings: room has number and type directly
+              if (room?.number) return `${room.number} (${room.type})`;
+              if (room?.room_id && roomIdToRoom && roomIdToRoom[room.room_id]) {
+                const r = roomIdToRoom[room.room_id];
+                return `${r.number} (${r.type})`;
+              }
+              return "-";
+            }
+          })
+          .filter(Boolean)
+          .join(", ") || "-"
+      : "-";
 
-  const isCheckedIn = booking.status && booking.status.toLowerCase().replace(/[-_]/g, '') === 'checkedin';
+  const isCheckedIn =
+    booking.status &&
+    booking.status.toLowerCase().replace(/[-_]/g, "") === "checkedin";
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-y-auto">
@@ -111,49 +129,94 @@ const BookingDetailsModal = ({ booking, onClose, onImageClick, roomIdToRoom, onA
       >
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-2xl font-bold text-gray-800">Booking Details</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
         <div className="space-y-4 text-gray-700">
-          <p><strong>Guest:</strong> {booking.guest_name}</p>
-          <p><strong>Rooms:</strong> {roomInfo}</p>
-          <p><strong>Check-in:</strong> {booking.check_in}</p>
-          <p><strong>Check-out:</strong> {booking.check_out}</p>
-          <p><strong>Mobile:</strong> {booking.guest_mobile}</p>
-          <p><strong>Email:</strong> {booking.guest_email}</p>
-          <p><strong>Guests:</strong> {booking.adults} Adults, {booking.children} Children</p>
-          {booking.status === 'checked-in' && booking.user && (
-            <p><strong>Checked-in By:</strong> {booking.user.name}</p>
+          <p>
+            <strong>Guest:</strong> {booking.guest_name}
+          </p>
+          <p>
+            <strong>Rooms:</strong> {roomInfo}
+          </p>
+          <p>
+            <strong>Check-in:</strong> {booking.check_in}
+          </p>
+          <p>
+            <strong>Check-out:</strong> {booking.check_out}
+          </p>
+          <p>
+            <strong>Mobile:</strong> {booking.guest_mobile}
+          </p>
+          <p>
+            <strong>Email:</strong> {booking.guest_email}
+          </p>
+          <p>
+            <strong>Guests:</strong> {booking.adults} Adults, {booking.children}{" "}
+            Children
+          </p>
+          {booking.status === "checked-in" && booking.user && (
+            <p>
+              <strong>Checked-in By:</strong> {booking.user.name}
+            </p>
           )}
           {(booking.id_card_image_url || booking.guest_photo_url) && (
             <div className="mt-4 pt-4 border-t border-gray-200">
-              <h4 className="text-lg font-semibold text-gray-800 mb-2">Check-in Documents</h4>
+              <h4 className="text-lg font-semibold text-gray-800 mb-2">
+                Check-in Documents
+              </h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {booking.id_card_image_url && (
-                    (() => {
-                        const imageUrl = `${API.defaults.baseURL.replace(/\/$/, '')}/${booking.is_package ? 'packages/booking/checkin-image' : 'bookings/checkin-image'}/${booking.id_card_image_url}`;
-                        return (
-                            <div className="text-center">
-                                <p className="text-sm font-medium text-gray-600 mb-1">ID Card</p>
-                                <img src={imageUrl} alt="ID Card" className="w-full h-auto rounded-lg border shadow-sm cursor-pointer" onClick={() => onImageClick(imageUrl)} />
-                            </div>
-                        );
-                    })()
-                )}
-                {booking.guest_photo_url && (
-                    (() => {
-                        const imageUrl = `${API.defaults.baseURL.replace(/\/$/, '')}/${booking.is_package ? 'packages/booking/checkin-image' : 'bookings/checkin-image'}/${booking.guest_photo_url}`;
-                        return (
-                            <div className="text-center">
-                                <p className="text-sm font-medium text-gray-600 mb-1">Guest Photo</p>
-                                <img src={imageUrl} alt="Guest" className="w-full h-auto rounded-lg border shadow-sm cursor-pointer" onClick={() => onImageClick(imageUrl)} />
-                            </div>
-                        );
-                    })()
-                )}
+                {booking.id_card_image_url &&
+                  (() => {
+                    const imageUrl = `${API.defaults.baseURL.replace(/\/$/, "")}/${booking.is_package ? "packages/booking/checkin-image" : "bookings/checkin-image"}/${booking.id_card_image_url}`;
+                    return (
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-gray-600 mb-1">
+                          ID Card
+                        </p>
+                        <img
+                          src={imageUrl}
+                          alt="ID Card"
+                          className="w-full h-auto rounded-lg border shadow-sm cursor-pointer"
+                          onClick={() => onImageClick(imageUrl)}
+                        />
+                      </div>
+                    );
+                  })()}
+                {booking.guest_photo_url &&
+                  (() => {
+                    const imageUrl = `${API.defaults.baseURL.replace(/\/$/, "")}/${booking.is_package ? "packages/booking/checkin-image" : "bookings/checkin-image"}/${booking.guest_photo_url}`;
+                    return (
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-gray-600 mb-1">
+                          Guest Photo
+                        </p>
+                        <img
+                          src={imageUrl}
+                          alt="Guest"
+                          className="w-full h-auto rounded-lg border shadow-sm cursor-pointer"
+                          onClick={() => onImageClick(imageUrl)}
+                        />
+                      </div>
+                    );
+                  })()}
               </div>
             </div>
           )}
@@ -169,7 +232,7 @@ const BookingDetailsModal = ({ booking, onClose, onImageClick, roomIdToRoom, onA
           )}
           <button
             onClick={onClose}
-            className={`${isCheckedIn && onAddAllocation ? 'flex-1' : 'w-full'} bg-indigo-600 text-white font-semibold py-2 rounded-md hover:bg-indigo-700 transition-colors`}
+            className={`${isCheckedIn && onAddAllocation ? "flex-1" : "w-full"} bg-indigo-600 text-white font-semibold py-2 rounded-md hover:bg-indigo-700 transition-colors`}
           >
             Close
           </button>
@@ -180,15 +243,22 @@ const BookingDetailsModal = ({ booking, onClose, onImageClick, roomIdToRoom, onA
 };
 
 // Add Extra Allocation Modal
-const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], inventoryLocations = [], onSuccess, authHeader }) => {
+const AddExtraAllocationModal = ({
+  booking,
+  onClose,
+  inventoryItems = [],
+  inventoryLocations = [],
+  onSuccess,
+  authHeader,
+}) => {
   const [allocationItems, setAllocationItems] = useState([
     {
       item_id: "",
       quantity: 1,
       is_payable: false,
       manual_override: false, // When true, use is_payable directly instead of auto-calculation
-      notes: ""
-    }
+      notes: "",
+    },
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentRoomItems, setCurrentRoomItems] = useState([]);
@@ -204,7 +274,7 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
     }
     // Fallback: generate it client-side if not provided
     const prefix = booking.is_package ? "PK" : "BK";
-    const paddedId = String(booking.id).padStart(6, '0');
+    const paddedId = String(booking.id).padStart(6, "0");
     return `${prefix}-${paddedId}`;
   };
 
@@ -215,7 +285,8 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
     const fetchCurrentItems = async () => {
       // Get first room from booking
       const roomForFetch = (booking.rooms && booking.rooms[0]) || null;
-      const roomNumber = roomForFetch?.number || roomForFetch?.room?.number || null;
+      const roomNumber =
+        roomForFetch?.number || roomForFetch?.room?.number || null;
 
       console.log("=== Fetching Current Room Items ===");
       console.log("Booking:", booking);
@@ -223,12 +294,20 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
       console.log("Room for fetch:", roomForFetch);
       console.log("Room number extracted:", roomNumber);
       console.log("Total locations available:", inventoryLocations.length);
-      console.log("GUEST_ROOM locations:", inventoryLocations.filter(loc => String(loc.location_type || "").toUpperCase() === "GUEST_ROOM").map(loc => ({
-        id: loc.id,
-        name: loc.name,
-        room_area: loc.room_area,
-        location_type: loc.location_type
-      })));
+      console.log(
+        "GUEST_ROOM locations:",
+        inventoryLocations
+          .filter(
+            (loc) =>
+              String(loc.location_type || "").toUpperCase() === "GUEST_ROOM",
+          )
+          .map((loc) => ({
+            id: loc.id,
+            name: loc.name,
+            room_area: loc.room_area,
+            location_type: loc.location_type,
+          })),
+      );
 
       if (!roomNumber) {
         console.warn("No room number found for booking");
@@ -240,56 +319,78 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
       if (roomNumber) {
         // Normalize room number (remove leading zeros for comparison, but keep original for exact match)
         const roomNumStr = String(roomNumber).trim();
-        const roomNumNoZeros = roomNumStr.replace(/^0+/, '') || roomNumStr; // Remove leading zeros
-        
+        const roomNumNoZeros = roomNumStr.replace(/^0+/, "") || roomNumStr; // Remove leading zeros
+
         // Try multiple matching strategies
-        destinationLocation = inventoryLocations.find((loc) => {
-          const type = String(loc.location_type || "").toUpperCase();
-          if (type !== "GUEST_ROOM") return false;
-          
-          // Try matching by room_area (most common)
-          const roomArea = String(loc.room_area || "").trim().toLowerCase();
-          const roomName = String(loc.name || "").trim().toLowerCase();
-          const roomAreaNoZeros = roomArea.replace(/^0+/, '') || roomArea;
-          const roomNameNoZeros = roomName.replace(/^0+/, '') || roomName;
-          const searchStr = roomNumStr.toLowerCase();
-          const searchStrNoZeros = roomNumNoZeros.toLowerCase();
-          
-          // Exact match (with or without leading zeros)
-          if (roomArea === searchStr || roomAreaNoZeros === searchStrNoZeros) return true;
-          if (roomName === searchStr || roomNameNoZeros === searchStrNoZeros) return true;
-          
-          // Contains match (with or without leading zeros)
-          if (roomArea.includes(searchStr) || roomAreaNoZeros.includes(searchStrNoZeros)) return true;
-          if (roomName.includes(searchStr) || roomNameNoZeros.includes(searchStrNoZeros)) return true;
-          
-          // Pattern matches (Room 004, Room-004, etc.)
-          const patterns = [
-            `room ${searchStr}`,
-            `room-${searchStr}`,
-            `room_${searchStr}`,
-            `room${searchStr}`,
-            `room ${searchStrNoZeros}`,
-            `room-${searchStrNoZeros}`,
-            `room_${searchStrNoZeros}`,
-            `room${searchStrNoZeros}`
-          ];
-          if (patterns.some(p => roomArea === p || roomName === p)) return true;
-          
-          return false;
-        }) || null;
+        destinationLocation =
+          inventoryLocations.find((loc) => {
+            const type = String(loc.location_type || "").toUpperCase();
+            if (type !== "GUEST_ROOM") return false;
+
+            // Try matching by room_area (most common)
+            const roomArea = String(loc.room_area || "")
+              .trim()
+              .toLowerCase();
+            const roomName = String(loc.name || "")
+              .trim()
+              .toLowerCase();
+            const roomAreaNoZeros = roomArea.replace(/^0+/, "") || roomArea;
+            const roomNameNoZeros = roomName.replace(/^0+/, "") || roomName;
+            const searchStr = roomNumStr.toLowerCase();
+            const searchStrNoZeros = roomNumNoZeros.toLowerCase();
+
+            // Exact match (with or without leading zeros)
+            if (roomArea === searchStr || roomAreaNoZeros === searchStrNoZeros)
+              return true;
+            if (roomName === searchStr || roomNameNoZeros === searchStrNoZeros)
+              return true;
+
+            // Contains match (with or without leading zeros)
+            if (
+              roomArea.includes(searchStr) ||
+              roomAreaNoZeros.includes(searchStrNoZeros)
+            )
+              return true;
+            if (
+              roomName.includes(searchStr) ||
+              roomNameNoZeros.includes(searchStrNoZeros)
+            )
+              return true;
+
+            // Pattern matches (Room 004, Room-004, etc.)
+            const patterns = [
+              `room ${searchStr}`,
+              `room-${searchStr}`,
+              `room_${searchStr}`,
+              `room${searchStr}`,
+              `room ${searchStrNoZeros}`,
+              `room-${searchStrNoZeros}`,
+              `room_${searchStrNoZeros}`,
+              `room${searchStrNoZeros}`,
+            ];
+            if (patterns.some((p) => roomArea === p || roomName === p))
+              return true;
+
+            return false;
+          }) || null;
       }
 
       console.log("Found destination location:", destinationLocation);
 
       if (!destinationLocation) {
-        console.warn(`Room location not found for room ${roomNumber}. Available GUEST_ROOM locations:`, 
-          inventoryLocations.filter(loc => String(loc.location_type || "").toUpperCase() === "GUEST_ROOM").map(loc => ({
-            id: loc.id,
-            name: loc.name,
-            room_area: loc.room_area,
-            location_type: loc.location_type
-          }))
+        console.warn(
+          `Room location not found for room ${roomNumber}. Available GUEST_ROOM locations:`,
+          inventoryLocations
+            .filter(
+              (loc) =>
+                String(loc.location_type || "").toUpperCase() === "GUEST_ROOM",
+            )
+            .map((loc) => ({
+              id: loc.id,
+              name: loc.name,
+              room_area: loc.room_area,
+              location_type: loc.location_type,
+            })),
         );
         setCurrentRoomItems([]);
         return;
@@ -297,8 +398,13 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
 
       setLoadingCurrentItems(true);
       try {
-        console.log(`Fetching items for location ${destinationLocation.id} (${destinationLocation.name || destinationLocation.room_area})`);
-        const res = await API.get(`/inventory/locations/${destinationLocation.id}/items`, authHeader());
+        console.log(
+          `Fetching items for location ${destinationLocation.id} (${destinationLocation.name || destinationLocation.room_area})`,
+        );
+        const res = await API.get(
+          `/inventory/locations/${destinationLocation.id}/items`,
+          authHeader(),
+        );
         console.log("Location items response:", res.data);
         setCurrentRoomItems(res.data?.items || []);
       } catch (error) {
@@ -325,8 +431,8 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
         quantity: 1,
         is_payable: false,
         manual_override: false,
-        notes: ""
-      }
+        notes: "",
+      },
     ]);
   };
 
@@ -344,10 +450,12 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Filter out empty items and validate
-    const validItems = allocationItems.filter(item => item.item_id && item.quantity > 0);
-    
+    const validItems = allocationItems.filter(
+      (item) => item.item_id && item.quantity > 0,
+    );
+
     if (validItems.length === 0) {
       alert("Please add at least one item with a valid quantity");
       return;
@@ -359,13 +467,20 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
       const mainWarehouse = inventoryLocations.find((loc) => {
         const type = String(loc.location_type || "").toUpperCase();
         return (
-          loc.is_inventory_point === true &&
-          (type === "CENTRAL_WAREHOUSE" || type === "WAREHOUSE" || type === "BRANCH_STORE")
-        ) || (type === "CENTRAL_WAREHOUSE" || type === "WAREHOUSE" || type === "BRANCH_STORE");
+          (loc.is_inventory_point === true &&
+            (type === "CENTRAL_WAREHOUSE" ||
+              type === "WAREHOUSE" ||
+              type === "BRANCH_STORE")) ||
+          type === "CENTRAL_WAREHOUSE" ||
+          type === "WAREHOUSE" ||
+          type === "BRANCH_STORE"
+        );
       });
 
       if (!mainWarehouse) {
-        alert("Main warehouse not found. Please create a main warehouse location first.");
+        alert(
+          "Main warehouse not found. Please create a main warehouse location first.",
+        );
         setIsSubmitting(false);
         return;
       }
@@ -376,23 +491,27 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
 
       let destinationLocation = null;
       if (roomNumber) {
-        destinationLocation = inventoryLocations.find((loc) => {
-          const type = String(loc.location_type || "").toUpperCase();
-          if (type !== "GUEST_ROOM") return false;
-          const label = `${loc.name || ""} ${loc.room_area || ""}`.toLowerCase();
-          return label.includes(String(roomNumber).toLowerCase());
-        }) || null;
+        destinationLocation =
+          inventoryLocations.find((loc) => {
+            const type = String(loc.location_type || "").toUpperCase();
+            if (type !== "GUEST_ROOM") return false;
+            const label =
+              `${loc.name || ""} ${loc.room_area || ""}`.toLowerCase();
+            return label.includes(String(roomNumber).toLowerCase());
+          }) || null;
       }
 
       if (!destinationLocation) {
-        alert(`Room location not found for room ${roomNumber}. Please ensure the room is synced as a location.`);
+        alert(
+          `Room location not found for room ${roomNumber}. Please ensure the room is synced as a location.`,
+        );
         setIsSubmitting(false);
         return;
       }
 
       // Calculate total quantities per item already allocated (to track complimentary limit usage)
       const itemQuantityMap = {}; // item_id -> total quantity already allocated
-      currentRoomItems.forEach(roomItem => {
+      currentRoomItems.forEach((roomItem) => {
         const itemId = roomItem.item_id;
         if (!itemQuantityMap[itemId]) {
           itemQuantityMap[itemId] = 0;
@@ -405,23 +524,28 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
       let totalPayableQty = 0;
       let totalComplimentaryQty = 0;
 
-      validItems.forEach(item => {
-        const selectedItem = inventoryItems.find(it => it.id === parseInt(item.item_id));
+      validItems.forEach((item) => {
+        const selectedItem = inventoryItems.find(
+          (it) => it.id === parseInt(item.item_id),
+        );
         if (!selectedItem) return;
-        
+
         const itemId = parseInt(item.item_id);
         const requestedQty = parseFloat(item.quantity);
-        
+
         // If manual override is enabled, use the is_payable flag directly
         if (item.manual_override) {
           issueDetails.push({
             item_id: itemId,
             issued_quantity: requestedQty,
-          unit: selectedItem.unit || "pcs",
-          batch_lot_number: null,
-          cost: null,
+            unit: selectedItem.unit || "pcs",
+            batch_lot_number: null,
+            cost: null,
             is_payable: item.is_payable,
-            notes: (item.is_payable ? "Payable" : "Complimentary") + ` item (${requestedQty} ${selectedItem.unit || "pcs"})` + (item.notes ? ` - ${item.notes}` : "")
+            notes:
+              (item.is_payable ? "Payable" : "Complimentary") +
+              ` item (${requestedQty} ${selectedItem.unit || "pcs"})` +
+              (item.notes ? ` - ${item.notes}` : ""),
           });
           if (item.is_payable) {
             totalPayableQty += requestedQty;
@@ -430,19 +554,25 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
           }
           return;
         }
-        
+
         // Automatic calculation based on complimentary limit
         const complimentaryLimit = selectedItem.complimentary_limit || 0;
-        
+
         // Calculate how many complimentary items are already used
         const alreadyAllocatedQty = itemQuantityMap[itemId] || 0;
-        const complimentaryUsed = Math.min(alreadyAllocatedQty, complimentaryLimit);
-        const complimentaryRemaining = Math.max(0, complimentaryLimit - complimentaryUsed);
-        
+        const complimentaryUsed = Math.min(
+          alreadyAllocatedQty,
+          complimentaryLimit,
+        );
+        const complimentaryRemaining = Math.max(
+          0,
+          complimentaryLimit - complimentaryUsed,
+        );
+
         // Split requested quantity into complimentary and payable
         const complimentaryQty = Math.min(requestedQty, complimentaryRemaining);
         const payableQty = Math.max(0, requestedQty - complimentaryQty);
-        
+
         // Create issue detail for complimentary items (if any)
         if (complimentaryQty > 0) {
           issueDetails.push({
@@ -452,11 +582,13 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
             batch_lot_number: null,
             cost: null,
             is_payable: false,
-            notes: `Complimentary item (${complimentaryQty} ${selectedItem.unit || "pcs"})` + (item.notes ? ` - ${item.notes}` : "")
+            notes:
+              `Complimentary item (${complimentaryQty} ${selectedItem.unit || "pcs"})` +
+              (item.notes ? ` - ${item.notes}` : ""),
           });
           totalComplimentaryQty += complimentaryQty;
         }
-        
+
         // Create issue detail for payable items (if any)
         if (payableQty > 0) {
           issueDetails.push({
@@ -466,7 +598,9 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
             batch_lot_number: null,
             cost: null,
             is_payable: true,
-            notes: `Payable item (${payableQty} ${selectedItem.unit || "pcs"})` + (item.notes ? ` - ${item.notes}` : "")
+            notes:
+              `Payable item (${payableQty} ${selectedItem.unit || "pcs"})` +
+              (item.notes ? ` - ${item.notes}` : ""),
           });
           totalPayableQty += payableQty;
         }
@@ -479,8 +613,10 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
       }
 
       // Count payable vs complimentary items
-      const payableCount = issueDetails.filter(d => d.is_payable).length;
-      const complimentaryCount = issueDetails.filter(d => !d.is_payable).length;
+      const payableCount = issueDetails.filter((d) => d.is_payable).length;
+      const complimentaryCount = issueDetails.filter(
+        (d) => !d.is_payable,
+      ).length;
 
       // Create stock issue
       const issueData = {
@@ -489,39 +625,47 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
         destination_location_id: destinationLocation.id,
         issue_date: getCurrentDateTimeIST(),
         notes: `Extra allocation for booking ${generateBookingId(booking)} (${totalPayableQty} payable qty, ${totalComplimentaryQty} complimentary qty)`,
-        details: issueDetails
+        details: issueDetails,
       };
 
       await API.post("/inventory/issues", issueData, authHeader());
-      
+
       alert(`Successfully added ${validItems.length} item(s) to room!`);
-      setAllocationItems([{
-        item_id: "",
-        quantity: 1,
-        is_payable: false,
-        manual_override: false,
-        notes: ""
-      }]);
-      
+      setAllocationItems([
+        {
+          item_id: "",
+          quantity: 1,
+          is_payable: false,
+          manual_override: false,
+          notes: "",
+        },
+      ]);
+
       // Refresh current items and switch to current items tab
       // Reuse existing destinationLocation from above
       if (destinationLocation) {
         try {
-          const res = await API.get(`/inventory/locations/${destinationLocation.id}/items`, authHeader());
+          const res = await API.get(
+            `/inventory/locations/${destinationLocation.id}/items`,
+            authHeader(),
+          );
           setCurrentRoomItems(res.data?.items || []);
           setActiveTab("current"); // Switch to current items tab to show the new items
         } catch (error) {
           console.error("Error refreshing items:", error);
         }
       }
-      
+
       if (onSuccess) {
         onSuccess();
       }
       // Don't close modal, just switch tabs
     } catch (error) {
       console.error("Error adding extra allocation:", error);
-      alert("Failed to add allocation: " + (error.response?.data?.detail || error.message));
+      alert(
+        "Failed to add allocation: " +
+          (error.response?.data?.detail || error.message),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -537,27 +681,37 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
       await API.patch(
         `/inventory/issues/${item.issue_id}/details/${item.issue_detail_id}`,
         { is_payable: isPayable },
-        authHeader()
+        authHeader(),
       );
-      
+
       // Refresh current items
       const roomForRefreshPayable = (booking.rooms && booking.rooms[0]) || null;
-      const roomNumForRefreshPayable = roomForRefreshPayable?.number || roomForRefreshPayable?.room?.number || null;
+      const roomNumForRefreshPayable =
+        roomForRefreshPayable?.number ||
+        roomForRefreshPayable?.room?.number ||
+        null;
       if (roomNumForRefreshPayable) {
         const destLocForRefreshPayable = inventoryLocations.find((loc) => {
           const type = String(loc.location_type || "").toUpperCase();
           if (type !== "GUEST_ROOM") return false;
-          const label = `${loc.name || ""} ${loc.room_area || ""}`.toLowerCase();
+          const label =
+            `${loc.name || ""} ${loc.room_area || ""}`.toLowerCase();
           return label.includes(String(roomNumForRefreshPayable).toLowerCase());
         });
         if (destLocForRefreshPayable) {
-          const res = await API.get(`/inventory/locations/${destLocForRefreshPayable.id}/items`, authHeader());
+          const res = await API.get(
+            `/inventory/locations/${destLocForRefreshPayable.id}/items`,
+            authHeader(),
+          );
           setCurrentRoomItems(res.data?.items || []);
         }
       }
     } catch (error) {
       console.error("Error updating payable status:", error);
-      alert("Failed to update payable status: " + (error.response?.data?.detail || error.message));
+      alert(
+        "Failed to update payable status: " +
+          (error.response?.data?.detail || error.message),
+      );
     }
   };
 
@@ -571,30 +725,38 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
       await API.patch(
         `/inventory/issues/${item.issue_id}/details/${item.issue_detail_id}`,
         { is_paid: isPaid },
-        authHeader()
+        authHeader(),
       );
-      
+
       // Update local state immediately for better UX
       setPaidStatusMap({ ...paidStatusMap, [item.item_id]: isPaid });
-      
+
       // Refresh current items
       const roomForRefreshPaid = (booking.rooms && booking.rooms[0]) || null;
-      const roomNumForRefreshPaid = roomForRefreshPaid?.number || roomForRefreshPaid?.room?.number || null;
+      const roomNumForRefreshPaid =
+        roomForRefreshPaid?.number || roomForRefreshPaid?.room?.number || null;
       if (roomNumForRefreshPaid) {
         const destLocForRefreshPaid = inventoryLocations.find((loc) => {
           const type = String(loc.location_type || "").toUpperCase();
           if (type !== "GUEST_ROOM") return false;
-          const label = `${loc.name || ""} ${loc.room_area || ""}`.toLowerCase();
+          const label =
+            `${loc.name || ""} ${loc.room_area || ""}`.toLowerCase();
           return label.includes(String(roomNumForRefreshPaid).toLowerCase());
         });
         if (destLocForRefreshPaid) {
-          const res = await API.get(`/inventory/locations/${destLocForRefreshPaid.id}/items`, authHeader());
+          const res = await API.get(
+            `/inventory/locations/${destLocForRefreshPaid.id}/items`,
+            authHeader(),
+          );
           setCurrentRoomItems(res.data?.items || []);
         }
       }
     } catch (error) {
       console.error("Error updating paid status:", error);
-      alert("Failed to update paid status: " + (error.response?.data?.detail || error.message));
+      alert(
+        "Failed to update paid status: " +
+          (error.response?.data?.detail || error.message),
+      );
     }
   };
 
@@ -607,10 +769,26 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
         className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
       >
         <div className="flex justify-between items-center mb-6">
-          <h3 className="text-2xl font-bold text-gray-800">Room Allocation Management</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <h3 className="text-2xl font-bold text-gray-800">
+            Room Allocation Management
+          </h3>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -645,48 +823,69 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
         {activeTab === "current" && (
           <div className="space-y-4">
             <div className="flex justify-between items-center mb-4">
-              <h4 className="text-lg font-semibold text-gray-800">Current Room Items</h4>
+              <h4 className="text-lg font-semibold text-gray-800">
+                Current Room Items
+              </h4>
               <button
                 type="button"
                 onClick={async () => {
                   // Force refresh
-                  const roomForFetch = (booking.rooms && booking.rooms[0]) || null;
-                  const roomNumber = roomForFetch?.number || roomForFetch?.room?.number || null;
+                  const roomForFetch =
+                    (booking.rooms && booking.rooms[0]) || null;
+                  const roomNumber =
+                    roomForFetch?.number || roomForFetch?.room?.number || null;
                   if (!roomNumber) {
                     alert("Room number not found");
                     return;
                   }
-                  
+
                   // Normalize room number
                   const roomNumStr = String(roomNumber).trim();
-                  const roomNumNoZeros = roomNumStr.replace(/^0+/, '') || roomNumStr;
-                  
+                  const roomNumNoZeros =
+                    roomNumStr.replace(/^0+/, "") || roomNumStr;
+
                   const destinationLocation = inventoryLocations.find((loc) => {
                     const type = String(loc.location_type || "").toUpperCase();
                     if (type !== "GUEST_ROOM") return false;
-                    const roomArea = String(loc.room_area || "").trim().toLowerCase();
-                    const roomName = String(loc.name || "").trim().toLowerCase();
-                    const roomAreaNoZeros = roomArea.replace(/^0+/, '') || roomArea;
+                    const roomArea = String(loc.room_area || "")
+                      .trim()
+                      .toLowerCase();
+                    const roomName = String(loc.name || "")
+                      .trim()
+                      .toLowerCase();
+                    const roomAreaNoZeros =
+                      roomArea.replace(/^0+/, "") || roomArea;
                     const searchStr = roomNumStr.toLowerCase();
                     const searchStrNoZeros = roomNumNoZeros.toLowerCase();
-                    return roomArea === searchStr || roomAreaNoZeros === searchStrNoZeros ||
-                           roomName === searchStr || roomName.includes(searchStr) ||
-                           roomArea.includes(searchStr) || roomAreaNoZeros.includes(searchStrNoZeros);
+                    return (
+                      roomArea === searchStr ||
+                      roomAreaNoZeros === searchStrNoZeros ||
+                      roomName === searchStr ||
+                      roomName.includes(searchStr) ||
+                      roomArea.includes(searchStr) ||
+                      roomAreaNoZeros.includes(searchStrNoZeros)
+                    );
                   });
-                  
+
                   if (!destinationLocation) {
                     alert(`Room location not found for room ${roomNumber}`);
                     return;
                   }
-                  
+
                   setLoadingCurrentItems(true);
                   try {
-                    const res = await API.get(`/inventory/locations/${destinationLocation.id}/items`, authHeader());
+                    const res = await API.get(
+                      `/inventory/locations/${destinationLocation.id}/items`,
+                      authHeader(),
+                    );
                     setCurrentRoomItems(res.data?.items || []);
                     console.log("✅ Refreshed items:", res.data?.items);
                   } catch (error) {
                     console.error("Error refreshing items:", error);
-                    alert("Failed to refresh items: " + (error.response?.data?.detail || error.message));
+                    alert(
+                      "Failed to refresh items: " +
+                        (error.response?.data?.detail || error.message),
+                    );
                   } finally {
                     setLoadingCurrentItems(false);
                   }
@@ -694,18 +893,33 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
                 className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 flex items-center gap-1"
                 disabled={loadingCurrentItems}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
                 </svg>
                 {loadingCurrentItems ? "Refreshing..." : "Refresh"}
               </button>
             </div>
             {loadingCurrentItems ? (
-              <div className="text-center py-8 text-gray-500">Loading current items...</div>
+              <div className="text-center py-8 text-gray-500">
+                Loading current items...
+              </div>
             ) : currentRoomItems.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <p>No items currently allocated to this room.</p>
-                <p className="text-xs text-gray-400 mt-2">Items added during check-in or manually will appear here.</p>
+                <p className="text-xs text-gray-400 mt-2">
+                  Items added during check-in or manually will appear here.
+                </p>
                 <button
                   type="button"
                   onClick={() => setActiveTab("add")}
@@ -719,90 +933,152 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total Qty</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Complimentary</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Payable</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Paid</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Item
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Total Qty
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Complimentary
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Payable
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Unit Price
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Total Value
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Paid
+                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {currentRoomItems.map((item, index) => {
-                      const paidStatus = item.is_paid || paidStatusMap[item.item_id] || false;
+                      const paidStatus =
+                        item.is_paid || paidStatusMap[item.item_id] || false;
                       const totalQty = parseFloat(item.location_stock || 0);
-                      
+
                       // Find the inventory item to get complimentary limit (always needed for display)
-                      const inventoryItem = inventoryItems.find(it => it.id === item.item_id);
-                      const complimentaryLimit = inventoryItem?.complimentary_limit || 0;
-                      
+                      const inventoryItem = inventoryItems.find(
+                        (it) => it.id === item.item_id,
+                      );
+                      const complimentaryLimit =
+                        inventoryItem?.complimentary_limit || 0;
+
                       // Use actual stored quantities if available, otherwise calculate
-                      const complimentaryQty = parseFloat(item.complimentary_qty || 0);
+                      const complimentaryQty = parseFloat(
+                        item.complimentary_qty || 0,
+                      );
                       const payableQty = parseFloat(item.payable_qty || 0);
-                      
+
                       // Fallback: If quantities not stored, calculate based on complimentary limit
                       let calculatedComplimentaryQty = complimentaryQty;
                       let calculatedPayableQty = payableQty;
-                      
-                      if (complimentaryQty === 0 && payableQty === 0 && totalQty > 0) {
+
+                      if (
+                        complimentaryQty === 0 &&
+                        payableQty === 0 &&
+                        totalQty > 0
+                      ) {
                         // Calculate based on limit
-                        calculatedComplimentaryQty = Math.min(totalQty, complimentaryLimit);
-                        calculatedPayableQty = Math.max(0, totalQty - complimentaryLimit);
+                        calculatedComplimentaryQty = Math.min(
+                          totalQty,
+                          complimentaryLimit,
+                        );
+                        calculatedPayableQty = Math.max(
+                          0,
+                          totalQty - complimentaryLimit,
+                        );
                       } else {
                         calculatedComplimentaryQty = complimentaryQty;
                         calculatedPayableQty = payableQty;
                       }
-                      
+
                       return (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-3 py-2 text-sm">
-                            <div className="font-medium text-gray-900">{item.item_name}</div>
+                            <div className="font-medium text-gray-900">
+                              {item.item_name}
+                            </div>
                             {item.item_code && (
-                              <div className="text-xs text-gray-500">{item.item_code}</div>
+                              <div className="text-xs text-gray-500">
+                                {item.item_code}
+                              </div>
                             )}
                             {complimentaryLimit > 0 && (
-                              <div className="text-xs text-blue-600 mt-1">Limit: {complimentaryLimit} free</div>
+                              <div className="text-xs text-blue-600 mt-1">
+                                Limit: {complimentaryLimit} free
+                              </div>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-sm text-gray-600 font-medium">{totalQty} {item.unit}</td>
+                          <td className="px-3 py-2 text-sm text-gray-600 font-medium">
+                            {totalQty} {item.unit}
+                          </td>
                           <td className="px-3 py-2 text-sm">
-                            <span className="text-green-700 font-medium">{calculatedComplimentaryQty} {item.unit}</span>
+                            <span className="text-green-700 font-medium">
+                              {calculatedComplimentaryQty} {item.unit}
+                            </span>
                             {calculatedComplimentaryQty > 0 && (
-                              <div className="text-xs text-gray-500">(Free)</div>
+                              <div className="text-xs text-gray-500">
+                                (Free)
+                              </div>
                             )}
                           </td>
                           <td className="px-3 py-2 text-sm">
                             {calculatedPayableQty > 0 ? (
                               <>
-                                <span className="text-orange-700 font-medium">{calculatedPayableQty} {item.unit}</span>
-                                <div className="text-xs text-gray-500">(Payable)</div>
+                                <span className="text-orange-700 font-medium">
+                                  {calculatedPayableQty} {item.unit}
+                                </span>
+                                <div className="text-xs text-gray-500">
+                                  (Payable)
+                                </div>
                               </>
                             ) : (
                               <span className="text-gray-400 text-xs">-</span>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-sm text-gray-600">{formatCurrency(item.unit_price || 0)}</td>
+                          <td className="px-3 py-2 text-sm text-gray-600">
+                            {formatCurrency(item.unit_price || 0)}
+                          </td>
                           <td className="px-3 py-2 text-sm font-semibold text-gray-900">
-                            {calculatedPayableQty > 0 ? formatCurrency((item.unit_price || 0) * calculatedPayableQty) : formatCurrency(0)}
+                            {calculatedPayableQty > 0
+                              ? formatCurrency(
+                                  (item.unit_price || 0) * calculatedPayableQty,
+                                )
+                              : formatCurrency(0)}
                           </td>
                           <td className="px-3 py-2">
                             {calculatedPayableQty > 0 && (
-                            <label className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={paidStatus}
-                                onChange={(e) => {
-                                  setPaidStatusMap({ ...paidStatusMap, [item.item_id]: e.target.checked });
-                                  updateItemPaidStatus(item, e.target.checked);
-                                }}
-                                className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                              />
-                              <span className={`text-xs ${paidStatus ? "text-green-600 font-medium" : "text-gray-500"}`}>
-                                {paidStatus ? "Paid" : "Unpaid"}
-                              </span>
-                            </label>
+                              <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  checked={paidStatus}
+                                  onChange={(e) => {
+                                    setPaidStatusMap({
+                                      ...paidStatusMap,
+                                      [item.item_id]: e.target.checked,
+                                    });
+                                    updateItemPaidStatus(
+                                      item,
+                                      e.target.checked,
+                                    );
+                                  }}
+                                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                                />
+                                <span
+                                  className={`text-xs ${paidStatus ? "text-green-600 font-medium" : "text-gray-500"}`}
+                                >
+                                  {paidStatus ? "Paid" : "Unpaid"}
+                                </span>
+                              </label>
                             )}
                             {calculatedPayableQty === 0 && (
                               <span className="text-xs text-gray-400">N/A</span>
@@ -810,13 +1086,19 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
                           </td>
                           <td className="px-3 py-2">
                             {calculatedPayableQty > 0 && !paidStatus && (
-                              <span className="text-xs text-orange-600 font-medium">Payment Pending</span>
+                              <span className="text-xs text-orange-600 font-medium">
+                                Payment Pending
+                              </span>
                             )}
                             {calculatedPayableQty > 0 && paidStatus && (
-                              <span className="text-xs text-green-600 font-medium">✓ Paid</span>
+                              <span className="text-xs text-green-600 font-medium">
+                                ✓ Paid
+                              </span>
                             )}
                             {calculatedPayableQty === 0 && (
-                              <span className="text-xs text-gray-400">Complimentary</span>
+                              <span className="text-xs text-gray-400">
+                                Complimentary
+                              </span>
                             )}
                           </td>
                         </tr>
@@ -832,176 +1114,294 @@ const AddExtraAllocationModal = ({ booking, onClose, inventoryItems = [], invent
         {/* Add New Items Tab */}
         {activeTab === "add" && (
           <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="flex justify-between items-center mb-4">
-            <h4 className="text-lg font-semibold text-gray-800">Items to Allocate</h4>
-            <button
-              type="button"
-              onClick={addAllocationRow}
-              className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-1"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add Item
-            </button>
-          </div>
-          
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {allocationItems.map((item, index) => (
-              <div key={index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-sm font-medium text-gray-700">Item {index + 1}</span>
-                  {allocationItems.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeAllocationRow(index)}
-                      className="text-red-600 hover:text-red-800 text-sm"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Item</label>
-                    <select
-                      value={item.item_id}
-                      onChange={(e) => updateAllocationItem(index, "item_id", e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="">Select an item</option>
-                      {inventoryItems.filter(it => it.is_active !== false).map((invItem) => (
-                        <option key={invItem.id} value={invItem.id}>
-                          {invItem.name} {invItem.item_code ? `(${invItem.item_code})` : ""} - Stock: {invItem.current_stock} {invItem.unit}
-                          {invItem.complimentary_limit ? ` (First ${invItem.complimentary_limit} free)` : ""}
-                        </option>
-                      ))}
-                    </select>
+            <div className="flex justify-between items-center mb-4">
+              <h4 className="text-lg font-semibold text-gray-800">
+                Items to Allocate
+              </h4>
+              <button
+                type="button"
+                onClick={addAllocationRow}
+                className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-1"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 4v16m8-8H4"
+                  />
+                </svg>
+                Add Item
+              </button>
+            </div>
+
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {allocationItems.map((item, index) => (
+                <div
+                  key={index}
+                  className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+                >
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-sm font-medium text-gray-700">
+                      Item {index + 1}
+                    </span>
+                    {allocationItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeAllocationRow(index)}
+                        className="text-red-600 hover:text-red-800 text-sm"
+                      >
+                        Remove
+                      </button>
+                    )}
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Total Quantity</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Item
+                      </label>
+                      <select
+                        value={item.item_id}
+                        onChange={(e) =>
+                          updateAllocationItem(index, "item_id", e.target.value)
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="">Select an item</option>
+                        {inventoryItems
+                          .filter((it) => it.is_active !== false)
+                          .map((invItem) => (
+                            <option key={invItem.id} value={invItem.id}>
+                              {invItem.name}{" "}
+                              {invItem.item_code
+                                ? `(${invItem.item_code})`
+                                : ""}{" "}
+                              - Stock: {invItem.current_stock} {invItem.unit}
+                              {invItem.complimentary_limit
+                                ? ` (First ${invItem.complimentary_limit} free)`
+                                : ""}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Total Quantity
+                      </label>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={item.quantity}
+                        onChange={(e) =>
+                          updateAllocationItem(
+                            index,
+                            "quantity",
+                            parseFloat(e.target.value) || 0,
+                          )
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
                     <input
-                      type="number"
-                      min="0.01"
-                      step="0.01"
-                      value={item.quantity}
-                      onChange={(e) => updateAllocationItem(index, "quantity", parseFloat(e.target.value) || 0)}
+                      type="checkbox"
+                      id={`manual_override_${index}`}
+                      checked={item.manual_override || false}
+                      onChange={(e) =>
+                        updateAllocationItem(
+                          index,
+                          "manual_override",
+                          e.target.checked,
+                        )
+                      }
+                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    />
+                    <label
+                      htmlFor={`manual_override_${index}`}
+                      className="text-xs font-medium text-gray-700 cursor-pointer"
+                    >
+                      Manual Override (ignore automatic calculation)
+                    </label>
+                  </div>
+                  {item.manual_override ? (
+                    <div className="mt-3 flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                      <input
+                        type="checkbox"
+                        id={`is_payable_${index}`}
+                        checked={item.is_payable}
+                        onChange={(e) =>
+                          updateAllocationItem(
+                            index,
+                            "is_payable",
+                            e.target.checked,
+                          )
+                        }
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <label
+                        htmlFor={`is_payable_${index}`}
+                        className="text-xs font-medium text-gray-700 cursor-pointer"
+                      >
+                        Mark entire quantity as{" "}
+                        <span
+                          className={
+                            item.is_payable
+                              ? "text-orange-700 font-semibold"
+                              : "text-green-700 font-semibold"
+                          }
+                        >
+                          {item.is_payable ? "Payable" : "Complimentary"}
+                        </span>
+                      </label>
+                    </div>
+                  ) : (
+                    (() => {
+                      const selectedItem = inventoryItems.find(
+                        (it) => it.id === parseInt(item.item_id),
+                      );
+                      if (!selectedItem || !item.item_id || !item.quantity)
+                        return null;
+
+                      // Get already allocated quantity for this item
+                      const alreadyAllocatedQty = currentRoomItems
+                        .filter(
+                          (roomItem) => roomItem.item_id === selectedItem.id,
+                        )
+                        .reduce(
+                          (sum, roomItem) =>
+                            sum + parseFloat(roomItem.location_stock || 0),
+                          0,
+                        );
+
+                      const complimentaryLimit =
+                        selectedItem.complimentary_limit || 0;
+                      const complimentaryUsed = Math.min(
+                        alreadyAllocatedQty,
+                        complimentaryLimit,
+                      );
+                      const complimentaryRemaining = Math.max(
+                        0,
+                        complimentaryLimit - complimentaryUsed,
+                      );
+                      const requestedQty = parseFloat(item.quantity) || 0;
+                      const complimentaryQty = Math.min(
+                        requestedQty,
+                        complimentaryRemaining,
+                      );
+                      const payableQty = Math.max(
+                        0,
+                        requestedQty - complimentaryQty,
+                      );
+
+                      return (
+                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <div className="text-xs font-semibold text-gray-700 mb-2">
+                            Automatic Quantity Breakdown:
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <span className="text-green-700 font-medium">
+                                Complimentary: {complimentaryQty}{" "}
+                                {selectedItem.unit}
+                              </span>
+                              {complimentaryLimit > 0 && (
+                                <div className="text-gray-500 mt-1">
+                                  ({complimentaryRemaining} remaining from{" "}
+                                  {complimentaryLimit} limit)
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <span className="text-orange-700 font-medium">
+                                Payable: {payableQty} {selectedItem.unit}
+                              </span>
+                              {payableQty > 0 && (
+                                <div className="text-gray-500 mt-1">
+                                  @{" "}
+                                  {formatCurrency(
+                                    selectedItem.selling_price ||
+                                      selectedItem.unit_price ||
+                                      0,
+                                  )}{" "}
+                                  each
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()
+                  )}
+                  <div className="mt-2">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      Notes (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={item.notes}
+                      onChange={(e) =>
+                        updateAllocationItem(index, "notes", e.target.value)
+                      }
+                      placeholder="e.g., Extra bed, Towels, etc."
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
                   </div>
                 </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id={`manual_override_${index}`}
-                    checked={item.manual_override || false}
-                    onChange={(e) => updateAllocationItem(index, "manual_override", e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                  />
-                  <label htmlFor={`manual_override_${index}`} className="text-xs font-medium text-gray-700 cursor-pointer">
-                    Manual Override (ignore automatic calculation)
-                  </label>
-                </div>
-                {item.manual_override ? (
-                  <div className="mt-3 flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <input
-                    type="checkbox"
-                    id={`is_payable_${index}`}
-                    checked={item.is_payable}
-                    onChange={(e) => updateAllocationItem(index, "is_payable", e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                  />
-                  <label htmlFor={`is_payable_${index}`} className="text-xs font-medium text-gray-700 cursor-pointer">
-                      Mark entire quantity as <span className={item.is_payable ? "text-orange-700 font-semibold" : "text-green-700 font-semibold"}>{item.is_payable ? "Payable" : "Complimentary"}</span>
-                  </label>
-                </div>
-                ) : (
-                  (() => {
-                    const selectedItem = inventoryItems.find(it => it.id === parseInt(item.item_id));
-                    if (!selectedItem || !item.item_id || !item.quantity) return null;
-                    
-                    // Get already allocated quantity for this item
-                    const alreadyAllocatedQty = (currentRoomItems
-                      .filter(roomItem => roomItem.item_id === selectedItem.id)
-                      .reduce((sum, roomItem) => sum + parseFloat(roomItem.location_stock || 0), 0));
-                    
-                    const complimentaryLimit = selectedItem.complimentary_limit || 0;
-                    const complimentaryUsed = Math.min(alreadyAllocatedQty, complimentaryLimit);
-                    const complimentaryRemaining = Math.max(0, complimentaryLimit - complimentaryUsed);
-                    const requestedQty = parseFloat(item.quantity) || 0;
-                    const complimentaryQty = Math.min(requestedQty, complimentaryRemaining);
-                    const payableQty = Math.max(0, requestedQty - complimentaryQty);
-                    
-                    return (
-                      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="text-xs font-semibold text-gray-700 mb-2">Automatic Quantity Breakdown:</div>
-                        <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div>
-                            <span className="text-green-700 font-medium">Complimentary: {complimentaryQty} {selectedItem.unit}</span>
-                            {complimentaryLimit > 0 && (
-                              <div className="text-gray-500 mt-1">
-                                ({complimentaryRemaining} remaining from {complimentaryLimit} limit)
-                              </div>
-                            )}
-                          </div>
-                          <div>
-                            <span className="text-orange-700 font-medium">Payable: {payableQty} {selectedItem.unit}</span>
-                            {payableQty > 0 && (
-                              <div className="text-gray-500 mt-1">
-                                @ {formatCurrency(selectedItem.selling_price || selectedItem.unit_price || 0)} each
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })()
-                )}
-                <div className="mt-2">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Notes (Optional)</label>
-                  <input
-                    type="text"
-                    value={item.notes}
-                    onChange={(e) => updateAllocationItem(index, "notes", e.target.value)}
-                    placeholder="e.g., Extra bed, Towels, etc."
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-          
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {isSubmitting ? "Adding..." : `Add ${allocationItems.filter(i => i.item_id && i.quantity > 0).length} Item(s)`}
-            </button>
-          </div>
-        </form>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50"
+              >
+                {isSubmitting
+                  ? "Adding..."
+                  : `Add ${allocationItems.filter((i) => i.item_id && i.quantity > 0).length} Item(s)`}
+              </button>
+            </div>
+          </form>
         )}
       </motion.div>
     </div>
   );
 };
 
-const ExtendBookingModal = ({ booking, onSave, onClose, feedback, isSubmitting }) => {
+const ExtendBookingModal = ({
+  booking,
+  onSave,
+  onClose,
+  feedback,
+  isSubmitting,
+}) => {
   // Safety check: ensure booking exists and has required properties
   if (!booking || !booking.check_out || !booking.id) {
     return (
       <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
         <div className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-lg">
-          <p className="text-red-600">Error: Invalid booking data. Please close and try again.</p>
-          <button onClick={onClose} className="mt-4 w-full bg-indigo-600 text-white font-semibold py-2 rounded-md hover:bg-indigo-700 transition-colors">
+          <p className="text-red-600">
+            Error: Invalid booking data. Please close and try again.
+          </p>
+          <button
+            onClick={onClose}
+            className="mt-4 w-full bg-indigo-600 text-white font-semibold py-2 rounded-md hover:bg-indigo-700 transition-colors"
+          >
             Close
           </button>
         </div>
@@ -1009,8 +1409,8 @@ const ExtendBookingModal = ({ booking, onSave, onClose, feedback, isSubmitting }
     );
   }
 
-  const [newCheckout, setNewCheckout] = useState(booking.check_out || '');
-  const minDate = booking.check_out || '';
+  const [newCheckout, setNewCheckout] = useState(booking.check_out || "");
+  const minDate = booking.check_out || "";
 
   const handleSave = () => {
     if (!booking.id || !newCheckout) {
@@ -1031,34 +1431,56 @@ const ExtendBookingModal = ({ booking, onSave, onClose, feedback, isSubmitting }
       >
         <div className="flex justify-between items-center mb-6">
           <h3 className="text-2xl font-bold text-gray-800">Extend Booking</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-800 transition-colors"
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-6 w-6"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
         <div className="space-y-4 text-gray-700">
-          <p><strong>Current Check-in:</strong> {booking.check_in}</p>
-          <p><strong>Current Check-out:</strong> {booking.check_out}</p>
+          <p>
+            <strong>Current Check-in:</strong> {booking.check_in}
+          </p>
+          <p>
+            <strong>Current Check-out:</strong> {booking.check_out}
+          </p>
           <div className="flex flex-col">
-            <label className="text-sm font-medium text-gray-700 mb-1">New Check-out Date</label>
+            <label className="text-sm font-medium text-gray-700 mb-1">
+              New Check-out Date
+            </label>
             <input
               type="date"
-              value={newCheckout || ''}
+              value={newCheckout || ""}
               onChange={(e) => {
                 const newValue = e.target.value;
                 if (newValue) {
                   setNewCheckout(newValue);
                 }
               }}
-              min={minDate || ''}
+              min={minDate || ""}
               className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
             />
           </div>
         </div>
         <button
           onClick={handleSave}
-          disabled={isSubmitting || !newCheckout || !minDate || newCheckout <= minDate}
+          disabled={
+            isSubmitting || !newCheckout || !minDate || newCheckout <= minDate
+          }
           className="mt-6 w-full bg-indigo-600 text-white font-semibold py-2 rounded-md hover:bg-indigo-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
         >
           {isSubmitting ? "Saving..." : "Save"}
@@ -1103,7 +1525,14 @@ const DEFAULT_AMENITIES = [
   },
 ];
 
-const CheckInModal = ({ booking, onSave, onClose, feedback, isSubmitting, inventoryItems = [] }) => {
+const CheckInModal = ({
+  booking,
+  onSave,
+  onClose,
+  feedback,
+  isSubmitting,
+  inventoryItems = [],
+}) => {
   const [idCardImage, setIdCardImage] = useState(null);
   const [guestPhoto, setGuestPhoto] = useState(null);
   const [idCardPreview, setIdCardPreview] = useState(null);
@@ -1186,7 +1615,7 @@ const CheckInModal = ({ booking, onSave, onClose, feedback, isSubmitting, invent
     if (!file) return;
 
     const previewUrl = URL.createObjectURL(file);
-    if (type === 'id') {
+    if (type === "id") {
       setIdCardImage(file);
       setIdCardPreview(previewUrl);
     } else {
@@ -1197,12 +1626,12 @@ const CheckInModal = ({ booking, onSave, onClose, feedback, isSubmitting, invent
 
   const handleSave = () => {
     // Check if booking is in correct state before attempting check-in
-    const normalizedStatus = booking.status?.toLowerCase().replace(/[-_]/g, '');
-    if (normalizedStatus !== 'booked') {
+    const normalizedStatus = booking.status?.toLowerCase().replace(/[-_]/g, "");
+    if (normalizedStatus !== "booked") {
       alert(`Cannot check in. Booking status is: ${booking.status}`);
       return;
     }
-    
+
     if (!idCardImage || !guestPhoto) {
       alert("Please upload both ID card and guest photo.");
       return;
@@ -1232,20 +1661,55 @@ const CheckInModal = ({ booking, onSave, onClose, feedback, isSubmitting, invent
 
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <motion.div initial={{ opacity: 0, y: -50 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 50 }} className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl">
-        <h3 className="text-2xl font-bold text-gray-800 mb-4">Check-in Guest: {booking.guest_name}</h3>
+      <motion.div
+        initial={{ opacity: 0, y: -50 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 50 }}
+        className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl"
+      >
+        <h3 className="text-2xl font-bold text-gray-800 mb-4">
+          Check-in Guest: {booking.guest_name}
+        </h3>
 
         {/* Basic guest / document capture */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="flex flex-col items-center">
-            <label className="font-medium text-gray-700 mb-2">ID Card Image</label>
-            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'id')} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" required />
-            {idCardPreview && <img src={idCardPreview} alt="ID Preview" className="mt-4 w-full h-40 object-contain rounded-lg border" />}
+            <label className="font-medium text-gray-700 mb-2">
+              ID Card Image
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleFileChange(e, "id")}
+              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              required
+            />
+            {idCardPreview && (
+              <img
+                src={idCardPreview}
+                alt="ID Preview"
+                className="mt-4 w-full h-40 object-contain rounded-lg border"
+              />
+            )}
           </div>
           <div className="flex flex-col items-center">
-            <label className="font-medium text-gray-700 mb-2">Guest Photo</label>
-            <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, 'guest')} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100" required />
-            {guestPhotoPreview && <img src={guestPhotoPreview} alt="Guest Preview" className="mt-4 w-full h-40 object-contain rounded-lg border" />}
+            <label className="font-medium text-gray-700 mb-2">
+              Guest Photo
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => handleFileChange(e, "guest")}
+              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              required
+            />
+            {guestPhotoPreview && (
+              <img
+                src={guestPhotoPreview}
+                alt="Guest Preview"
+                className="mt-4 w-full h-40 object-contain rounded-lg border"
+              />
+            )}
           </div>
         </div>
 
@@ -1256,17 +1720,22 @@ const CheckInModal = ({ booking, onSave, onClose, feedback, isSubmitting, invent
               Amenity Allocation for this Stay
             </h4>
             <p className="text-xs text-gray-500 mb-3">
-              Based on room type <span className="font-semibold">{amenitySummary.roomType}</span> and
-              {" "}{amenitySummary.nights} night(s). Complimentary quantities are already
-              included in the room tariff. You can adjust the complimentary limits and
-              whether extra usage is payable or not.
+              Based on room type{" "}
+              <span className="font-semibold">{amenitySummary.roomType}</span>{" "}
+              and {amenitySummary.nights} night(s). Complimentary quantities are
+              already included in the room tariff. You can adjust the
+              complimentary limits and whether extra usage is payable or not.
             </p>
             <div className="overflow-x-auto">
               <table className="min-w-full text-xs md:text-sm border border-gray-200 rounded-lg overflow-hidden">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-3 py-2 text-left font-medium text-gray-600">Item</th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-600">Frequency</th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">
+                      Item
+                    </th>
+                    <th className="px-3 py-2 text-left font-medium text-gray-600">
+                      Frequency
+                    </th>
                     <th className="px-3 py-2 text-left font-medium text-gray-600">
                       Complimentary / Night
                     </th>
@@ -1291,15 +1760,23 @@ const CheckInModal = ({ booking, onSave, onClose, feedback, isSubmitting, invent
                         <select
                           value={item.item_id || ""}
                           onChange={(e) => {
-                            const selectedId = e.target.value ? Number(e.target.value) : null;
-                            const selectedItem = inventoryItems.find((inv) => inv.id === selectedId);
+                            const selectedId = e.target.value
+                              ? Number(e.target.value)
+                              : null;
+                            const selectedItem = inventoryItems.find(
+                              (inv) => inv.id === selectedId,
+                            );
                             handleAmenityChange(index, "item_id", selectedId);
                             if (selectedItem) {
-                              handleAmenityChange(index, "name", selectedItem.name || item.name);
+                              handleAmenityChange(
+                                index,
+                                "name",
+                                selectedItem.name || item.name,
+                              );
                               handleAmenityChange(
                                 index,
                                 "extraPrice",
-                                Number(selectedItem.selling_price) || 0
+                                Number(selectedItem.selling_price) || 0,
                               );
                             }
                           }}
@@ -1317,7 +1794,11 @@ const CheckInModal = ({ booking, onSave, onClose, feedback, isSubmitting, invent
                         <select
                           value={item.frequency}
                           onChange={(e) =>
-                            handleAmenityChange(index, "frequency", e.target.value)
+                            handleAmenityChange(
+                              index,
+                              "frequency",
+                              e.target.value,
+                            )
                           }
                           className="w-full border border-gray-300 rounded px-2 py-1 text-xs md:text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                         >
@@ -1334,7 +1815,7 @@ const CheckInModal = ({ booking, onSave, onClose, feedback, isSubmitting, invent
                             handleAmenityChange(
                               index,
                               "complimentaryPerNight",
-                              Number(e.target.value) || 0
+                              Number(e.target.value) || 0,
                             )
                           }
                           className="w-full border border-gray-300 rounded px-2 py-1 text-xs md:text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
@@ -1349,7 +1830,7 @@ const CheckInModal = ({ booking, onSave, onClose, feedback, isSubmitting, invent
                             handleAmenityChange(
                               index,
                               "complimentaryPerStay",
-                              Number(e.target.value) || 0
+                              Number(e.target.value) || 0,
                             )
                           }
                           className="w-full border border-gray-300 rounded px-2 py-1 text-xs md:text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
@@ -1366,7 +1847,7 @@ const CheckInModal = ({ booking, onSave, onClose, feedback, isSubmitting, invent
                               handleAmenityChange(
                                 index,
                                 "extraPrice",
-                                Number(e.target.value) || 0
+                                Number(e.target.value) || 0,
                               )
                             }
                             className="w-full border border-gray-300 rounded px-2 py-1 text-xs md:text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
@@ -1382,7 +1863,7 @@ const CheckInModal = ({ booking, onSave, onClose, feedback, isSubmitting, invent
                               handleAmenityChange(
                                 index,
                                 "is_payable",
-                                e.target.checked
+                                e.target.checked,
                               )
                             }
                             className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
@@ -1423,8 +1904,17 @@ const CheckInModal = ({ booking, onSave, onClose, feedback, isSubmitting, invent
         )}
 
         <div className="flex gap-4 mt-6">
-          <button onClick={onClose} className="w-full bg-gray-200 text-gray-800 font-semibold py-2 rounded-md hover:bg-gray-300 transition-colors">Cancel</button>
-          <button onClick={handleSave} disabled={isSubmitting || !idCardImage || !guestPhoto} className="w-full bg-indigo-600 text-white font-semibold py-2 rounded-md hover:bg-indigo-700 transition-colors disabled:bg-gray-400">
+          <button
+            onClick={onClose}
+            className="w-full bg-gray-200 text-gray-800 font-semibold py-2 rounded-md hover:bg-gray-300 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSubmitting || !idCardImage || !guestPhoto}
+            className="w-full bg-indigo-600 text-white font-semibold py-2 rounded-md hover:bg-indigo-700 transition-colors disabled:bg-gray-400"
+          >
             {isSubmitting ? "Checking in..." : "Confirm Check-in"}
           </button>
         </div>
@@ -1465,14 +1955,16 @@ const BookingStatusChart = React.memo(({ data }) => {
 
   return (
     <div className="bg-white p-6 rounded-2xl shadow-lg flex-1">
-      <h3 className="text-xl font-bold mb-4 text-gray-800">Bookings by Status</h3>
+      <h3 className="text-xl font-bold mb-4 text-gray-800">
+        Bookings by Status
+      </h3>
       <div className="w-full h-64 flex items-center justify-center">
         <Pie data={chartData} />
       </div>
     </div>
   );
 });
-BookingStatusChart.displayName = 'BookingStatusChart';
+BookingStatusChart.displayName = "BookingStatusChart";
 
 const Bookings = () => {
   const navigate = useNavigate();
@@ -1500,7 +1992,7 @@ const Bookings = () => {
     check_out: "",
     adults: 2,
     children: 0,
-    room_ids: []
+    room_ids: [],
   });
   const [rooms, setRooms] = useState([]);
   const [packageRooms, setPackageRooms] = useState([]); // Separate state for package booking rooms
@@ -1545,13 +2037,18 @@ const Bookings = () => {
   // Map of roomId -> room for robust display when API omits nested room payloads
   const roomIdToRoom = useMemo(() => {
     const map = {};
-    (allRooms || []).forEach(r => { if (r && r.id) map[r.id] = r; });
+    (allRooms || []).forEach((r) => {
+      if (r && r.id) map[r.id] = r;
+    });
     return map;
   }, [allRooms]);
 
-  const authHeader = useCallback(() => ({
-    headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-  }), []);
+  const authHeader = useCallback(
+    () => ({
+      headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+    }),
+    [],
+  );
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -1562,9 +2059,19 @@ const Bookings = () => {
         return;
       }
 
-      const [roomsRes, bookingsRes, packageBookingsRes, packageRes, itemsRes, locationsRes] = await Promise.all([
+      const [
+        roomsRes,
+        bookingsRes,
+        packageBookingsRes,
+        packageRes,
+        itemsRes,
+        locationsRes,
+      ] = await Promise.all([
         API.get("/rooms/", authHeader()),
-        API.get("/bookings?skip=0&limit=20&order_by=id&order=desc", authHeader()), // Order by latest first
+        API.get(
+          "/bookings?skip=0&limit=20&order_by=id&order=desc",
+          authHeader(),
+        ), // Order by latest first
         API.get("/packages/bookingsall?skip=0&limit=500", authHeader()), // Reduced from 10000 to 500 for performance
         API.get("/packages/", authHeader()),
         API.get("/inventory/items?limit=500", authHeader()),
@@ -1580,92 +2087,118 @@ const Bookings = () => {
 
       // Only allow items that are marked sellable to guests (used as rentable / chargeable items)
       const sellableItems = (rawItems || []).filter(
-        (item) => item && (item.is_sellable_to_guest === true || item.is_sellable === true)
+        (item) =>
+          item &&
+          (item.is_sellable_to_guest === true || item.is_sellable === true),
       );
       setInventoryItems(sellableItems);
       setInventoryLocations(allLocations);
 
       // Reduced limit for better performance - KPI calculation uses sample data
-      const allBookingsRes = await API.get("/bookings?limit=500&order_by=id&order=desc", authHeader()); // Reduced from 10000 to 500
+      const allBookingsRes = await API.get(
+        "/bookings?limit=500&order_by=id&order=desc",
+        authHeader(),
+      ); // Reduced from 10000 to 500
       const allRegularBookings = allBookingsRes.data.bookings;
-      
+
       // Combine regular bookings and package bookings
-      const allPackageBookings = packageBookings.map(pb => ({
+      const allPackageBookings = packageBookings.map((pb) => ({
         ...pb,
         is_package: true,
-        rooms: pb.rooms || []
+        rooms: pb.rooms || [],
       }));
       const allBookings = [...allRegularBookings, ...allPackageBookings];
 
-      const activeBookingsCount = allBookings.filter(b => b.status === "booked" || b.status === "checked-in").length;
-      const cancelledBookingsCount = allBookings.filter(b => b.status === "cancelled").length;
-      const availableRoomsCount = allRooms.filter(r => r.status === "Available").length;
-      
+      const activeBookingsCount = allBookings.filter(
+        (b) => b.status === "booked" || b.status === "checked-in",
+      ).length;
+      const cancelledBookingsCount = allBookings.filter(
+        (b) => b.status === "cancelled",
+      ).length;
+      const availableRoomsCount = allRooms.filter(
+        (r) => r.status === "Available",
+      ).length;
+
       // Fix: Filter by actual dates and status for check-in/out KPIs
       const todaysGuestsCheckin = allBookings
-        .filter(b => b.check_in === todaysDate && b.status !== 'cancelled')
+        .filter((b) => b.check_in === todaysDate && b.status !== "cancelled")
         .reduce((sum, b) => sum + b.adults + b.children, 0);
       const todaysGuestsCheckout = allBookings
-        .filter(b => b.check_out === todaysDate && b.status !== 'cancelled')
+        .filter((b) => b.check_out === todaysDate && b.status !== "cancelled")
         .reduce((sum, b) => sum + b.adults + b.children, 0);
-
 
       // Store all rooms for filtering
       setAllRooms(allRooms);
-      
+
       // Set initial package rooms to all available rooms
       setPackageRooms(allRooms.filter((r) => r.status === "Available"));
-      
+
       // Filter rooms based on date availability if dates are selected
       let availableRooms = allRooms;
       if (formData.checkIn && formData.checkOut) {
-        availableRooms = allRooms.filter(room => {
+        availableRooms = allRooms.filter((room) => {
           // Check if room has any conflicting bookings
           // Only consider bookings with status "booked" or "checked-in" as conflicts
-          const hasConflict = allBookings.some(booking => {
-            const normalizedStatus = booking.status?.toLowerCase().replace(/_/g, '-');
+          const hasConflict = allBookings.some((booking) => {
+            const normalizedStatus = booking.status
+              ?.toLowerCase()
+              .replace(/_/g, "-");
             // Only check for "booked" or "checked-in" status - all other statuses are available
-            if (normalizedStatus !== "booked" && normalizedStatus !== "checked-in") return false;
-            
+            if (
+              normalizedStatus !== "booked" &&
+              normalizedStatus !== "checked-in"
+            )
+              return false;
+
             const bookingCheckIn = new Date(booking.check_in);
             const bookingCheckOut = new Date(booking.check_out);
             const requestedCheckIn = new Date(formData.checkIn);
             const requestedCheckOut = new Date(formData.checkOut);
-            
+
             // Check if room is part of this booking
-            const isRoomInBooking = booking.rooms && booking.rooms.some(r => r.id === room.id);
+            const isRoomInBooking =
+              booking.rooms && booking.rooms.some((r) => r.id === room.id);
             if (!isRoomInBooking) return false;
-            
+
             // Check for date overlap
-            return (requestedCheckIn < bookingCheckOut && requestedCheckOut > bookingCheckIn);
+            return (
+              requestedCheckIn < bookingCheckOut &&
+              requestedCheckOut > bookingCheckIn
+            );
           });
-          
+
           return !hasConflict;
         });
       } else {
         // If no dates selected, show all available rooms
         availableRooms = allRooms.filter((r) => r.status === "Available");
       }
-      
+
       setRooms(availableRooms);
-      
+
       // Combine initial regular bookings with package bookings, sorted by ID descending
       // Use a Map with composite keys to prevent ID collisions between regular and package bookings
       const bookingsMap = new Map();
-      
+
       // Add regular bookings with type prefix
-      initialBookings.forEach(b => {
+      initialBookings.forEach((b) => {
         bookingsMap.set(`regular_${b.id}`, { ...b, is_package: false });
       });
-      
+
       // Add package bookings with type prefix
-      packageBookings.forEach(pb => {
-        bookingsMap.set(`package_${pb.id}`, { ...pb, is_package: true, rooms: pb.rooms || [] });
+      packageBookings.forEach((pb) => {
+        bookingsMap.set(`package_${pb.id}`, {
+          ...pb,
+          is_package: true,
+          rooms: pb.rooms || [],
+        });
       });
-      
+
       // Convert Map to array and sort by ID descending
-      const combinedBookings = Array.from(bookingsMap.values()).sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
-      
+      const combinedBookings = Array.from(bookingsMap.values()).sort(
+        (a, b) => (b.id ?? 0) - (a.id ?? 0),
+      );
+
       setBookings(combinedBookings);
       setPackages(packageRes.data || []);
       setTotalBookings(total + (packageBookings?.length || 0));
@@ -1680,7 +2213,10 @@ const Bookings = () => {
       });
     } catch (err) {
       console.error("Error fetching dashboard data:", err);
-      showBannerMessage("error", "Failed to load dashboard data. Please try again.");
+      showBannerMessage(
+        "error",
+        "Failed to load dashboard data. Please try again.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -1693,30 +2229,40 @@ const Bookings = () => {
   // Refilter rooms when check-in/check-out dates change for room booking
   useEffect(() => {
     if (formData.checkIn && formData.checkOut && allRooms.length > 0) {
-      const availableRooms = allRooms.filter(room => {
+      const availableRooms = allRooms.filter((room) => {
         // Check if room has any conflicting bookings
         // Only consider bookings with status "booked" or "checked-in" as conflicts
-        const hasConflict = bookings.some(booking => {
-          const normalizedStatus = booking.status?.toLowerCase().replace(/_/g, '-');
+        const hasConflict = bookings.some((booking) => {
+          const normalizedStatus = booking.status
+            ?.toLowerCase()
+            .replace(/_/g, "-");
           // Only check for "booked" or "checked-in" status - all other statuses are available
-          if (normalizedStatus !== "booked" && normalizedStatus !== "checked-in") return false;
-          
+          if (
+            normalizedStatus !== "booked" &&
+            normalizedStatus !== "checked-in"
+          )
+            return false;
+
           const bookingCheckIn = new Date(booking.check_in);
           const bookingCheckOut = new Date(booking.check_out);
           const requestedCheckIn = new Date(formData.checkIn);
           const requestedCheckOut = new Date(formData.checkOut);
-          
+
           // Check if room is part of this booking
-          const isRoomInBooking = booking.rooms && booking.rooms.some(r => r.id === room.id);
+          const isRoomInBooking =
+            booking.rooms && booking.rooms.some((r) => r.id === room.id);
           if (!isRoomInBooking) return false;
-          
+
           // Check for date overlap
-          return (requestedCheckIn < bookingCheckOut && requestedCheckOut > bookingCheckIn);
+          return (
+            requestedCheckIn < bookingCheckOut &&
+            requestedCheckOut > bookingCheckIn
+          );
         });
-        
+
         return !hasConflict;
       });
-      
+
       setRooms(availableRooms);
     } else if (!formData.checkIn || !formData.checkOut) {
       // If no dates selected, show all available rooms
@@ -1726,59 +2272,89 @@ const Bookings = () => {
 
   // Refilter rooms for package booking when dates change
   useEffect(() => {
-    if (packageBookingForm.check_in && packageBookingForm.check_out && allRooms.length > 0) {
-      const selectedPackage = packages.find(p => p.id === parseInt(packageBookingForm.package_id));
-      
-      let availableRooms = allRooms.filter(room => {
+    if (
+      packageBookingForm.check_in &&
+      packageBookingForm.check_out &&
+      allRooms.length > 0
+    ) {
+      const selectedPackage = packages.find(
+        (p) => p.id === parseInt(packageBookingForm.package_id),
+      );
+
+      let availableRooms = allRooms.filter((room) => {
         // Check if room has any conflicting bookings
         // Only consider bookings with status "booked" or "checked-in" as conflicts
-        const hasConflict = bookings.some(booking => {
-          const normalizedStatus = booking.status?.toLowerCase().replace(/_/g, '-');
+        const hasConflict = bookings.some((booking) => {
+          const normalizedStatus = booking.status
+            ?.toLowerCase()
+            .replace(/_/g, "-");
           // Only check for "booked" or "checked-in" status - all other statuses are available
-          if (normalizedStatus !== "booked" && normalizedStatus !== "checked-in") return false;
-          
+          if (
+            normalizedStatus !== "booked" &&
+            normalizedStatus !== "checked-in"
+          )
+            return false;
+
           const bookingCheckIn = new Date(booking.check_in);
           const bookingCheckOut = new Date(booking.check_out);
           const requestedCheckIn = new Date(packageBookingForm.check_in);
           const requestedCheckOut = new Date(packageBookingForm.check_out);
-          
+
           // Check if room is part of this booking
-          const isRoomInBooking = booking.rooms && booking.rooms.some(r => {
-            // Handle both nested (r.room.id) and direct (r.id) room references
-            const roomId = r.room?.id || r.id;
-            return roomId === room.id;
-          });
+          const isRoomInBooking =
+            booking.rooms &&
+            booking.rooms.some((r) => {
+              // Handle both nested (r.room.id) and direct (r.id) room references
+              const roomId = r.room?.id || r.id;
+              return roomId === room.id;
+            });
           if (!isRoomInBooking) return false;
-          
+
           // Check for date overlap
-          return (requestedCheckIn < bookingCheckOut && requestedCheckOut > bookingCheckIn);
+          return (
+            requestedCheckIn < bookingCheckOut &&
+            requestedCheckOut > bookingCheckIn
+          );
         });
-        
+
         // If there are no conflicting bookings for the selected dates, room is available
         // Don't filter by room.status - availability is determined by booking conflicts, not status field
         return !hasConflict;
       });
-      
+
       // If package is selected and has room_types, filter by room types (case-insensitive)
-      if (selectedPackage && selectedPackage.booking_type === 'room_type' && selectedPackage.room_types) {
-        const allowedRoomTypes = selectedPackage.room_types.split(',').map(t => t.trim().toLowerCase());
-        availableRooms = availableRooms.filter(room => {
-          const roomType = room.type ? room.type.trim().toLowerCase() : '';
+      if (
+        selectedPackage &&
+        selectedPackage.booking_type === "room_type" &&
+        selectedPackage.room_types
+      ) {
+        const allowedRoomTypes = selectedPackage.room_types
+          .split(",")
+          .map((t) => t.trim().toLowerCase());
+        availableRooms = availableRooms.filter((room) => {
+          const roomType = room.type ? room.type.trim().toLowerCase() : "";
           return allowedRoomTypes.includes(roomType);
         });
       }
       // For whole_property, availableRooms remains all available rooms (no filtering)
-      
+
       // Update package rooms separately
       setPackageRooms(availableRooms);
-      
+
       // If whole_property, automatically select all available rooms
-      if (selectedPackage && selectedPackage.booking_type === 'whole_property' && availableRooms.length > 0) {
-        setPackageBookingForm(prev => ({
+      if (
+        selectedPackage &&
+        selectedPackage.booking_type === "whole_property" &&
+        availableRooms.length > 0
+      ) {
+        setPackageBookingForm((prev) => ({
           ...prev,
-          room_ids: availableRooms.map(r => r.id)
+          room_ids: availableRooms.map((r) => r.id),
         }));
-      } else if (selectedPackage && selectedPackage.booking_type === 'room_type') {
+      } else if (
+        selectedPackage &&
+        selectedPackage.booking_type === "room_type"
+      ) {
         // For room_type, clear selection if package changed or dates changed
         // User will manually select rooms
       }
@@ -1786,13 +2362,23 @@ const Bookings = () => {
       // If no dates selected, show all available rooms
       setPackageRooms(allRooms.filter((r) => r.status === "Available"));
     }
-  }, [packageBookingForm.check_in, packageBookingForm.check_out, packageBookingForm.package_id, allRooms, bookings, packages]);
+  }, [
+    packageBookingForm.check_in,
+    packageBookingForm.check_out,
+    packageBookingForm.package_id,
+    allRooms,
+    bookings,
+    packages,
+  ]);
 
   const loadMoreBookings = async () => {
     if (!hasMoreBookings) return;
     setIsSubmitting(true);
     try {
-      const response = await API.get(`/bookings?skip=${regularBookingsLoaded}&limit=20&order_by=id&order=desc`, authHeader());
+      const response = await API.get(
+        `/bookings?skip=${regularBookingsLoaded}&limit=20&order_by=id&order=desc`,
+        authHeader(),
+      );
       const { bookings: newBookings, total } = response.data;
 
       if (!newBookings || newBookings.length === 0) {
@@ -1800,19 +2386,26 @@ const Bookings = () => {
         return;
       }
 
-      setBookings(prev => {
+      setBookings((prev) => {
         const bookingsMap = new Map();
 
         prev.forEach((booking) => {
-          const key = booking.is_package ? `package_${booking.id}` : `regular_${booking.id}`;
+          const key = booking.is_package
+            ? `package_${booking.id}`
+            : `regular_${booking.id}`;
           bookingsMap.set(key, booking);
         });
 
         newBookings.forEach((booking) => {
-          bookingsMap.set(`regular_${booking.id}`, { ...booking, is_package: false });
+          bookingsMap.set(`regular_${booking.id}`, {
+            ...booking,
+            is_package: false,
+          });
         });
 
-        return Array.from(bookingsMap.values()).sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+        return Array.from(bookingsMap.values()).sort(
+          (a, b) => (b.id ?? 0) - (a.id ?? 0),
+        );
       });
 
       const updatedRegularCount = regularBookingsLoaded + newBookings.length;
@@ -1826,17 +2419,29 @@ const Bookings = () => {
     }
   };
 
-  const loadMoreRef = useInfiniteScroll(loadMoreBookings, hasMoreBookings, isSubmitting);
+  const loadMoreRef = useInfiniteScroll(
+    loadMoreBookings,
+    hasMoreBookings,
+    isSubmitting,
+  );
 
   const extractRoomNumber = useCallback((room) => {
     if (!room) return null;
     const directNumber = room.number;
-    if (directNumber !== undefined && directNumber !== null && directNumber !== '') {
+    if (
+      directNumber !== undefined &&
+      directNumber !== null &&
+      directNumber !== ""
+    ) {
       return String(directNumber).trim();
     }
 
     const nestedNumber = room.room?.number;
-    if (nestedNumber !== undefined && nestedNumber !== null && nestedNumber !== '') {
+    if (
+      nestedNumber !== undefined &&
+      nestedNumber !== null &&
+      nestedNumber !== ""
+    ) {
       return String(nestedNumber).trim();
     }
 
@@ -1855,7 +2460,10 @@ const Bookings = () => {
       };
 
       const prefix = booking.is_package ? "PK" : "BK";
-      const displayId = (booking.display_id || `${prefix}-${String(booking.id ?? "").padStart(6, "0")}`)
+      const displayId = (
+        booking.display_id ||
+        `${prefix}-${String(booking.id ?? "").padStart(6, "0")}`
+      )
         .toString()
         .trim()
         .toUpperCase();
@@ -1888,7 +2496,9 @@ const Bookings = () => {
       });
     });
 
-    const sortedNumbers = Array.from(numbers).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    const sortedNumbers = Array.from(numbers).sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true }),
+    );
     return ["All", ...sortedNumbers];
   }, [bookings, extractRoomNumber]);
 
@@ -1897,55 +2507,59 @@ const Bookings = () => {
   }, [rooms, formData.roomTypes]);
 
   const selectedRoomDetails = useMemo(() => {
-    return formData.roomNumbers.map(roomNumber =>
-      rooms.find(r => r.number === roomNumber && r.type === formData.roomTypes[0])
-    ).filter(room => room !== null);
+    return formData.roomNumbers
+      .map((roomNumber) =>
+        rooms.find(
+          (r) => r.number === roomNumber && r.type === formData.roomTypes[0],
+        ),
+      )
+      .filter((room) => room !== null);
   }, [rooms, formData.roomNumbers, formData.roomTypes]);
 
   const totalGuests = useMemo(() => {
     return parseInt(formData.adults) + parseInt(formData.children);
   }, [formData.adults, formData.children]);
 
-  const handlePackageBookingChange = e => {
+  const handlePackageBookingChange = (e) => {
     const { name, value } = e.target;
-    setPackageBookingForm(prev => {
+    setPackageBookingForm((prev) => {
       const updated = { ...prev, [name]: value };
-      
+
       // When package is selected, check its booking_type
-      if (name === 'package_id' && value) {
-        const selectedPackage = packages.find(p => p.id === parseInt(value));
+      if (name === "package_id" && value) {
+        const selectedPackage = packages.find((p) => p.id === parseInt(value));
         if (selectedPackage) {
           // If whole_property, automatically select all available rooms (will be handled in useEffect)
-          if (selectedPackage.booking_type === 'whole_property') {
+          if (selectedPackage.booking_type === "whole_property") {
             updated.room_ids = [];
-          } else if (selectedPackage.booking_type === 'room_type') {
+          } else if (selectedPackage.booking_type === "room_type") {
             // Clear room selection when switching packages
             updated.room_ids = [];
           }
         }
       }
-      
+
       return updated;
     });
   };
 
-  const handlePackageRoomSelect = roomId => {
-    setPackageBookingForm(prev => ({
+  const handlePackageRoomSelect = (roomId) => {
+    setPackageBookingForm((prev) => ({
       ...prev,
       room_ids: prev.room_ids.includes(roomId)
-        ? prev.room_ids.filter(id => id !== roomId)
-        : [...prev.room_ids, roomId]
+        ? prev.room_ids.filter((id) => id !== roomId)
+        : [...prev.room_ids, roomId],
     }));
   };
 
-  const handlePackageBookingSubmit = async e => {
+  const handlePackageBookingSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Prevent multiple submissions
     if (isSubmitting) {
       return;
     }
-    
+
     setIsSubmitting(true);
     setFeedback({ message: "", type: "" });
     try {
@@ -1955,75 +2569,101 @@ const Bookings = () => {
         const checkOutDate = new Date(packageBookingForm.check_out);
         const timeDiff = checkOutDate.getTime() - checkInDate.getTime();
         const daysDiff = timeDiff / (1000 * 3600 * 24);
-        
+
         if (daysDiff < 1) {
-          showBannerMessage("error", "Minimum 1 day booking is mandatory. Check-out date must be at least 1 day after check-in date.");
+          showBannerMessage(
+            "error",
+            "Minimum 1 day booking is mandatory. Check-out date must be at least 1 day after check-in date.",
+          );
           setIsSubmitting(false);
           return;
         }
       }
 
       // Check if package is whole_property - skip room validation
-      const selectedPackage = packages.find(p => p.id === parseInt(packageBookingForm.package_id));
+      const selectedPackage = packages.find(
+        (p) => p.id === parseInt(packageBookingForm.package_id),
+      );
       if (!selectedPackage) {
-        showBannerMessage("error", "Package not found. Please select a valid package.");
+        showBannerMessage(
+          "error",
+          "Package not found. Please select a valid package.",
+        );
         setIsSubmitting(false);
         return;
       }
-      
+
       // Determine if it's whole_property
-      const isWholeProperty = selectedPackage.booking_type === 'whole_property';
-      
+      const isWholeProperty = selectedPackage.booking_type === "whole_property";
+
       // For whole_property, get all available rooms and use them directly
       let finalRoomIds = packageBookingForm.room_ids;
-      
+
       if (isWholeProperty) {
         // Use all available rooms from packageRooms (already filtered by availability)
-        const availableRoomIds = packageRooms.map(r => r.id);
-        
+        const availableRoomIds = packageRooms.map((r) => r.id);
+
         if (availableRoomIds.length === 0) {
-          showBannerMessage("error", "No rooms are available for the selected dates.");
+          showBannerMessage(
+            "error",
+            "No rooms are available for the selected dates.",
+          );
           setIsSubmitting(false);
           return;
         }
-        
+
         // Use all available rooms for whole_property
         finalRoomIds = availableRoomIds;
       } else {
         // For room_type packages, validate that at least one room is selected
         if (packageBookingForm.room_ids.length === 0) {
-          showBannerMessage("error", "Please select at least one room for the package.");
+          showBannerMessage(
+            "error",
+            "Please select at least one room for the package.",
+          );
           setIsSubmitting(false);
           return;
         }
         finalRoomIds = packageBookingForm.room_ids;
       }
-      
+
       // --- CAPACITY VALIDATION ---
       // Skip capacity validation for whole_property packages (they book entire property regardless of guest count)
       if (!isWholeProperty) {
         const selectedPackageRooms = finalRoomIds
-          .map(id => rooms.find(r => r.id === id))
-          .filter(room => room !== null);
-        
+          .map((id) => rooms.find((r) => r.id === id))
+          .filter((room) => room !== null);
+
         const packageCapacity = {
-          adults: selectedPackageRooms.reduce((sum, room) => sum + (room.adults || 0), 0),
-          children: selectedPackageRooms.reduce((sum, room) => sum + (room.children || 0), 0)
+          adults: selectedPackageRooms.reduce(
+            (sum, room) => sum + (room.adults || 0),
+            0,
+          ),
+          children: selectedPackageRooms.reduce(
+            (sum, room) => sum + (room.children || 0),
+            0,
+          ),
         };
-        
+
         const adultsRequested = parseInt(packageBookingForm.adults);
         const childrenRequested = parseInt(packageBookingForm.children);
-        
+
         // Validate adults capacity
         if (adultsRequested > packageCapacity.adults) {
-          showBannerMessage("error", `The number of adults (${adultsRequested}) exceeds the total adult capacity of the selected rooms (${packageCapacity.adults} adults max). Please select additional rooms or reduce the number of adults.`);
+          showBannerMessage(
+            "error",
+            `The number of adults (${adultsRequested}) exceeds the total adult capacity of the selected rooms (${packageCapacity.adults} adults max). Please select additional rooms or reduce the number of adults.`,
+          );
           setIsSubmitting(false);
           return;
         }
-        
+
         // Validate children capacity
         if (childrenRequested > packageCapacity.children) {
-          showBannerMessage("error", `The number of children (${childrenRequested}) exceeds the total children capacity of the selected rooms (${packageCapacity.children} children max). Please select additional rooms or reduce the number of children.`);
+          showBannerMessage(
+            "error",
+            `The number of children (${childrenRequested}) exceeds the total children capacity of the selected rooms (${packageCapacity.children} children max). Please select additional rooms or reduce the number of children.`,
+          );
           setIsSubmitting(false);
           return;
         }
@@ -2035,24 +2675,39 @@ const Bookings = () => {
         package_id: parseInt(packageBookingForm.package_id),
         adults: parseInt(packageBookingForm.adults),
         children: parseInt(packageBookingForm.children),
-        room_ids: finalRoomIds.map(id => parseInt(id)) // Use finalRoomIds (all available for whole_property, selected for room_type)
+        room_ids: finalRoomIds.map((id) => parseInt(id)), // Use finalRoomIds (all available for whole_property, selected for room_type)
       };
-      const response = await API.post("/packages/book", bookingData, authHeader());
+      const response = await API.post(
+        "/packages/book",
+        bookingData,
+        authHeader(),
+      );
       showBannerMessage("success", "Package booked successfully!");
-      setPackageBookingForm({ package_id: "", guest_name: "", guest_email: "", guest_mobile: "", check_in: "", check_out: "", adults: 2, children: 0, room_ids: [] });
-      
+      setPackageBookingForm({
+        package_id: "",
+        guest_name: "",
+        guest_email: "",
+        guest_mobile: "",
+        check_in: "",
+        check_out: "",
+        adults: 2,
+        children: 0,
+        room_ids: [],
+      });
+
       // Add the new package booking to the state - use response data as-is from backend
       const newPackageBooking = {
         ...response.data,
-        is_package: true
+        is_package: true,
         // Backend already returns rooms in the response, so we don't need to reconstruct them
       };
-      
+
       // Use functional update to prevent duplicates
-      setBookings(prev => dedupeBookings([newPackageBooking, ...prev]));
+      setBookings((prev) => dedupeBookings([newPackageBooking, ...prev]));
     } catch (err) {
       console.error(err);
-      const errorMessage = err.response?.data?.detail || "Failed to process package booking.";
+      const errorMessage =
+        err.response?.data?.detail || "Failed to process package booking.";
       showBannerMessage("error", errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -2062,8 +2717,14 @@ const Bookings = () => {
   const totalCapacity = useMemo(() => {
     return {
       adults: selectedRoomDetails.reduce((sum, room) => sum + room.adults, 0),
-      children: selectedRoomDetails.reduce((sum, room) => sum + room.children, 0),
-      total: selectedRoomDetails.reduce((sum, room) => sum + (room.adults + room.children), 0)
+      children: selectedRoomDetails.reduce(
+        (sum, room) => sum + room.children,
+        0,
+      ),
+      total: selectedRoomDetails.reduce(
+        (sum, room) => sum + (room.adults + room.children),
+        0,
+      ),
     };
   }, [selectedRoomDetails]);
 
@@ -2075,36 +2736,40 @@ const Bookings = () => {
     }
     // Fallback: generate it client-side if not provided
     const prefix = booking.is_package ? "PK" : "BK";
-    const paddedId = String(booking.id).padStart(6, '0');
+    const paddedId = String(booking.id).padStart(6, "0");
     return `${prefix}-${paddedId}`;
   };
 
   // Share booking via Email
   const shareViaEmail = (booking) => {
     const bookingId = generateBookingId(booking);
-    const rooms = booking.rooms && booking.rooms.length > 0
-      ? booking.rooms.map(r => {
-          if (booking.is_package) {
-            return r.room ? `Room ${r.room.number} (${r.room.type})` : '-';
-          } else {
-            return `Room ${r.number} (${r.type})`;
-          }
-        }).filter(Boolean).join(", ")
-      : "N/A";
+    const rooms =
+      booking.rooms && booking.rooms.length > 0
+        ? booking.rooms
+            .map((r) => {
+              if (booking.is_package) {
+                return r.room ? `Room ${r.room.number} (${r.room.type})` : "-";
+              } else {
+                return `Room ${r.number} (${r.type})`;
+              }
+            })
+            .filter(Boolean)
+            .join(", ")
+        : "N/A";
 
     const subject = encodeURIComponent(`Booking Confirmation - ${bookingId}`);
     const body = encodeURIComponent(
       `Dear ${booking.guest_name},\n\n` +
-      `Your booking has been confirmed!\n\n` +
-      `Booking ID: ${bookingId}\n` +
-      `Booking Type: ${booking.is_package ? "Package" : "Room"}\n` +
-      `Rooms: ${rooms}\n` +
-      `Check-in: ${booking.check_in}\n` +
-      `Check-out: ${booking.check_out}\n` +
-      `Guests: ${booking.adults} Adults, ${booking.children} Children\n` +
-      `Status: ${booking.status}\n\n` +
-      `Thank you for choosing our resort!\n\n` +
-      `Best regards,\nResort Team`
+        `Your booking has been confirmed!\n\n` +
+        `Booking ID: ${bookingId}\n` +
+        `Booking Type: ${booking.is_package ? "Package" : "Room"}\n` +
+        `Rooms: ${rooms}\n` +
+        `Check-in: ${booking.check_in}\n` +
+        `Check-out: ${booking.check_out}\n` +
+        `Guests: ${booking.adults} Adults, ${booking.children} Children\n` +
+        `Status: ${booking.status}\n\n` +
+        `Thank you for choosing our resort!\n\n` +
+        `Best regards,\nResort Team`,
     );
     window.location.href = `mailto:${booking.guest_email}?subject=${subject}&body=${body}`;
   };
@@ -2112,36 +2777,43 @@ const Bookings = () => {
   // Share booking via WhatsApp
   const shareViaWhatsApp = (booking) => {
     const bookingId = generateBookingId(booking);
-    const mobile = booking.guest_mobile?.replace(/[^\d]/g, '') || '';
-    
+    const mobile = booking.guest_mobile?.replace(/[^\d]/g, "") || "";
+
     if (!mobile) {
-      showBannerMessage("error", "Mobile number not available for this booking.");
+      showBannerMessage(
+        "error",
+        "Mobile number not available for this booking.",
+      );
       return;
     }
 
-    const rooms = booking.rooms && booking.rooms.length > 0
-      ? booking.rooms.map(r => {
-          if (booking.is_package) {
-            return r.room ? `Room ${r.room.number} (${r.room.type})` : '-';
-          } else {
-            return `Room ${r.number} (${r.type})`;
-          }
-        }).filter(Boolean).join(", ")
-      : "N/A";
+    const rooms =
+      booking.rooms && booking.rooms.length > 0
+        ? booking.rooms
+            .map((r) => {
+              if (booking.is_package) {
+                return r.room ? `Room ${r.room.number} (${r.room.type})` : "-";
+              } else {
+                return `Room ${r.number} (${r.type})`;
+              }
+            })
+            .filter(Boolean)
+            .join(", ")
+        : "N/A";
 
     const message = encodeURIComponent(
       `Dear ${booking.guest_name},\n\n` +
-      `Your booking has been confirmed!\n\n` +
-      `Booking ID: ${bookingId}\n` +
-      `Booking Type: ${booking.is_package ? "Package" : "Room"}\n` +
-      `Rooms: ${rooms}\n` +
-      `Check-in: ${booking.check_in}\n` +
-      `Check-out: ${booking.check_out}\n` +
-      `Guests: ${booking.adults} Adults, ${booking.children} Children\n` +
-      `Status: ${booking.status}\n\n` +
-      `Thank you for choosing our resort!`
+        `Your booking has been confirmed!\n\n` +
+        `Booking ID: ${bookingId}\n` +
+        `Booking Type: ${booking.is_package ? "Package" : "Room"}\n` +
+        `Rooms: ${rooms}\n` +
+        `Check-in: ${booking.check_in}\n` +
+        `Check-out: ${booking.check_out}\n` +
+        `Guests: ${booking.adults} Adults, ${booking.children} Children\n` +
+        `Status: ${booking.status}\n\n` +
+        `Thank you for choosing our resort!`,
     );
-    window.open(`https://wa.me/${mobile}?text=${message}`, '_blank');
+    window.open(`https://wa.me/${mobile}?text=${message}`, "_blank");
   };
 
   // Calculate status counts for better filter clarity
@@ -2150,18 +2822,29 @@ const Bookings = () => {
       all: bookings.length,
       booked: 0,
       cancelled: 0,
-      'checked-in': 0,
-      'checked-out': 0,
+      "checked-in": 0,
+      "checked-out": 0,
     };
-    
+
     bookings.forEach((b) => {
-      const normalizedStatus = (b.status || '').toLowerCase().replace(/[-_]/g, '-').trim();
-      if (normalizedStatus === 'booked') counts.booked++;
-      else if (normalizedStatus === 'cancelled') counts.cancelled++;
-      else if (normalizedStatus === 'checked-in' || normalizedStatus === 'checked_in') counts['checked-in']++;
-      else if (normalizedStatus === 'checked-out' || normalizedStatus === 'checked_out') counts['checked-out']++;
+      const normalizedStatus = (b.status || "")
+        .toLowerCase()
+        .replace(/[-_]/g, "-")
+        .trim();
+      if (normalizedStatus === "booked") counts.booked++;
+      else if (normalizedStatus === "cancelled") counts.cancelled++;
+      else if (
+        normalizedStatus === "checked-in" ||
+        normalizedStatus === "checked_in"
+      )
+        counts["checked-in"]++;
+      else if (
+        normalizedStatus === "checked-out" ||
+        normalizedStatus === "checked_out"
+      )
+        counts["checked-out"]++;
     });
-    
+
     return counts;
   }, [bookings]);
 
@@ -2172,37 +2855,51 @@ const Bookings = () => {
         // Normalize status values - handle both hyphens and underscores
         let normalizedBookingStatus = b.status?.toLowerCase().trim();
         let normalizedFilterStatus = statusFilter?.toLowerCase().trim();
-        
+
         // Normalize: replace underscores and hyphens with standard format
-        normalizedBookingStatus = normalizedBookingStatus?.replace(/[-_]/g, '-');
-        normalizedFilterStatus = normalizedFilterStatus?.replace(/[-_]/g, '-');
-        
+        normalizedBookingStatus = normalizedBookingStatus?.replace(
+          /[-_]/g,
+          "-",
+        );
+        normalizedFilterStatus = normalizedFilterStatus?.replace(/[-_]/g, "-");
+
         // Handle case variations and exact match - works for both regular and package bookings
-        const statusMatch = statusFilter === "All" || 
+        const statusMatch =
+          statusFilter === "All" ||
           normalizedBookingStatus === normalizedFilterStatus ||
-          (normalizedBookingStatus === "checked-out" && normalizedFilterStatus === "checked-out") ||
-          (normalizedBookingStatus === "checked_out" && normalizedFilterStatus === "checked-out") ||
-          (normalizedBookingStatus === "checked-in" && normalizedFilterStatus === "checked-in") ||
-          (normalizedBookingStatus === "checked_in" && normalizedFilterStatus === "checked-in");
-        const normalizedRoomFilterValue = roomNumberFilter === "All" ? null : String(roomNumberFilter).trim();
-        const roomNumberMatch = !normalizedRoomFilterValue || (b.rooms && b.rooms.some((room) => extractRoomNumber(room) === normalizedRoomFilterValue));
-        
+          (normalizedBookingStatus === "checked-out" &&
+            normalizedFilterStatus === "checked-out") ||
+          (normalizedBookingStatus === "checked_out" &&
+            normalizedFilterStatus === "checked-out") ||
+          (normalizedBookingStatus === "checked-in" &&
+            normalizedFilterStatus === "checked-in") ||
+          (normalizedBookingStatus === "checked_in" &&
+            normalizedFilterStatus === "checked-in");
+        const normalizedRoomFilterValue =
+          roomNumberFilter === "All" ? null : String(roomNumberFilter).trim();
+        const roomNumberMatch =
+          !normalizedRoomFilterValue ||
+          (b.rooms &&
+            b.rooms.some(
+              (room) => extractRoomNumber(room) === normalizedRoomFilterValue,
+            ));
+
         // Fix: Apply date filter to both check-in and check-out dates
         let dateMatch = true;
-        
+
         if (fromDate || toDate) {
           const checkInDate = new Date(b.check_in);
           const checkOutDate = new Date(b.check_out);
           checkInDate.setHours(0, 0, 0, 0); // Normalize times for accurate comparison
           checkOutDate.setHours(0, 0, 0, 0);
-          
+
           if (fromDate && toDate) {
             // Both dates specified: booking overlaps if it intersects with the range
             const from = new Date(fromDate);
             const to = new Date(toDate);
             from.setHours(0, 0, 0, 0);
             to.setHours(0, 0, 0, 0);
-            
+
             dateMatch = checkInDate <= to && checkOutDate >= from;
           } else if (fromDate) {
             // Only from date specified: booking must end on or after this date
@@ -2216,45 +2913,53 @@ const Bookings = () => {
             dateMatch = checkInDate <= to;
           }
         }
-        
+
         return statusMatch && roomNumberMatch && dateMatch;
       })
       .sort((a, b) => {
         // First, sort by status priority: booked (1), checked-in (2), checked-out (3), cancelled (4)
         const statusPriority = {
-          'booked': 1,
-          'checked-in': 2,
-          'checked_in': 2,
-          'checked-out': 3,
-          'checked_out': 3,
-          'cancelled': 4
+          booked: 1,
+          "checked-in": 2,
+          checked_in: 2,
+          "checked-out": 3,
+          checked_out: 3,
+          cancelled: 4,
         };
-        
-        const aStatus = a.status?.toLowerCase().replace(/[-_]/g, '-') || '';
-        const bStatus = b.status?.toLowerCase().replace(/[-_]/g, '-') || '';
-        
+
+        const aStatus = a.status?.toLowerCase().replace(/[-_]/g, "-") || "";
+        const bStatus = b.status?.toLowerCase().replace(/[-_]/g, "-") || "";
+
         const aPriority = statusPriority[aStatus] || 99;
         const bPriority = statusPriority[bStatus] || 99;
-        
+
         // If statuses are different, sort by priority
         if (aPriority !== bPriority) {
           return aPriority - bPriority;
         }
-        
+
         // If same status, sort by ID descending (latest first)
         return b.id - a.id;
       });
-  }, [bookings, statusFilter, roomNumberFilter, fromDate, toDate, extractRoomNumber, dedupeBookings]);
+  }, [
+    bookings,
+    statusFilter,
+    roomNumberFilter,
+    fromDate,
+    toDate,
+    extractRoomNumber,
+    dedupeBookings,
+  ]);
 
   const handleRoomNumberToggle = (roomNumber) => {
     const isSelected = formData.roomNumbers.includes(roomNumber);
     let newRoomNumbers;
     if (isSelected) {
-      newRoomNumbers = formData.roomNumbers.filter(num => num !== roomNumber);
+      newRoomNumbers = formData.roomNumbers.filter((num) => num !== roomNumber);
     } else {
       newRoomNumbers = [...formData.roomNumbers, roomNumber];
     }
-    setFormData(prev => ({ ...prev, roomNumbers: newRoomNumbers }));
+    setFormData((prev) => ({ ...prev, roomNumbers: newRoomNumbers }));
   };
 
   const handleChange = (e) => {
@@ -2269,12 +2974,12 @@ const Bookings = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Prevent multiple submissions
     if (isSubmitting) {
       return;
     }
-    
+
     setIsSubmitting(true);
     setFeedback({ message: "", type: "" });
 
@@ -2285,9 +2990,12 @@ const Bookings = () => {
         const checkOutDate = new Date(formData.checkOut);
         const timeDiff = checkOutDate.getTime() - checkInDate.getTime();
         const daysDiff = timeDiff / (1000 * 3600 * 24);
-        
+
         if (daysDiff < 1) {
-          showBannerMessage("error", "Minimum 1 day booking is mandatory. Check-out date must be at least 1 day after check-in date.");
+          showBannerMessage(
+            "error",
+            "Minimum 1 day booking is mandatory. Check-out date must be at least 1 day after check-in date.",
+          );
           setIsSubmitting(false);
           return;
         }
@@ -2301,25 +3009,33 @@ const Bookings = () => {
 
       const adultsRequested = parseInt(formData.adults);
       const childrenRequested = parseInt(formData.children);
-      
+
       // Validate adults capacity
       if (adultsRequested > totalCapacity.adults) {
-        showBannerMessage("error", `The number of adults (${adultsRequested}) exceeds the total adult capacity of the selected rooms (${totalCapacity.adults} adults max). Please select additional rooms or reduce the number of adults.`);
-        setIsSubmitting(false);
-        return;
-      }
-      
-      // Validate children capacity
-      if (childrenRequested > totalCapacity.children) {
-        showBannerMessage("error", `The number of children (${childrenRequested}) exceeds the total children capacity of the selected rooms (${totalCapacity.children} children max). Please select additional rooms or reduce the number of children.`);
+        showBannerMessage(
+          "error",
+          `The number of adults (${adultsRequested}) exceeds the total adult capacity of the selected rooms (${totalCapacity.adults} adults max). Please select additional rooms or reduce the number of adults.`,
+        );
         setIsSubmitting(false);
         return;
       }
 
-      const roomIds = formData.roomNumbers.map((roomNumber) => {
-        const room = rooms.find((r) => r.number === roomNumber);
-        return room ? room.id : null;
-      }).filter(id => id !== null);
+      // Validate children capacity
+      if (childrenRequested > totalCapacity.children) {
+        showBannerMessage(
+          "error",
+          `The number of children (${childrenRequested}) exceeds the total children capacity of the selected rooms (${totalCapacity.children} children max). Please select additional rooms or reduce the number of children.`,
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
+      const roomIds = formData.roomNumbers
+        .map((roomNumber) => {
+          const room = rooms.find((r) => r.number === roomNumber);
+          return room ? room.id : null;
+        })
+        .filter((id) => id !== null);
 
       if (roomIds.length !== formData.roomNumbers.length) {
         showBannerMessage("error", "One or more selected rooms are invalid.");
@@ -2339,7 +3055,7 @@ const Bookings = () => {
           adults: parseInt(formData.adults),
           children: parseInt(formData.children),
         },
-        authHeader()
+        authHeader(),
       );
 
       showBannerMessage("success", "Bookings created successfully!");
@@ -2357,15 +3073,16 @@ const Bookings = () => {
       // Add the new booking to the state - use response data as-is from backend
       const newBooking = {
         ...response.data,
-        is_package: false
+        is_package: false,
         // Backend already returns rooms in the response, so we don't need to reconstruct them
       };
-      
+
       // Use functional update to prevent duplicates
-      setBookings(prev => dedupeBookings([newBooking, ...prev]));
+      setBookings((prev) => dedupeBookings([newBooking, ...prev]));
     } catch (err) {
       console.error("Booking creation error:", err);
-      const errorMessage = err.response?.data?.message || "Error creating booking.";
+      const errorMessage =
+        err.response?.data?.message || "Error creating booking.";
       showBannerMessage("error", errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -2378,135 +3095,175 @@ const Bookings = () => {
 
     try {
       // Find the booking from the current bookings list to get basic info
-      const booking = bookings.find(b => b.id === bookingId);
-      
+      const booking = bookings.find((b) => b.id === bookingId);
+
       if (!booking || !booking.id) {
-        showBannerMessage("error", "Booking not found. Please refresh the page.");
+        showBannerMessage(
+          "error",
+          "Booking not found. Please refresh the page.",
+        );
         setIsSubmitting(false);
         setBookingToExtend(null);
         return;
       }
-      
-      // Determine booking type: 
+
+      // Determine booking type:
       // - Room bookings: standalone room bookings from 'bookings' table (is_package = false)
       // - Package bookings: package bookings from 'package_bookings' table (is_package = true)
       //   Note: Rooms booked as part of a package are treated as package bookings
       const isPackage = booking.is_package || false;
       const displayId = generateBookingId(booking);
-      
+
       if (!displayId) {
-        showBannerMessage("error", "Invalid booking ID. Please refresh the page.");
+        showBannerMessage(
+          "error",
+          "Invalid booking ID. Please refresh the page.",
+        );
         setIsSubmitting(false);
         setBookingToExtend(null);
         return;
       }
-      
+
       // Fetch fresh booking details from API to get the most current status
       let freshBooking = booking;
       try {
-        const detailsResponse = await API.get(`/bookings/details/${displayId}?is_package=${isPackage}`, authHeader());
+        const detailsResponse = await API.get(
+          `/bookings/details/${displayId}?is_package=${isPackage}`,
+          authHeader(),
+        );
         if (detailsResponse.data) {
-          freshBooking = { ...booking, ...detailsResponse.data, is_package: isPackage };
+          freshBooking = {
+            ...booking,
+            ...detailsResponse.data,
+            is_package: isPackage,
+          };
         }
       } catch (err) {
-        console.warn('Could not fetch fresh booking details, using cached data:', err);
+        console.warn(
+          "Could not fetch fresh booking details, using cached data:",
+          err,
+        );
         // Continue with cached booking data
       }
-      
+
       // Validate booking status - only allow "booked" or "checked-in" statuses
       if (!freshBooking.status) {
-        showBannerMessage("error", "Booking status is missing. Please refresh the page.");
+        showBannerMessage(
+          "error",
+          "Booking status is missing. Please refresh the page.",
+        );
         setIsSubmitting(false);
         setBookingToExtend(null);
         return;
       }
-      
+
       // Normalize status: handle both "checked-in", "checked_in", "checked-out", "checked_out" formats
       // Convert to lowercase and replace both hyphens and underscores with hyphens for consistent comparison
       const rawStatusLower = freshBooking.status.toLowerCase().trim();
-      const normalizedStatus = rawStatusLower.replace(/[-_]/g, '-');
-      
+      const normalizedStatus = rawStatusLower.replace(/[-_]/g, "-");
+
       // Debug: log the actual status for troubleshooting
-      console.log('Extend booking - Booking ID:', bookingId, 'Display ID:', displayId, 'Original status:', freshBooking.status, 'Raw lower:', rawStatusLower, 'Normalized:', normalizedStatus, 'Is Package:', isPackage);
-      
+      console.log(
+        "Extend booking - Booking ID:",
+        bookingId,
+        "Display ID:",
+        displayId,
+        "Original status:",
+        freshBooking.status,
+        "Raw lower:",
+        rawStatusLower,
+        "Normalized:",
+        normalizedStatus,
+        "Is Package:",
+        isPackage,
+      );
+
       // Check if status is valid for extension (booked or checked-in)
       // Handle multiple formats: "booked", "checked-in", "checked_in", "checked in"
       // Note: "checked_out" is NOT allowed (that means guest has already left)
-      const isValidStatus = 
-        normalizedStatus === 'booked' || 
-        normalizedStatus === 'checked-in' ||
-        rawStatusLower === 'checked_in' ||
-        rawStatusLower === 'checked-in' ||
-        rawStatusLower === 'checked in';
-      
-        // Explicitly reject checked_out/checked-out statuses
-        // Be careful: "checked-in" normalizes to "checked-in", "checked-out" normalizes to "checked-out"
-        const isCheckedOut = (
-          normalizedStatus.includes('out') && normalizedStatus.startsWith('checked-') && normalizedStatus.endsWith('-out')
-        ) || ['checked_out', 'checked-out', 'checked out'].includes(rawStatusLower);
-        
-        if (isCheckedOut) {
-          showBannerMessage("error", `Cannot extend checkout for booking with status '${freshBooking.status}'. The guest has already checked out.`);
-          console.error('Booking already checked out:', { 
-            bookingId, 
-            displayId,
-            originalStatus: freshBooking.status, 
-            normalizedStatus,
-            rawStatusLower,
-            isCheckedOut,
-            isPackage: isPackage 
-          });
-          setIsSubmitting(false);
-          setBookingToExtend(null);
-          return;
-        }
-      
-      if (!isValidStatus) {
-        // Show more detailed error message
-        const statusDisplay = freshBooking.status || 'unknown';
-        showBannerMessage("error", `Cannot extend checkout for booking with status '${statusDisplay}'. Only 'booked' or 'checked-in' bookings can be extended.`);
-        console.error('Invalid status for extension:', { 
-          bookingId, 
+      const isValidStatus =
+        normalizedStatus === "booked" ||
+        normalizedStatus === "checked-in" ||
+        rawStatusLower === "checked_in" ||
+        rawStatusLower === "checked-in" ||
+        rawStatusLower === "checked in";
+
+      // Explicitly reject checked_out/checked-out statuses
+      // Be careful: "checked-in" normalizes to "checked-in", "checked-out" normalizes to "checked-out"
+      const isCheckedOut =
+        (normalizedStatus.includes("out") &&
+          normalizedStatus.startsWith("checked-") &&
+          normalizedStatus.endsWith("-out")) ||
+        ["checked_out", "checked-out", "checked out"].includes(rawStatusLower);
+
+      if (isCheckedOut) {
+        showBannerMessage(
+          "error",
+          `Cannot extend checkout for booking with status '${freshBooking.status}'. The guest has already checked out.`,
+        );
+        console.error("Booking already checked out:", {
+          bookingId,
           displayId,
-          originalStatus: freshBooking.status, 
+          originalStatus: freshBooking.status,
+          normalizedStatus,
           rawStatusLower,
-          normalizedStatus, 
-          isValidStatus,
-          isPackage: isPackage 
+          isCheckedOut,
+          isPackage: isPackage,
         });
         setIsSubmitting(false);
         setBookingToExtend(null);
         return;
       }
-      
+
+      if (!isValidStatus) {
+        // Show more detailed error message
+        const statusDisplay = freshBooking.status || "unknown";
+        showBannerMessage(
+          "error",
+          `Cannot extend checkout for booking with status '${statusDisplay}'. Only 'booked' or 'checked-in' bookings can be extended.`,
+        );
+        console.error("Invalid status for extension:", {
+          bookingId,
+          displayId,
+          originalStatus: freshBooking.status,
+          rawStatusLower,
+          normalizedStatus,
+          isValidStatus,
+          isPackage: isPackage,
+        });
+        setIsSubmitting(false);
+        setBookingToExtend(null);
+        return;
+      }
+
       // Use the correct endpoint based on booking type
       // Room bookings (from bookings table) use: /bookings/{id}/extend
       // Package bookings (from package_bookings table) use: /packages/booking/{id}/extend
-      const url = isPackage 
+      const url = isPackage
         ? `/packages/booking/${displayId}/extend?new_checkout=${newCheckoutDate}`
         : `/bookings/${displayId}/extend?new_checkout=${newCheckoutDate}`;
-      
-      console.log('Extending booking:', { 
-        bookingId, 
-        displayId, 
-        isPackage, 
-        url, 
-        status: freshBooking.status,
-        newCheckoutDate 
-      });
-      
-      await API.put(
+
+      console.log("Extending booking:", {
+        bookingId,
+        displayId,
+        isPackage,
         url,
-        {},
-        authHeader()
-      );
-      
+        status: freshBooking.status,
+        newCheckoutDate,
+      });
+
+      await API.put(url, {}, authHeader());
+
       showBannerMessage("success", "Booking checkout extended successfully!");
       setBookingToExtend(null);
       fetchData();
     } catch (err) {
       console.error("Booking extension error:", err);
-      const errorMessage = err.response?.data?.detail || err.response?.data?.message || err.message || "Failed to extend booking.";
+      const errorMessage =
+        err.response?.data?.detail ||
+        err.response?.data?.message ||
+        err.message ||
+        "Failed to extend booking.";
       showBannerMessage("error", errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -2518,12 +3275,25 @@ const Bookings = () => {
     setIsSubmitting(true);
 
     // Double-check booking status before submitting
-    const booking = bookings.find(b => b.id === bookingId && b.is_package === (bookingToCheckIn?.is_package || false));
-    const normalizedStatus = booking?.status?.toLowerCase().replace(/[-_]/g, '');
-    
-    if (normalizedStatus !== 'booked') {
-      console.error("Check-in blocked: Invalid booking status", { bookingId, status: booking?.status, normalizedStatus });
-      showBannerMessage("error", `Cannot check in. Booking status is: ${booking?.status || 'unknown'}`);
+    const booking = bookings.find(
+      (b) =>
+        b.id === bookingId &&
+        b.is_package === (bookingToCheckIn?.is_package || false),
+    );
+    const normalizedStatus = booking?.status
+      ?.toLowerCase()
+      .replace(/[-_]/g, "");
+
+    if (normalizedStatus !== "booked") {
+      console.error("Check-in blocked: Invalid booking status", {
+        bookingId,
+        status: booking?.status,
+        normalizedStatus,
+      });
+      showBannerMessage(
+        "error",
+        `Cannot check in. Booking status is: ${booking?.status || "unknown"}`,
+      );
       setBookingToCheckIn(null);
       setIsSubmitting(false);
       return;
@@ -2535,7 +3305,9 @@ const Bookings = () => {
 
     // Use display ID for API call
     const displayId = generateBookingId(booking || bookingToCheckIn);
-    const url = booking?.is_package ? `/packages/booking/${displayId}/check-in` : `/bookings/${displayId}/check-in`;
+    const url = booking?.is_package
+      ? `/packages/booking/${displayId}/check-in`
+      : `/bookings/${displayId}/check-in`;
 
     try {
       const response = await API.put(url, formData, {
@@ -2546,13 +3318,13 @@ const Bookings = () => {
       });
 
       // Directly update the booking in the state with the response data
-      setBookings(prevBookings =>
-        prevBookings.map(b => 
-          (b.id === bookingId && b.is_package === booking.is_package) 
-            // Merge old booking data with new to preserve fields like `is_package`
-            ? { ...b, ...response.data } 
-            : b
-        )
+      setBookings((prevBookings) =>
+        prevBookings.map((b) =>
+          b.id === bookingId && b.is_package === booking.is_package
+            ? // Merge old booking data with new to preserve fields like `is_package`
+              { ...b, ...response.data }
+            : b,
+        ),
       );
 
       // After successful check-in, auto-create stock issues for complimentary amenities
@@ -2566,54 +3338,79 @@ const Bookings = () => {
             const type = String(loc.location_type || "").toUpperCase();
             return (
               loc.is_inventory_point === true &&
-              (type === "CENTRAL_WAREHOUSE" || type === "WAREHOUSE" || type === "BRANCH_STORE")
+              (type === "CENTRAL_WAREHOUSE" ||
+                type === "WAREHOUSE" ||
+                type === "BRANCH_STORE")
             );
           });
           if (!mainWarehouse) {
-            mainWarehouse = inventoryLocations.find((loc) => {
-              const type = String(loc.location_type || "").toUpperCase();
-              return type === "CENTRAL_WAREHOUSE" || type === "WAREHOUSE" || type === "BRANCH_STORE";
-            }) || null;
+            mainWarehouse =
+              inventoryLocations.find((loc) => {
+                const type = String(loc.location_type || "").toUpperCase();
+                return (
+                  type === "CENTRAL_WAREHOUSE" ||
+                  type === "WAREHOUSE" ||
+                  type === "BRANCH_STORE"
+                );
+              }) || null;
           }
 
           if (!mainWarehouse) {
-            console.warn("❌ No main warehouse inventory point found; skipping amenity stock issue.");
-            console.log("Available locations:", inventoryLocations.map(loc => ({
-              id: loc.id,
-              name: loc.name,
-              location_type: loc.location_type,
-              is_inventory_point: loc.is_inventory_point
-            })));
+            console.warn(
+              "❌ No main warehouse inventory point found; skipping amenity stock issue.",
+            );
+            console.log(
+              "Available locations:",
+              inventoryLocations.map((loc) => ({
+                id: loc.id,
+                name: loc.name,
+                location_type: loc.location_type,
+                is_inventory_point: loc.is_inventory_point,
+              })),
+            );
           } else {
             console.log("✅ Found main warehouse:", mainWarehouse);
             // Determine destination room location (first room of booking)
             const firstRoom = (booking.rooms && booking.rooms[0]) || null;
-            const roomNumber = firstRoom?.number || firstRoom?.room?.number || null;
+            const roomNumber =
+              firstRoom?.number || firstRoom?.room?.number || null;
 
             let destinationLocation = null;
             if (roomNumber) {
-              destinationLocation = inventoryLocations.find((loc) => {
-                const type = String(loc.location_type || "").toUpperCase();
-                if (type !== "GUEST_ROOM") return false;
-                const label = `${loc.name || ""} ${loc.room_area || ""}`.toLowerCase();
-                return label.includes(String(roomNumber).toLowerCase());
-              }) || null;
+              destinationLocation =
+                inventoryLocations.find((loc) => {
+                  const type = String(loc.location_type || "").toUpperCase();
+                  if (type !== "GUEST_ROOM") return false;
+                  const label =
+                    `${loc.name || ""} ${loc.room_area || ""}`.toLowerCase();
+                  return label.includes(String(roomNumber).toLowerCase());
+                }) || null;
             }
 
             if (!destinationLocation) {
-              console.warn("No matching room location found for amenity allocation; skipping stock issue.");
+              console.warn(
+                "No matching room location found for amenity allocation; skipping stock issue.",
+              );
               console.log("Room number searched:", roomNumber);
-              console.log("Available locations:", inventoryLocations.filter(loc => {
-                const type = String(loc.location_type || "").toUpperCase();
-                return type === "GUEST_ROOM";
-              }).map(loc => ({
-                id: loc.id,
-                name: loc.name,
-                room_area: loc.room_area,
-                location_type: loc.location_type
-              })));
+              console.log(
+                "Available locations:",
+                inventoryLocations
+                  .filter((loc) => {
+                    const type = String(loc.location_type || "").toUpperCase();
+                    return type === "GUEST_ROOM";
+                  })
+                  .map((loc) => ({
+                    id: loc.id,
+                    name: loc.name,
+                    room_area: loc.room_area,
+                    location_type: loc.location_type,
+                  })),
+              );
             } else {
-              console.log("✅ Found destination location:", destinationLocation);
+              console.log(
+                "✅ Found destination location:",
+                destinationLocation,
+              );
               const issueDetails = alloc.items
                 .map((a) => {
                   // Find inventory item by explicit ID if present, otherwise by name match
@@ -2626,15 +3423,20 @@ const Bookings = () => {
                     invItem =
                       // Exact match
                       inventoryItems.find(
-                        (it) => String(it.name || "").trim().toLowerCase() === target
+                        (it) =>
+                          String(it.name || "")
+                            .trim()
+                            .toLowerCase() === target,
                       ) ||
                       // Inventory name contains target (e.g. "Mineral Water 500ml" vs "Water")
                       inventoryItems.find((it) =>
-                        String(it.name || "").toLowerCase().includes(target)
+                        String(it.name || "")
+                          .toLowerCase()
+                          .includes(target),
                       ) ||
                       // Target contains inventory name (e.g. "Water Bottle 500ml" vs "Water")
                       inventoryItems.find((it) =>
-                        target.includes(String(it.name || "").toLowerCase())
+                        target.includes(String(it.name || "").toLowerCase()),
                       ) ||
                       null;
                   }
@@ -2643,8 +3445,9 @@ const Bookings = () => {
                   const totalComplimentary =
                     a.frequency === "PER_NIGHT"
                       ? (a.complimentaryPerNight || 0) * nights
-                      : (a.complimentaryPerStay || 0);
-                  if (!totalComplimentary || totalComplimentary <= 0) return null;
+                      : a.complimentaryPerStay || 0;
+                  if (!totalComplimentary || totalComplimentary <= 0)
+                    return null;
 
                   return {
                     item_id: invItem.id,
@@ -2662,8 +3465,13 @@ const Bookings = () => {
                 console.log("Main Warehouse:", mainWarehouse);
                 console.log("Destination Location:", destinationLocation);
                 console.log("Issue Details:", issueDetails);
-                console.log("Inventory Items:", inventoryItems.filter(it => issueDetails.some(id => id.item_id === it.id)));
-                
+                console.log(
+                  "Inventory Items:",
+                  inventoryItems.filter((it) =>
+                    issueDetails.some((id) => id.item_id === it.id),
+                  ),
+                );
+
                 try {
                   const issueResponse = await API.post(
                     "/inventory/issues",
@@ -2675,49 +3483,72 @@ const Bookings = () => {
                       notes: `Auto amenity allocation for booking ${generateBookingId(booking || bookingToCheckIn)}`,
                       details: issueDetails,
                     },
-                    authHeader()
+                    authHeader(),
                   );
-                  console.log("✅ Stock issue created successfully:", issueResponse.data);
-                  showBannerMessage("success", `Stock issue created: ${issueDetails.length} item(s) allocated to room.`);
+                  console.log(
+                    "✅ Stock issue created successfully:",
+                    issueResponse.data,
+                  );
+                  showBannerMessage(
+                    "success",
+                    `Stock issue created: ${issueDetails.length} item(s) allocated to room.`,
+                  );
                 } catch (issueError) {
                   console.error("❌ Stock issue creation failed:", issueError);
                   console.error("Error response:", issueError.response?.data);
-                  showBannerMessage("error", `Failed to create stock issue: ${issueError.response?.data?.detail || issueError.message}`);
+                  showBannerMessage(
+                    "error",
+                    `Failed to create stock issue: ${issueError.response?.data?.detail || issueError.message}`,
+                  );
                 }
               } else {
-                console.warn("No issue details to create - all items filtered out");
+                console.warn(
+                  "No issue details to create - all items filtered out",
+                );
               }
             }
           }
         } catch (issueErr) {
-          console.error("Failed to create amenity stock issue on check-in:", issueErr);
+          console.error(
+            "Failed to create amenity stock issue on check-in:",
+            issueErr,
+          );
         }
       }
 
       showBannerMessage("success", "Guest checked in successfully!");
       setBookingToCheckIn(null);
-      
+
       // Trigger refresh of Inventory page if it's open
-      window.dispatchEvent(new CustomEvent('inventory-refresh'));
+      window.dispatchEvent(new CustomEvent("inventory-refresh"));
     } catch (err) {
       console.error("Check-in error:", err);
-      const errorMessage = err.response?.data?.detail || "Failed to check in guest.";
+      const errorMessage =
+        err.response?.data?.detail || "Failed to check in guest.";
       showBannerMessage("error", errorMessage);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-
   const viewDetails = async (id, is_package) => {
     // Set a temporary booking to open the modal instantly, then fetch full details
-    const tempBooking = bookings.find(b => b.id === id && b.is_package === is_package);
+    const tempBooking = bookings.find(
+      (b) => b.id === id && b.is_package === is_package,
+    );
     setModalBooking(tempBooking || { guest_name: "Loading..." }); // Show a loading state
 
     try {
       // Use display ID for API call
-      const displayId = tempBooking ? generateBookingId(tempBooking) : (is_package ? `PK-${String(id).padStart(6, '0')}` : `BK-${String(id).padStart(6, '0')}`);
-      const response = await API.get(`/bookings/details/${displayId}?is_package=${is_package}`, authHeader());
+      const displayId = tempBooking
+        ? generateBookingId(tempBooking)
+        : is_package
+          ? `PK-${String(id).padStart(6, "0")}`
+          : `BK-${String(id).padStart(6, "0")}`;
+      const response = await API.get(
+        `/bookings/details/${displayId}?is_package=${is_package}`,
+        authHeader(),
+      );
       setModalBooking(response.data); // Update the modal with full, fresh data
     } catch (err) {
       console.error("Failed to fetch booking details:", err);
@@ -2728,43 +3559,84 @@ const Bookings = () => {
   };
 
   const cancelBooking = async (id, is_package) => {
-    if (!window.confirm("Are you sure you want to cancel this booking?")) return;
+    if (!window.confirm("Are you sure you want to cancel this booking?"))
+      return;
     try {
       // Find booking and get display ID
-      const booking = bookings.find(b => b.id === id && b.is_package === is_package);
-      const displayId = booking ? generateBookingId(booking) : (is_package ? `PK-${String(id).padStart(6, '0')}` : `BK-${String(id).padStart(6, '0')}`);
-      
+      const booking = bookings.find(
+        (b) => b.id === id && b.is_package === is_package,
+      );
+      const displayId = booking
+        ? generateBookingId(booking)
+        : is_package
+          ? `PK-${String(id).padStart(6, "0")}`
+          : `BK-${String(id).padStart(6, "0")}`;
+
       // First fetch fresh details; if already cancelled, reflect immediately
       try {
-        const fresh = await API.get(`/bookings/details/${displayId}?is_package=${is_package}`, authHeader());
-        if (fresh?.data?.status && fresh.data.status.toLowerCase().includes('cancel')) {
-          setBookings(prev => prev.map(b => (b.id === id && b.is_package === is_package) ? { ...b, ...fresh.data } : b));
+        const fresh = await API.get(
+          `/bookings/details/${displayId}?is_package=${is_package}`,
+          authHeader(),
+        );
+        if (
+          fresh?.data?.status &&
+          fresh.data.status.toLowerCase().includes("cancel")
+        ) {
+          setBookings((prev) =>
+            prev.map((b) =>
+              b.id === id && b.is_package === is_package
+                ? { ...b, ...fresh.data }
+                : b,
+            ),
+          );
           showBannerMessage("success", "Booking is already cancelled.");
           return;
         }
       } catch (_) {}
 
-      const url = is_package ? `/packages/booking/${displayId}/cancel` : `/bookings/${displayId}/cancel`;
+      const url = is_package
+        ? `/packages/booking/${displayId}/cancel`
+        : `/bookings/${displayId}/cancel`;
       const response = await API.put(url, {}, authHeader());
       showBannerMessage("success", "Booking cancelled successfully.");
       // Update the booking in state instead of refetching everything
-      setBookings(prevBookings =>
-        prevBookings.map(b =>
-          (b.id === id && b.is_package === is_package) ? { ...b, ...response.data } : b
-        )
+      setBookings((prevBookings) =>
+        prevBookings.map((b) =>
+          b.id === id && b.is_package === is_package
+            ? { ...b, ...response.data }
+            : b,
+        ),
       );
     } catch (err) {
       // If endpoint is unavailable but the booking is actually cancelled, reflect it
       if (err?.response?.status === 404) {
         try {
-          const booking = bookings.find(b => b.id === id && b.is_package === is_package);
-          const displayId = booking ? generateBookingId(booking) : (is_package ? `PK-${String(id).padStart(6, '0')}` : `BK-${String(id).padStart(6, '0')}`);
-          const fresh = await API.get(`/bookings/details/${displayId}?is_package=${is_package}`, authHeader());
+          const booking = bookings.find(
+            (b) => b.id === id && b.is_package === is_package,
+          );
+          const displayId = booking
+            ? generateBookingId(booking)
+            : is_package
+              ? `PK-${String(id).padStart(6, "0")}`
+              : `BK-${String(id).padStart(6, "0")}`;
+          const fresh = await API.get(
+            `/bookings/details/${displayId}?is_package=${is_package}`,
+            authHeader(),
+          );
           if (fresh?.data) {
-            setBookings(prev => prev.map(b => (b.id === id && b.is_package === is_package) ? { ...b, ...fresh.data } : b));
-            const normalized = fresh.data.status?.toLowerCase() || '';
-            if (normalized.includes('cancel')) {
-              showBannerMessage("success", "Booking status synced to Cancelled.");
+            setBookings((prev) =>
+              prev.map((b) =>
+                b.id === id && b.is_package === is_package
+                  ? { ...b, ...fresh.data }
+                  : b,
+              ),
+            );
+            const normalized = fresh.data.status?.toLowerCase() || "";
+            if (normalized.includes("cancel")) {
+              showBannerMessage(
+                "success",
+                "Booking status synced to Cancelled.",
+              );
               return;
             }
           }
@@ -2775,55 +3647,80 @@ const Bookings = () => {
     }
   };
 
-  const RoomSelection = React.memo(({ rooms, selectedRoomNumbers, onRoomToggle }) => {
-    return (
-      <div className="flex flex-wrap gap-4 p-4 border border-gray-300 rounded-lg bg-gray-50 max-h-64 overflow-y-auto">
-        {rooms.length > 0 ? (
-          rooms.map((room) => (
-            <motion.div
-              key={room.id}
-              whileHover={{ scale: 1.05 }}
-              className={`
+  const RoomSelection = React.memo(
+    ({ rooms, selectedRoomNumbers, onRoomToggle }) => {
+      return (
+        <div className="flex flex-wrap gap-4 p-4 border border-gray-300 rounded-lg bg-gray-50 max-h-64 overflow-y-auto">
+          {rooms.length > 0 ? (
+            rooms.map((room) => (
+              <motion.div
+                key={room.id}
+                whileHover={{ scale: 1.05 }}
+                className={`
                 p-4 rounded-xl shadow-md cursor-pointer transition-all duration-200
-                ${selectedRoomNumbers.includes(room.number)
-                  ? 'bg-indigo-600 text-white transform scale-105 ring-2 ring-indigo-500'
-                  : 'bg-white text-gray-800 hover:bg-gray-100'
+                ${
+                  selectedRoomNumbers.includes(room.number)
+                    ? "bg-indigo-600 text-white transform scale-105 ring-2 ring-indigo-500"
+                    : "bg-white text-gray-800 hover:bg-gray-100"
                 }
               `}
-              onClick={() => onRoomToggle(room.number)}
-            >
-              <div className="w-full h-24 mb-2 bg-gray-200 rounded-lg flex items-center justify-center text-gray-500">
-                {/* Placeholder for Room Image */}
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 8v-10a1 1 0 011-1h2a1 1 0 011 1v10m-6 0h6" />
-                </svg>
-              </div>
-              <div className={`font-semibold text-lg ${selectedRoomNumbers.includes(room.number) ? 'text-white' : 'text-indigo-700'}`}>
-                Room {room.number}
-              </div>
-              <div className={`text-sm ${selectedRoomNumbers.includes(room.number) ? 'text-indigo-200' : 'text-gray-500'}`}>
-                <p>Capacity: {room.adults} Adults, {room.children} Children</p>
-                <p className="font-medium">{formatCurrency(room.price)}/night</p>
-              </div>
-            </motion.div>
-          ))
-        ) : (
-          <div className="w-full text-center py-8 text-gray-500">
-            <div className="text-lg mb-2">🚫</div>
-            <p className="font-medium">No rooms available for the selected dates</p>
-            <p className="text-sm mt-1">Please try different dates or room type</p>
-          </div>
-        )}
-      </div>
-    );
-  });
-  RoomSelection.displayName = 'RoomSelection';
-
+                onClick={() => onRoomToggle(room.number)}
+              >
+                <div className="w-full h-24 mb-2 bg-gray-200 rounded-lg flex items-center justify-center text-gray-500">
+                  {/* Placeholder for Room Image */}
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-12 w-12"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 8v-10a1 1 0 011-1h2a1 1 0 011 1v10m-6 0h6"
+                    />
+                  </svg>
+                </div>
+                <div
+                  className={`font-semibold text-lg ${selectedRoomNumbers.includes(room.number) ? "text-white" : "text-indigo-700"}`}
+                >
+                  Room {room.number}
+                </div>
+                <div
+                  className={`text-sm ${selectedRoomNumbers.includes(room.number) ? "text-indigo-200" : "text-gray-500"}`}
+                >
+                  <p>
+                    Capacity: {room.adults} Adults, {room.children} Children
+                  </p>
+                  <p className="font-medium">
+                    {formatCurrency(room.price)}/night
+                  </p>
+                </div>
+              </motion.div>
+            ))
+          ) : (
+            <div className="w-full text-center py-8 text-gray-500">
+              <div className="text-lg mb-2">🚫</div>
+              <p className="font-medium">
+                No rooms available for the selected dates
+              </p>
+              <p className="text-sm mt-1">
+                Please try different dates or room type
+              </p>
+            </div>
+          )}
+        </div>
+      );
+    },
+  );
+  RoomSelection.displayName = "RoomSelection";
 
   return (
     <DashboardLayout>
-      <BannerMessage 
-        message={bannerMessage} 
+      <BannerMessage
+        message={bannerMessage}
         onClose={closeBannerMessage}
         autoDismiss={true}
         duration={5000}
@@ -2843,7 +3740,9 @@ const Bookings = () => {
       </div>
 
       <div className="p-4 sm:p-6 lg:p-8 space-y-8 bg-gray-100 min-h-screen font-sans">
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-800 tracking-tight">Booking Management Dashboard</h1>
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-800 tracking-tight">
+          Booking Management Dashboard
+        </h1>
 
         {/* Main Tabs Navigation */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 mb-6">
@@ -2894,998 +3793,1606 @@ const Bookings = () => {
         {/* Dashboard Tab */}
         {mainTab === "dashboard" && (
           <>
-                {/* Enhanced KPI Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
-                  <KPI_Card title="Total Bookings" value={kpis.activeBookings} />
-                  <KPI_Card title="Cancelled Bookings" value={kpis.cancelledBookings} />
-                  <KPI_Card title="Available Rooms" value={kpis.availableRooms} />
-                  <KPI_Card title="Guests Today Check-in" value={kpis.todaysGuestsCheckin} />
-                  <KPI_Card title="Guests Today Check-out" value={kpis.todaysGuestsCheckout} />
-                  <KPI_Card title="Total Packages" value={packages.length} />
-                  <KPI_Card title="Active Guests" value={bookings.filter(b => b.status === "checked-in" || b.status === "booked").length} />
-                  <KPI_Card title="Package Bookings" value={bookings.filter(b => b.is_package).length} />
+            {/* Enhanced KPI Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+              <KPI_Card title="Total Bookings" value={kpis.activeBookings} />
+              <KPI_Card
+                title="Cancelled Bookings"
+                value={kpis.cancelledBookings}
+              />
+              <KPI_Card title="Available Rooms" value={kpis.availableRooms} />
+              <KPI_Card
+                title="Guests Today Check-in"
+                value={kpis.todaysGuestsCheckin}
+              />
+              <KPI_Card
+                title="Guests Today Check-out"
+                value={kpis.todaysGuestsCheckout}
+              />
+              <KPI_Card title="Total Packages" value={packages.length} />
+              <KPI_Card
+                title="Active Guests"
+                value={
+                  bookings.filter(
+                    (b) => b.status === "checked-in" || b.status === "booked",
+                  ).length
+                }
+              />
+              <KPI_Card
+                title="Package Bookings"
+                value={bookings.filter((b) => b.is_package).length}
+              />
+            </div>
+
+            {/* Charts and Statistics Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+              {/* Booking Status Chart */}
+              <motion.div
+                className="bg-white p-6 rounded-2xl shadow-lg"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+              >
+                <BookingStatusChart data={bookings} />
+              </motion.div>
+
+              {/* Package Information */}
+              <motion.div
+                className="bg-white p-6 rounded-2xl shadow-lg"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+              >
+                <h3 className="text-xl font-bold mb-4 text-gray-800">
+                  Available Packages
+                </h3>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {packages.length > 0 ? (
+                    packages.map((pkg) => (
+                      <div
+                        key={pkg.id}
+                        className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-semibold text-gray-800">
+                            {pkg.title}
+                          </h4>
+                          <span className="text-indigo-600 font-bold">
+                            {formatCurrency(pkg.price)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                          {pkg.description}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <span
+                            className={`px-2 py-1 rounded ${pkg.booking_type === "whole_property" ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}
+                          >
+                            {pkg.booking_type === "whole_property"
+                              ? "Whole Property"
+                              : "Selected Rooms"}
+                          </span>
+                          {pkg.room_types && (
+                            <span className="text-gray-600">
+                              Types: {pkg.room_types}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-gray-500 text-center py-8">
+                      No packages available
+                    </p>
+                  )}
                 </div>
+              </motion.div>
+            </div>
 
-                {/* Charts and Statistics Row */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                  {/* Booking Status Chart */}
-                  <motion.div
-                    className="bg-white p-6 rounded-2xl shadow-lg"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5 }}
-                  >
-                    <BookingStatusChart data={bookings} />
-                  </motion.div>
+            {/* All Packages - Detailed View */}
+            <motion.div
+              className="bg-white p-6 rounded-2xl shadow-lg mb-8"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+            >
+              <h3 className="text-xl font-bold mb-6 text-gray-800">
+                All Packages - Complete Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {packages.length > 0 ? (
+                  packages.map((pkg) => (
+                    <div
+                      key={pkg.id}
+                      className="border-2 border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all bg-gradient-to-br from-white to-gray-50"
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <h4 className="font-bold text-lg text-gray-800">
+                          {pkg.title}
+                        </h4>
+                        <span className="text-indigo-600 font-bold text-xl">
+                          {formatCurrency(pkg.price)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-600 mb-4 min-h-[3rem]">
+                        {pkg.description || "No description available"}
+                      </p>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                              pkg.booking_type === "whole_property"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-blue-100 text-blue-700"
+                            }`}
+                          >
+                            {pkg.booking_type === "whole_property"
+                              ? "Whole Property"
+                              : "Selected Rooms"}
+                          </span>
+                        </div>
+                        {pkg.room_types && (
+                          <div className="text-xs text-gray-600">
+                            <span className="font-semibold">Room Types: </span>
+                            <span>{pkg.room_types}</span>
+                          </div>
+                        )}
+                        {pkg.images && pkg.images.length > 0 && (
+                          <div className="text-xs text-gray-500">
+                            <span className="font-semibold">Images: </span>
+                            <span>{pkg.images.length} photo(s)</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="col-span-full text-center py-12 text-gray-500">
+                    <p className="text-lg">No packages available</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
 
-                  {/* Package Information */}
-                  <motion.div
-                    className="bg-white p-6 rounded-2xl shadow-lg"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, delay: 0.1 }}
-                  >
-                    <h3 className="text-xl font-bold mb-4 text-gray-800">Available Packages</h3>
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {packages.length > 0 ? (
-                        packages.map((pkg) => (
-                          <div key={pkg.id} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                            <div className="flex justify-between items-start mb-2">
-                              <h4 className="font-semibold text-gray-800">{pkg.title}</h4>
-                              <span className="text-indigo-600 font-bold">{formatCurrency(pkg.price)}</span>
+            {/* All Rooms - Detailed View */}
+            <motion.div
+              className="bg-white p-6 rounded-2xl shadow-lg mb-8"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <h3 className="text-xl font-bold mb-6 text-gray-800">
+                All Rooms - Complete Details
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {allRooms.length > 0 ? (
+                  allRooms.map((room) => {
+                    const getImageUrl = (imageUrl) => {
+                      if (!imageUrl)
+                        return "https://placehold.co/400x300/e2e8f0/a0aec0?text=No+Image";
+                      if (imageUrl.startsWith("http")) return imageUrl;
+                      const baseUrl =
+                        API.defaults.baseURL?.replace(/\/$/, "") || "";
+                      const path = imageUrl.startsWith("/")
+                        ? imageUrl
+                        : `/${imageUrl}`;
+                      return `${baseUrl}${path}`;
+                    };
+
+                    return (
+                      <div
+                        key={room.id}
+                        className="border-2 border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-all bg-white"
+                      >
+                        {room.image_url && (
+                          <img
+                            src={getImageUrl(room.image_url)}
+                            alt={`Room ${room.number}`}
+                            className="w-full h-48 object-cover"
+                          />
+                        )}
+                        <div className="p-4">
+                          <div className="flex justify-between items-start mb-2">
+                            <div>
+                              <h4 className="font-bold text-lg text-gray-800">
+                                Room {room.number}
+                              </h4>
+                              <p className="text-sm text-gray-600">
+                                {room.type}
+                              </p>
                             </div>
-                            <p className="text-sm text-gray-600 mb-2 line-clamp-2">{pkg.description}</p>
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                              <span className={`px-2 py-1 rounded ${pkg.booking_type === 'whole_property' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
-                                {pkg.booking_type === 'whole_property' ? 'Whole Property' : 'Selected Rooms'}
-                              </span>
-                              {pkg.room_types && (
-                                <span className="text-gray-600">Types: {pkg.room_types}</span>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                room.status === "Available"
+                                  ? "bg-green-100 text-green-700"
+                                  : room.status === "Booked"
+                                    ? "bg-red-100 text-red-700"
+                                    : room.status === "Maintenance"
+                                      ? "bg-yellow-100 text-yellow-700"
+                                      : "bg-gray-100 text-gray-700"
+                              }`}
+                            >
+                              {room.status}
+                            </span>
+                          </div>
+                          <p className="text-indigo-600 font-bold text-lg mb-3">
+                            {formatCurrency(room.price)}/night
+                          </p>
+                          <p className="text-sm text-gray-600 mb-3">
+                            Capacity: {room.adults || 0} Adults,{" "}
+                            {room.children || 0} Children
+                          </p>
+                          {(room.air_conditioning ||
+                            room.wifi ||
+                            room.bathroom ||
+                            room.living_area ||
+                            room.terrace ||
+                            room.parking ||
+                            room.kitchen ||
+                            room.family_room ||
+                            room.bbq ||
+                            room.garden ||
+                            room.dining ||
+                            room.breakfast) && (
+                            <div className="flex flex-wrap gap-1 mt-3">
+                              {room.air_conditioning && (
+                                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                                  AC
+                                </span>
+                              )}
+                              {room.wifi && (
+                                <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                                  WiFi
+                                </span>
+                              )}
+                              {room.bathroom && (
+                                <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
+                                  Bathroom
+                                </span>
+                              )}
+                              {room.living_area && (
+                                <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">
+                                  Living
+                                </span>
+                              )}
+                              {room.terrace && (
+                                <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">
+                                  Terrace
+                                </span>
+                              )}
+                              {room.parking && (
+                                <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">
+                                  Parking
+                                </span>
+                              )}
+                              {room.kitchen && (
+                                <span className="px-2 py-1 text-xs bg-pink-100 text-pink-700 rounded-full">
+                                  Kitchen
+                                </span>
+                              )}
+                              {room.family_room && (
+                                <span className="px-2 py-1 text-xs bg-teal-100 text-teal-700 rounded-full">
+                                  Family
+                                </span>
+                              )}
+                              {room.bbq && (
+                                <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">
+                                  BBQ
+                                </span>
+                              )}
+                              {room.garden && (
+                                <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">
+                                  Garden
+                                </span>
+                              )}
+                              {room.dining && (
+                                <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-full">
+                                  Dining
+                                </span>
+                              )}
+                              {room.breakfast && (
+                                <span className="px-2 py-1 text-xs bg-cyan-100 text-cyan-700 rounded-full">
+                                  Breakfast
+                                </span>
                               )}
                             </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-gray-500 text-center py-8">No packages available</p>
-                      )}
-                    </div>
-                  </motion.div>
-                </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="col-span-full text-center py-12 text-gray-500">
+                    <p className="text-lg">No rooms available</p>
+                  </div>
+                )}
+              </div>
+            </motion.div>
 
-                {/* All Packages - Detailed View */}
-                <motion.div
-                  className="bg-white p-6 rounded-2xl shadow-lg mb-8"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.2 }}
-                >
-                  <h3 className="text-xl font-bold mb-6 text-gray-800">All Packages - Complete Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {packages.length > 0 ? (
-                      packages.map((pkg) => (
-                        <div key={pkg.id} className="border-2 border-gray-200 rounded-xl p-5 hover:shadow-lg transition-all bg-gradient-to-br from-white to-gray-50">
-                          <div className="flex justify-between items-start mb-3">
-                            <h4 className="font-bold text-lg text-gray-800">{pkg.title}</h4>
-                            <span className="text-indigo-600 font-bold text-xl">{formatCurrency(pkg.price)}</span>
-                          </div>
-                          <p className="text-sm text-gray-600 mb-4 min-h-[3rem]">{pkg.description || 'No description available'}</p>
-                          <div className="space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                                pkg.booking_type === 'whole_property' 
-                                  ? 'bg-purple-100 text-purple-700' 
-                                  : 'bg-blue-100 text-blue-700'
-                              }`}>
-                                {pkg.booking_type === 'whole_property' ? 'Whole Property' : 'Selected Rooms'}
+            {/* Available Rooms Section */}
+            <motion.div
+              className="bg-white p-6 rounded-2xl shadow-lg mb-8"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+            >
+              <h3 className="text-xl font-bold mb-6 text-gray-800">
+                Available Rooms (
+                {allRooms.filter((r) => r.status === "Available").length})
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {allRooms.filter((r) => r.status === "Available").length > 0 ? (
+                  allRooms
+                    .filter((r) => r.status === "Available")
+                    .map((room) => {
+                      const getImageUrl = (imageUrl) => {
+                        if (!imageUrl)
+                          return "https://placehold.co/400x300/e2e8f0/a0aec0?text=No+Image";
+                        if (imageUrl.startsWith("http")) return imageUrl;
+                        const baseUrl =
+                          API.defaults.baseURL?.replace(/\/$/, "") || "";
+                        const path = imageUrl.startsWith("/")
+                          ? imageUrl
+                          : `/${imageUrl}`;
+                        return `${baseUrl}${path}`;
+                      };
+
+                      return (
+                        <div
+                          key={room.id}
+                          className="border-2 border-green-200 rounded-xl overflow-hidden hover:shadow-lg transition-all bg-gradient-to-br from-green-50 to-white"
+                        >
+                          {room.image_url && (
+                            <img
+                              src={getImageUrl(room.image_url)}
+                              alt={`Room ${room.number}`}
+                              className="w-full h-48 object-cover"
+                            />
+                          )}
+                          <div className="p-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h4 className="font-bold text-lg text-gray-800">
+                                  Room {room.number}
+                                </h4>
+                                <p className="text-sm text-gray-600">
+                                  {room.type}
+                                </p>
+                              </div>
+                              <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                                Available
                               </span>
                             </div>
-                            {pkg.room_types && (
-                              <div className="text-xs text-gray-600">
-                                <span className="font-semibold">Room Types: </span>
-                                <span>{pkg.room_types}</span>
-                              </div>
-                            )}
-                            {pkg.images && pkg.images.length > 0 && (
-                              <div className="text-xs text-gray-500">
-                                <span className="font-semibold">Images: </span>
-                                <span>{pkg.images.length} photo(s)</span>
+                            <p className="text-indigo-600 font-bold text-lg mb-3">
+                              {formatCurrency(room.price)}/night
+                            </p>
+                            <p className="text-sm text-gray-600 mb-3">
+                              Capacity: {room.adults || 0} Adults,{" "}
+                              {room.children || 0} Children
+                            </p>
+                            {(room.air_conditioning ||
+                              room.wifi ||
+                              room.bathroom ||
+                              room.living_area ||
+                              room.terrace ||
+                              room.parking ||
+                              room.kitchen ||
+                              room.family_room ||
+                              room.bbq ||
+                              room.garden ||
+                              room.dining ||
+                              room.breakfast) && (
+                              <div className="flex flex-wrap gap-1 mt-3">
+                                {room.air_conditioning && (
+                                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                                    AC
+                                  </span>
+                                )}
+                                {room.wifi && (
+                                  <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                                    WiFi
+                                  </span>
+                                )}
+                                {room.bathroom && (
+                                  <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
+                                    Bathroom
+                                  </span>
+                                )}
+                                {room.living_area && (
+                                  <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">
+                                    Living
+                                  </span>
+                                )}
+                                {room.terrace && (
+                                  <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">
+                                    Terrace
+                                  </span>
+                                )}
+                                {room.parking && (
+                                  <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">
+                                    Parking
+                                  </span>
+                                )}
+                                {room.kitchen && (
+                                  <span className="px-2 py-1 text-xs bg-pink-100 text-pink-700 rounded-full">
+                                    Kitchen
+                                  </span>
+                                )}
+                                {room.family_room && (
+                                  <span className="px-2 py-1 text-xs bg-teal-100 text-teal-700 rounded-full">
+                                    Family
+                                  </span>
+                                )}
+                                {room.bbq && (
+                                  <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">
+                                    BBQ
+                                  </span>
+                                )}
+                                {room.garden && (
+                                  <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">
+                                    Garden
+                                  </span>
+                                )}
+                                {room.dining && (
+                                  <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-full">
+                                    Dining
+                                  </span>
+                                )}
+                                {room.breakfast && (
+                                  <span className="px-2 py-1 text-xs bg-cyan-100 text-cyan-700 rounded-full">
+                                    Breakfast
+                                  </span>
+                                )}
                               </div>
                             )}
                           </div>
                         </div>
-                      ))
-                    ) : (
-                      <div className="col-span-full text-center py-12 text-gray-500">
-                        <p className="text-lg">No packages available</p>
-                      </div>
-                    )}
+                      );
+                    })
+                ) : (
+                  <div className="col-span-full text-center py-12 text-gray-500">
+                    <p className="text-lg">No available rooms</p>
                   </div>
-                </motion.div>
+                )}
+              </div>
+            </motion.div>
 
-                {/* All Rooms - Detailed View */}
-                <motion.div
-                  className="bg-white p-6 rounded-2xl shadow-lg mb-8"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.3 }}
+            {/* All Bookings with Guest Details */}
+            <motion.div
+              className="bg-white p-6 rounded-2xl shadow-lg"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.5 }}
+            >
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold text-gray-800">
+                  All Bookings & Guest Details ({bookings.length})
+                </h3>
+                <button
+                  onClick={() => setBookingView("create")}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                 >
-                  <h3 className="text-xl font-bold mb-6 text-gray-800">All Rooms - Complete Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {allRooms.length > 0 ? (
-                      allRooms.map((room) => {
-                        const getImageUrl = (imageUrl) => {
-                          if (!imageUrl) return 'https://placehold.co/400x300/e2e8f0/a0aec0?text=No+Image';
-                          if (imageUrl.startsWith('http')) return imageUrl;
-                          const baseUrl = API.defaults.baseURL?.replace(/\/$/, '') || '';
-                          const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-                          return `${baseUrl}${path}`;
-                        };
-                        
-                        return (
-                          <div key={room.id} className="border-2 border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-all bg-white">
-                            {room.image_url && (
-                              <img 
-                                src={getImageUrl(room.image_url)} 
-                                alt={`Room ${room.number}`}
-                                className="w-full h-48 object-cover"
-                              />
-                            )}
-                            <div className="p-4">
-                              <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <h4 className="font-bold text-lg text-gray-800">Room {room.number}</h4>
-                                  <p className="text-sm text-gray-600">{room.type}</p>
-                                </div>
-                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                  room.status === 'Available' ? 'bg-green-100 text-green-700' :
-                                  room.status === 'Booked' ? 'bg-red-100 text-red-700' :
-                                  room.status === 'Maintenance' ? 'bg-yellow-100 text-yellow-700' :
-                                  'bg-gray-100 text-gray-700'
-                                }`}>
-                                  {room.status}
-                                </span>
-                              </div>
-                              <p className="text-indigo-600 font-bold text-lg mb-3">{formatCurrency(room.price)}/night</p>
-                              <p className="text-sm text-gray-600 mb-3">
-                                Capacity: {room.adults || 0} Adults, {room.children || 0} Children
-                              </p>
-                              {(room.air_conditioning || room.wifi || room.bathroom || room.living_area || room.terrace || room.parking || room.kitchen || room.family_room || room.bbq || room.garden || room.dining || room.breakfast) && (
-                                <div className="flex flex-wrap gap-1 mt-3">
-                                  {room.air_conditioning && <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">AC</span>}
-                                  {room.wifi && <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">WiFi</span>}
-                                  {room.bathroom && <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">Bathroom</span>}
-                                  {room.living_area && <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">Living</span>}
-                                  {room.terrace && <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">Terrace</span>}
-                                  {room.parking && <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">Parking</span>}
-                                  {room.kitchen && <span className="px-2 py-1 text-xs bg-pink-100 text-pink-700 rounded-full">Kitchen</span>}
-                                  {room.family_room && <span className="px-2 py-1 text-xs bg-teal-100 text-teal-700 rounded-full">Family</span>}
-                                  {room.bbq && <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">BBQ</span>}
-                                  {room.garden && <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">Garden</span>}
-                                  {room.dining && <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-full">Dining</span>}
-                                  {room.breakfast && <span className="px-2 py-1 text-xs bg-cyan-100 text-cyan-700 rounded-full">Breakfast</span>}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="col-span-full text-center py-12 text-gray-500">
-                        <p className="text-lg">No rooms available</p>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-
-                {/* Available Rooms Section */}
-                <motion.div
-                  className="bg-white p-6 rounded-2xl shadow-lg mb-8"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.4 }}
-                >
-                  <h3 className="text-xl font-bold mb-6 text-gray-800">Available Rooms ({allRooms.filter(r => r.status === 'Available').length})</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {allRooms.filter(r => r.status === 'Available').length > 0 ? (
-                      allRooms.filter(r => r.status === 'Available').map((room) => {
-                        const getImageUrl = (imageUrl) => {
-                          if (!imageUrl) return 'https://placehold.co/400x300/e2e8f0/a0aec0?text=No+Image';
-                          if (imageUrl.startsWith('http')) return imageUrl;
-                          const baseUrl = API.defaults.baseURL?.replace(/\/$/, '') || '';
-                          const path = imageUrl.startsWith('/') ? imageUrl : `/${imageUrl}`;
-                          return `${baseUrl}${path}`;
-                        };
-                        
-                        return (
-                          <div key={room.id} className="border-2 border-green-200 rounded-xl overflow-hidden hover:shadow-lg transition-all bg-gradient-to-br from-green-50 to-white">
-                            {room.image_url && (
-                              <img 
-                                src={getImageUrl(room.image_url)} 
-                                alt={`Room ${room.number}`}
-                                className="w-full h-48 object-cover"
-                              />
-                            )}
-                            <div className="p-4">
-                              <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <h4 className="font-bold text-lg text-gray-800">Room {room.number}</h4>
-                                  <p className="text-sm text-gray-600">{room.type}</p>
-                                </div>
-                                <span className="px-2 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                                  Available
-                                </span>
-                              </div>
-                              <p className="text-indigo-600 font-bold text-lg mb-3">{formatCurrency(room.price)}/night</p>
-                              <p className="text-sm text-gray-600 mb-3">
-                                Capacity: {room.adults || 0} Adults, {room.children || 0} Children
-                              </p>
-                              {(room.air_conditioning || room.wifi || room.bathroom || room.living_area || room.terrace || room.parking || room.kitchen || room.family_room || room.bbq || room.garden || room.dining || room.breakfast) && (
-                                <div className="flex flex-wrap gap-1 mt-3">
-                                  {room.air_conditioning && <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">AC</span>}
-                                  {room.wifi && <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">WiFi</span>}
-                                  {room.bathroom && <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">Bathroom</span>}
-                                  {room.living_area && <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">Living</span>}
-                                  {room.terrace && <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">Terrace</span>}
-                                  {room.parking && <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">Parking</span>}
-                                  {room.kitchen && <span className="px-2 py-1 text-xs bg-pink-100 text-pink-700 rounded-full">Kitchen</span>}
-                                  {room.family_room && <span className="px-2 py-1 text-xs bg-teal-100 text-teal-700 rounded-full">Family</span>}
-                                  {room.bbq && <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">BBQ</span>}
-                                  {room.garden && <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">Garden</span>}
-                                  {room.dining && <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-full">Dining</span>}
-                                  {room.breakfast && <span className="px-2 py-1 text-xs bg-cyan-100 text-cyan-700 rounded-full">Breakfast</span>}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="col-span-full text-center py-12 text-gray-500">
-                        <p className="text-lg">No available rooms</p>
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-
-                {/* All Bookings with Guest Details */}
-                <motion.div
-                  className="bg-white p-6 rounded-2xl shadow-lg"
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.5 }}
-                >
-                  <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-xl font-bold text-gray-800">All Bookings & Guest Details ({bookings.length})</h3>
-                    <button
-                      onClick={() => setBookingView("create")}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-                    >
-                      Create New Booking
-                    </button>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Guest Name</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Contact</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Type</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Rooms</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Check-in</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Check-out</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Status</th>
-                          <th className="px-4 py-3 text-left font-semibold text-gray-700">Guests</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {bookings.map((booking) => {
-                          const roomInfo = booking.rooms && booking.rooms.length > 0
-                            ? booking.rooms.map(room => {
+                  Create New Booking
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                        Guest Name
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                        Contact
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                        Type
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                        Rooms
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                        Check-in
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                        Check-out
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                        Status
+                      </th>
+                      <th className="px-4 py-3 text-left font-semibold text-gray-700">
+                        Guests
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {bookings.map((booking) => {
+                      const roomInfo =
+                        booking.rooms && booking.rooms.length > 0
+                          ? booking.rooms
+                              .map((room) => {
                                 if (booking.is_package) {
-                                  if (room?.room?.number) return room.room.number;
-                                  if (room?.room_id && roomIdToRoom && roomIdToRoom[room.room_id]) {
+                                  if (room?.room?.number)
+                                    return room.room.number;
+                                  if (
+                                    room?.room_id &&
+                                    roomIdToRoom &&
+                                    roomIdToRoom[room.room_id]
+                                  ) {
                                     return roomIdToRoom[room.room_id].number;
                                   }
-                                  return '-';
+                                  return "-";
                                 } else {
                                   if (room?.number) return room.number;
-                                  if (room?.room_id && roomIdToRoom && roomIdToRoom[room.room_id]) {
+                                  if (
+                                    room?.room_id &&
+                                    roomIdToRoom &&
+                                    roomIdToRoom[room.room_id]
+                                  ) {
                                     return roomIdToRoom[room.room_id].number;
                                   }
-                                  return '-';
+                                  return "-";
                                 }
-                              }).filter(Boolean).join(", ") || '-'
-                            : "-";
-                          
-                          return (
-                            <tr key={`${booking.is_package ? 'pkg' : 'reg'}_${booking.id}`} className="hover:bg-gray-50">
-                              <td className="px-4 py-3">
-                                <div className="font-medium text-gray-900">{booking.guest_name}</div>
-                                {booking.guest_email && (
-                                  <div className="text-xs text-gray-500">{booking.guest_email}</div>
-                                )}
-                              </td>
-                              <td className="px-4 py-3 text-gray-700">{booking.guest_mobile || '-'}</td>
-                              <td className="px-4 py-3">
-                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                  booking.is_package 
-                                    ? 'bg-purple-100 text-purple-700' 
-                                    : 'bg-blue-100 text-blue-700'
-                                }`}>
-                                  {booking.is_package ? 'Package' : 'Room'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-3 text-gray-700">{roomInfo}</td>
-                              <td className="px-4 py-3 text-gray-700">{booking.check_in}</td>
-                              <td className="px-4 py-3 text-gray-700">{booking.check_out}</td>
-                              <td className="px-4 py-3">
-                                <BookingStatusBadge status={booking.status} />
-                              </td>
-                              <td className="px-4 py-3 text-gray-700">
-                                {booking.adults || 0}A, {booking.children || 0}C
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {bookings.length === 0 && (
-                          <tr>
-                            <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
-                              No bookings found
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </motion.div>
+                              })
+                              .filter(Boolean)
+                              .join(", ") || "-"
+                          : "-";
+
+                      return (
+                        <tr
+                          key={`${booking.is_package ? "pkg" : "reg"}_${booking.id}`}
+                          className="hover:bg-gray-50"
+                        >
+                          <td className="px-4 py-3">
+                            <div className="font-medium text-gray-900">
+                              {booking.guest_name}
+                            </div>
+                            {booking.guest_email && (
+                              <div className="text-xs text-gray-500">
+                                {booking.guest_email}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {booking.guest_mobile || "-"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                booking.is_package
+                                  ? "bg-purple-100 text-purple-700"
+                                  : "bg-blue-100 text-blue-700"
+                              }`}
+                            >
+                              {booking.is_package ? "Package" : "Room"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {roomInfo}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {booking.check_in}
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {booking.check_out}
+                          </td>
+                          <td className="px-4 py-3">
+                            <BookingStatusBadge status={booking.status} />
+                          </td>
+                          <td className="px-4 py-3 text-gray-700">
+                            {booking.adults || 0}A, {booking.children || 0}C
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {bookings.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan="8"
+                          className="px-4 py-8 text-center text-gray-500"
+                        >
+                          No bookings found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </motion.div>
           </>
         )}
 
         {/* Booking Management Tab */}
         {mainTab === "booking" && (
           <>
-                {/* KPI Row */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
-          <KPI_Card title="Total Bookings" value={kpis.activeBookings} />
-          <KPI_Card title="Cancelled Bookings" value={kpis.cancelledBookings} />
-          <KPI_Card title="Available Rooms" value={kpis.availableRooms} />
-          <KPI_Card title="Guests Today Check-in" value={kpis.todaysGuestsCheckin} />
-          <KPI_Card title="Guests Today Check-out" value={kpis.todaysGuestsCheckout} />
-        </div>
-
-        {/* Booking Form & Chart Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <motion.div
-            className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg flex flex-col"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-          >
-            {/* Tabs Navigation */}
-            <div className="flex border-b border-gray-200 mb-6">
-              <button
-                onClick={() => setBookingTab("room")}
-                className={`px-6 py-3 font-medium transition-colors ${
-                  bookingTab === "room"
-                    ? "text-indigo-600 border-b-2 border-indigo-600"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                Room Booking
-              </button>
-              <button
-                onClick={() => setBookingTab("package")}
-                className={`px-6 py-3 font-medium transition-colors ${
-                  bookingTab === "package"
-                    ? "text-indigo-600 border-b-2 border-indigo-600"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
-              >
-                Package Booking
-              </button>
+            {/* KPI Row */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 mb-8">
+              <KPI_Card title="Total Bookings" value={kpis.activeBookings} />
+              <KPI_Card
+                title="Cancelled Bookings"
+                value={kpis.cancelledBookings}
+              />
+              <KPI_Card title="Available Rooms" value={kpis.availableRooms} />
+              <KPI_Card
+                title="Guests Today Check-in"
+                value={kpis.todaysGuestsCheckin}
+              />
+              <KPI_Card
+                title="Guests Today Check-out"
+                value={kpis.todaysGuestsCheckout}
+              />
             </div>
 
-            {/* Room Booking Tab */}
-            {bookingTab === "room" && (
-              <>
-            <h2 className="text-2xl font-bold mb-6 text-gray-700">Create Room Booking</h2>
-
-            {feedback.message && (
+            {/* Booking Form & Chart Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
+                className="bg-white p-6 sm:p-8 rounded-2xl shadow-lg flex flex-col"
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`mb-4 p-4 rounded-lg text-sm font-semibold ${
-                  feedback.type === "success"
-                    ? "bg-green-100 text-green-800"
-                    : "bg-red-100 text-red-800"
-                }`}
+                transition={{ duration: 0.5 }}
               >
-                {feedback.message}
-              </motion.div>
-            )}
-            <form onSubmit={handleSubmit} className="flex flex-col h-full">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 flex-grow">
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-1">Guest Name</label>
-                  <input
-                    type="text" name="guestName" value={formData.guestName}
-                    onChange={handleChange} placeholder="Enter guest's full name"
-                    className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-1">Mobile Number</label>
-                  <input
-                    type="text" name="guestMobile" value={formData.guestMobile}
-                    onChange={handleChange} placeholder="e.g., +1234567890"
-                    className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-                <div className="flex flex-col md:col-span-2">
-                  <label className="text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email" name="guestEmail" value={formData.guestEmail}
-                    onChange={handleChange} placeholder="email@example.com"
-                    className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-1">Check-in Date</label>
-                  <input
-                    type="date" name="checkIn" value={formData.checkIn}
-                    onChange={handleChange} min={today}
-                    className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-1">Check-out Date</label>
-                  <input
-                    type="date" name="checkOut" value={formData.checkOut}
-                    onChange={handleChange} min={formData.checkIn || today}
-                    className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-1">Room Type</label>
-                  <select
-                    name="roomTypes" value={formData.roomTypes[0] || ""}
-                    onChange={handleRoomTypeChange}
-                    className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
-                    required
+                {/* Tabs Navigation */}
+                <div className="flex border-b border-gray-200 mb-6">
+                  <button
+                    onClick={() => setBookingTab("room")}
+                    className={`px-6 py-3 font-medium transition-colors ${
+                      bookingTab === "room"
+                        ? "text-indigo-600 border-b-2 border-indigo-600"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
                   >
-                    <option value="">Select Room Type</option>
-                    {roomTypes.map((type, idx) => (
-                      <option key={idx} value={type}>{type}</option>
-                    ))}
-                  </select>
+                    Room Booking
+                  </button>
+                  <button
+                    onClick={() => setBookingTab("package")}
+                    className={`px-6 py-3 font-medium transition-colors ${
+                      bookingTab === "package"
+                        ? "text-indigo-600 border-b-2 border-indigo-600"
+                        : "text-gray-600 hover:text-gray-900"
+                    }`}
+                  >
+                    Package Booking
+                  </button>
                 </div>
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-1">
-                    Available Rooms for Selected Dates
-                    {formData.checkIn && formData.checkOut && (
-                      <span className="text-xs text-gray-500 ml-2">
-                        ({formData.checkIn} to {formData.checkOut})
-                      </span>
-                    )}
-                  </label>
-                  <AnimatePresence mode="wait">
-                    {formData.roomTypes.length > 0 && (
+
+                {/* Room Booking Tab */}
+                {bookingTab === "room" && (
+                  <>
+                    <h2 className="text-2xl font-bold mb-6 text-gray-700">
+                      Create Room Booking
+                    </h2>
+
+                    {feedback.message && (
                       <motion.div
-                        key={formData.roomTypes[0]}
-                        initial={{ opacity: 0, y: 10 }}
+                        initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.3 }}
+                        className={`mb-4 p-4 rounded-lg text-sm font-semibold ${
+                          feedback.type === "success"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
                       >
-                        <RoomSelection
-                          rooms={filteredRooms}
-                          selectedRoomNumbers={formData.roomNumbers}
-                          onRoomToggle={handleRoomNumberToggle}
-                        />
+                        {feedback.message}
                       </motion.div>
                     )}
-                  </AnimatePresence>
-                  {!formData.checkIn || !formData.checkOut ? (
-                    <div className="text-center py-8 text-gray-500 text-sm">
-                      <p>Please select check-in and check-out dates first</p>
-                      <p className="text-xs mt-1">Available rooms will be shown here</p>
-                    </div>
-                  ) : null}
-                </div>
-
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-1">Number of Adults</label>
-                  <input
-                    type="number" name="adults" value={formData.adults}
-                    onChange={handleChange}
-                    className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
-                    min="1"
-                    required
-                  />
-                </div>
-                <div className="flex flex-col">
-                  <label className="text-sm font-medium text-gray-700 mb-1">Number of Children</label>
-                  <input
-                    type="number" name="children" value={formData.children}
-                    onChange={handleChange}
-                    className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
-                    min="0"
-                    required
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="mt-6 w-full bg-indigo-600 text-white font-semibold py-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                disabled={isSubmitting || isLoading}
-              >
-                {isSubmitting ? "Creating..." : "Create Booking"}
-              </button>
-            </form>
-              </>
-            )}
-
-            {/* Package Booking Tab */}
-            {bookingTab === "package" && (
-              <>
-            <h2 className="text-2xl font-bold mb-6 text-gray-700">Book a Package</h2>
-            <form onSubmit={handlePackageBookingSubmit} className="flex flex-col h-full">
-              <div className="space-y-4 flex-grow">
-                <select name="package_id" value={packageBookingForm.package_id} onChange={handlePackageBookingChange} className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all" required>
-                  <option value="">Select Package</option>
-                  {packages.map(p => {
-                    const bookingTypeLabel = p.booking_type === 'whole_property' ? ' (Whole Property)' : p.booking_type === 'room_type' ? ' (Selected Rooms)' : '';
-                    return <option key={p.id} value={p.id}>{p.title}{bookingTypeLabel} - {formatCurrency(p.price)}</option>;
-                  })}
-                </select>
-                <input name="guest_name" placeholder="Guest Name" value={packageBookingForm.guest_name} onChange={handlePackageBookingChange} className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all" required />
-                <input type="email" name="guest_email" placeholder="Guest Email" value={packageBookingForm.guest_email} onChange={handlePackageBookingChange} className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all" />
-                <input name="guest_mobile" placeholder="Guest Mobile" value={packageBookingForm.guest_mobile} onChange={handlePackageBookingChange} className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all" required />
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <input type="date" name="check_in" value={packageBookingForm.check_in} min={today} onChange={handlePackageBookingChange} className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all" required />
-                  <input type="date" name="check_out" value={packageBookingForm.check_out} min={packageBookingForm.check_in || today} onChange={handlePackageBookingChange} className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all" required />
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <input type="number" name="adults" min={1} placeholder="Adults" value={packageBookingForm.adults} onChange={handlePackageBookingChange} className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all" required />
-                  <input type="number" name="children" min={0} placeholder="Children" value={packageBookingForm.children} onChange={handlePackageBookingChange} className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all" />
-                </div>
-                {/* Room Selection - Only show for room_type packages */}
-                {(() => {
-                  const selectedPackage = packages.find(p => p.id === parseInt(packageBookingForm.package_id));
-                  
-                  if (!selectedPackage) {
-                    return null;
-                  }
-                  
-                  // Determine if it's whole_property:
-                  // 1. If booking_type is explicitly 'whole_property'
-                  // 2. If booking_type is not set AND room_types is not set (legacy packages without booking_type)
-                  const hasRoomTypes = selectedPackage.room_types && selectedPackage.room_types.trim().length > 0;
-                  const isWholeProperty = selectedPackage.booking_type === 'whole_property' || 
-                                         selectedPackage.booking_type === 'whole property' ||
-                                         (!selectedPackage.booking_type && !hasRoomTypes);
-                  
-                  // Hide room selection completely for whole_property
-                  if (isWholeProperty) {
-                    return (
-                      <div className="bg-indigo-50 border-2 border-indigo-300 rounded-lg p-4">
-                        <p className="text-sm font-semibold text-indigo-800">Whole Property Package</p>
-                        <p className="text-xs text-indigo-600 mt-1">
-                          All available rooms ({packageRooms.length} room{packageRooms.length !== 1 ? 's' : ''}) will be booked automatically for the selected dates.
-                        </p>
-                      </div>
-                    );
-                  }
-                  
-                  // Show room selection for room_type packages
-                  // If booking_type is explicitly 'room_type', always show room selection
-                  // If booking_type is not set but has room_types, treat as room_type
-                  const isRoomType = selectedPackage.booking_type === 'room_type' || 
-                                     (selectedPackage.booking_type !== 'whole_property' && hasRoomTypes);
-                  
-                  // If it's not whole_property and not clearly room_type, default to showing room selection
-                  // (for backward compatibility with packages that don't have booking_type set)
-                  if (!isWholeProperty && !isRoomType && !selectedPackage.booking_type) {
-                    // Legacy package without booking_type - show room selection by default
-                    return (
-                      <div>
-                        <label className="block text-gray-600 font-medium mb-2">
-                          Select Rooms for Package
-                          {packageBookingForm.check_in && packageBookingForm.check_out && (
-                            <span className="text-xs text-gray-500 ml-2">
-                              ({packageBookingForm.check_in} to {packageBookingForm.check_out})
-                            </span>
-                          )}
-                        </label>
-                        {!packageBookingForm.check_in || !packageBookingForm.check_out ? (
-                          <div className="text-center py-8 text-gray-500 text-sm bg-gray-50 rounded-lg border">
-                            <p>Please select check-in and check-out dates first</p>
-                            <p className="text-xs mt-1">Available rooms will be shown here</p>
-                          </div>
-                        ) : (
-                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-lg border">
-                            {packageRooms.length > 0 ? (
-                              packageRooms.map(room => (
-                                <div key={room.id} onClick={() => handlePackageRoomSelect(room.id)} className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200
-                                                     ${packageBookingForm.room_ids.includes(room.id) ? 'bg-indigo-500 text-white border-indigo-600' : 'bg-white border-gray-300 hover:border-indigo-500'}
-                                `}>
-                                  <p className="font-semibold">Room {room.number}</p>
-                                  <p className={`text-sm ${packageBookingForm.room_ids.includes(room.id) ? 'text-indigo-200' : 'text-gray-600'}`}>{room.type}</p>
-                                  <p className={`text-xs ${packageBookingForm.room_ids.includes(room.id) ? 'text-indigo-200' : 'text-gray-500'}`}>{formatCurrency(room.price)}/night</p>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="col-span-full text-center py-4 text-gray-500">
-                                <p className="font-medium">No rooms available for the selected dates</p>
-                                <p className="text-sm mt-1">Please try different dates</p>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  }
-                  
-                  // Show room selection for room_type packages
-                  if (!isRoomType) {
-                    return null; // Don't show room selection if package type is unclear
-                  }
-                  
-                  return (
-                    <div>
-                      <label className="block text-gray-600 font-medium mb-2">
-                        Select Rooms for Package
-                        {selectedPackage.room_types && (
-                          <span className="text-xs text-indigo-600 ml-2">
-                            (Filtered by: {selectedPackage.room_types})
-                          </span>
-                        )}
-                        {packageBookingForm.check_in && packageBookingForm.check_out && (
-                          <span className="text-xs text-gray-500 ml-2">
-                            ({packageBookingForm.check_in} to {packageBookingForm.check_out})
-                          </span>
-                        )}
-                      </label>
-                      {!packageBookingForm.check_in || !packageBookingForm.check_out ? (
-                        <div className="text-center py-8 text-gray-500 text-sm bg-gray-50 rounded-lg border">
-                          <p>Please select check-in and check-out dates first</p>
-                          <p className="text-xs mt-1">Available rooms will be shown here</p>
+                    <form
+                      onSubmit={handleSubmit}
+                      className="flex flex-col h-full"
+                    >
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 flex-grow">
+                        <div className="flex flex-col">
+                          <label className="text-sm font-medium text-gray-700 mb-1">
+                            Guest Name
+                          </label>
+                          <input
+                            type="text"
+                            name="guestName"
+                            value={formData.guestName}
+                            onChange={handleChange}
+                            placeholder="Enter guest's full name"
+                            className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                          />
                         </div>
-                      ) : (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-lg border">
-                          {(() => {
-                            // Filter rooms by package's room_types (only for room_type packages with room_types set)
-                            // Use case-insensitive comparison to handle "Cottage" vs "cottage"
-                            let roomsToShow = packageRooms;
-                            if (selectedPackage.booking_type === 'room_type' && selectedPackage.room_types) {
-                              const allowedRoomTypes = selectedPackage.room_types.split(',').map(t => t.trim().toLowerCase());
-                              roomsToShow = packageRooms.filter(room => {
-                                const roomType = room.type ? room.type.trim().toLowerCase() : '';
-                                return allowedRoomTypes.includes(roomType);
-                              });
-                            }
-                            // If booking_type is 'room_type' but no room_types specified, show all available rooms
-                            
-                            return roomsToShow.length > 0 ? (
-                              roomsToShow.map(room => (
-                                <div key={room.id} onClick={() => handlePackageRoomSelect(room.id)} className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200
-                                                     ${packageBookingForm.room_ids.includes(room.id) ? 'bg-indigo-500 text-white border-indigo-600' : 'bg-white border-gray-300 hover:border-indigo-500'}
-                                `}>
-                                  <p className="font-semibold">Room {room.number}</p>
-                                  <p className={`text-sm ${packageBookingForm.room_ids.includes(room.id) ? 'text-indigo-200' : 'text-gray-600'}`}>{room.type}</p>
-                                  <p className={`text-xs ${packageBookingForm.room_ids.includes(room.id) ? 'text-indigo-200' : 'text-gray-500'}`}>{formatCurrency(room.price)}/night</p>
-                                </div>
-                              ))
-                            ) : (
-                              <div className="col-span-full text-center py-4 text-gray-500">
-                                <p className="font-medium">No rooms available for the selected dates</p>
-                                {selectedPackage.room_types && (
-                                  <p className="text-sm mt-1">No rooms match the selected room types: {selectedPackage.room_types}</p>
-                                )}
-                                {!selectedPackage.room_types && (
-                                  <p className="text-sm mt-1">Please try different dates</p>
+                        <div className="flex flex-col">
+                          <label className="text-sm font-medium text-gray-700 mb-1">
+                            Mobile Number
+                          </label>
+                          <input
+                            type="text"
+                            name="guestMobile"
+                            value={formData.guestMobile}
+                            onChange={handleChange}
+                            placeholder="e.g., +1234567890"
+                            className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                          />
+                        </div>
+                        <div className="flex flex-col md:col-span-2">
+                          <label className="text-sm font-medium text-gray-700 mb-1">
+                            Email
+                          </label>
+                          <input
+                            type="email"
+                            name="guestEmail"
+                            value={formData.guestEmail}
+                            onChange={handleChange}
+                            placeholder="email@example.com"
+                            className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                          />
+                        </div>
+
+                        <div className="flex flex-col">
+                          <label className="text-sm font-medium text-gray-700 mb-1">
+                            Check-in Date
+                          </label>
+                          <input
+                            type="date"
+                            name="checkIn"
+                            value={formData.checkIn}
+                            onChange={handleChange}
+                            min={today}
+                            className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="text-sm font-medium text-gray-700 mb-1">
+                            Check-out Date
+                          </label>
+                          <input
+                            type="date"
+                            name="checkOut"
+                            value={formData.checkOut}
+                            onChange={handleChange}
+                            min={formData.checkIn || today}
+                            className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                          />
+                        </div>
+
+                        <div className="flex flex-col">
+                          <label className="text-sm font-medium text-gray-700 mb-1">
+                            Room Type
+                          </label>
+                          <select
+                            name="roomTypes"
+                            value={formData.roomTypes[0] || ""}
+                            onChange={handleRoomTypeChange}
+                            className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
+                            required
+                          >
+                            <option value="">Select Room Type</option>
+                            {roomTypes.map((type, idx) => (
+                              <option key={idx} value={type}>
+                                {type}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="text-sm font-medium text-gray-700 mb-1">
+                            Available Rooms for Selected Dates
+                            {formData.checkIn && formData.checkOut && (
+                              <span className="text-xs text-gray-500 ml-2">
+                                ({formData.checkIn} to {formData.checkOut})
+                              </span>
+                            )}
+                          </label>
+                          <AnimatePresence mode="wait">
+                            {formData.roomTypes.length > 0 && (
+                              <motion.div
+                                key={formData.roomTypes[0]}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -10 }}
+                                transition={{ duration: 0.3 }}
+                              >
+                                <RoomSelection
+                                  rooms={filteredRooms}
+                                  selectedRoomNumbers={formData.roomNumbers}
+                                  onRoomToggle={handleRoomNumberToggle}
+                                />
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                          {!formData.checkIn || !formData.checkOut ? (
+                            <div className="text-center py-8 text-gray-500 text-sm">
+                              <p>
+                                Please select check-in and check-out dates first
+                              </p>
+                              <p className="text-xs mt-1">
+                                Available rooms will be shown here
+                              </p>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="flex flex-col">
+                          <label className="text-sm font-medium text-gray-700 mb-1">
+                            Number of Adults
+                          </label>
+                          <input
+                            type="number"
+                            name="adults"
+                            value={formData.adults}
+                            onChange={handleChange}
+                            className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
+                            min="1"
+                            required
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="text-sm font-medium text-gray-700 mb-1">
+                            Number of Children
+                          </label>
+                          <input
+                            type="number"
+                            name="children"
+                            value={formData.children}
+                            onChange={handleChange}
+                            className="w-full border-gray-300 rounded-lg shadow-sm p-2 transition-colors focus:border-indigo-500 focus:ring-indigo-500"
+                            min="0"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        className="mt-6 w-full bg-indigo-600 text-white font-semibold py-3 rounded-lg hover:bg-indigo-700 transition-colors duration-200 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        disabled={isSubmitting || isLoading}
+                      >
+                        {isSubmitting ? "Creating..." : "Create Booking"}
+                      </button>
+                    </form>
+                  </>
+                )}
+
+                {/* Package Booking Tab */}
+                {bookingTab === "package" && (
+                  <>
+                    <h2 className="text-2xl font-bold mb-6 text-gray-700">
+                      Book a Package
+                    </h2>
+                    <form
+                      onSubmit={handlePackageBookingSubmit}
+                      className="flex flex-col h-full"
+                    >
+                      <div className="space-y-4 flex-grow">
+                        <select
+                          name="package_id"
+                          value={packageBookingForm.package_id}
+                          onChange={handlePackageBookingChange}
+                          className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all"
+                          required
+                        >
+                          <option value="">Select Package</option>
+                          {packages.map((p) => {
+                            const bookingTypeLabel =
+                              p.booking_type === "whole_property"
+                                ? " (Whole Property)"
+                                : p.booking_type === "room_type"
+                                  ? " (Selected Rooms)"
+                                  : "";
+                            return (
+                              <option key={p.id} value={p.id}>
+                                {p.title}
+                                {bookingTypeLabel} - {formatCurrency(p.price)}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <input
+                          name="guest_name"
+                          placeholder="Guest Name"
+                          value={packageBookingForm.guest_name}
+                          onChange={handlePackageBookingChange}
+                          className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all"
+                          required
+                        />
+                        <input
+                          type="email"
+                          name="guest_email"
+                          placeholder="Guest Email"
+                          value={packageBookingForm.guest_email}
+                          onChange={handlePackageBookingChange}
+                          className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all"
+                        />
+                        <input
+                          name="guest_mobile"
+                          placeholder="Guest Mobile"
+                          value={packageBookingForm.guest_mobile}
+                          onChange={handlePackageBookingChange}
+                          className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all"
+                          required
+                        />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <input
+                            type="date"
+                            name="check_in"
+                            value={packageBookingForm.check_in}
+                            min={today}
+                            onChange={handlePackageBookingChange}
+                            className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all"
+                            required
+                          />
+                          <input
+                            type="date"
+                            name="check_out"
+                            value={packageBookingForm.check_out}
+                            min={packageBookingForm.check_in || today}
+                            onChange={handlePackageBookingChange}
+                            className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all"
+                            required
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <input
+                            type="number"
+                            name="adults"
+                            min={1}
+                            placeholder="Adults"
+                            value={packageBookingForm.adults}
+                            onChange={handlePackageBookingChange}
+                            className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all"
+                            required
+                          />
+                          <input
+                            type="number"
+                            name="children"
+                            min={0}
+                            placeholder="Children"
+                            value={packageBookingForm.children}
+                            onChange={handlePackageBookingChange}
+                            className="w-full p-3 rounded-lg border border-gray-300 focus:border-indigo-500 focus:ring focus:ring-indigo-200 transition-all"
+                          />
+                        </div>
+                        {/* Room Selection - Only show for room_type packages */}
+                        {(() => {
+                          const selectedPackage = packages.find(
+                            (p) =>
+                              p.id === parseInt(packageBookingForm.package_id),
+                          );
+
+                          if (!selectedPackage) {
+                            return null;
+                          }
+
+                          // Determine if it's whole_property:
+                          // 1. If booking_type is explicitly 'whole_property'
+                          // 2. If booking_type is not set AND room_types is not set (legacy packages without booking_type)
+                          const hasRoomTypes =
+                            selectedPackage.room_types &&
+                            selectedPackage.room_types.trim().length > 0;
+                          const isWholeProperty =
+                            selectedPackage.booking_type === "whole_property" ||
+                            selectedPackage.booking_type === "whole property" ||
+                            (!selectedPackage.booking_type && !hasRoomTypes);
+
+                          // Hide room selection completely for whole_property
+                          if (isWholeProperty) {
+                            return (
+                              <div className="bg-indigo-50 border-2 border-indigo-300 rounded-lg p-4">
+                                <p className="text-sm font-semibold text-indigo-800">
+                                  Whole Property Package
+                                </p>
+                                <p className="text-xs text-indigo-600 mt-1">
+                                  All available rooms ({packageRooms.length}{" "}
+                                  room{packageRooms.length !== 1 ? "s" : ""})
+                                  will be booked automatically for the selected
+                                  dates.
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          // Show room selection for room_type packages
+                          // If booking_type is explicitly 'room_type', always show room selection
+                          // If booking_type is not set but has room_types, treat as room_type
+                          const isRoomType =
+                            selectedPackage.booking_type === "room_type" ||
+                            (selectedPackage.booking_type !==
+                              "whole_property" &&
+                              hasRoomTypes);
+
+                          // If it's not whole_property and not clearly room_type, default to showing room selection
+                          // (for backward compatibility with packages that don't have booking_type set)
+                          if (
+                            !isWholeProperty &&
+                            !isRoomType &&
+                            !selectedPackage.booking_type
+                          ) {
+                            // Legacy package without booking_type - show room selection by default
+                            return (
+                              <div>
+                                <label className="block text-gray-600 font-medium mb-2">
+                                  Select Rooms for Package
+                                  {packageBookingForm.check_in &&
+                                    packageBookingForm.check_out && (
+                                      <span className="text-xs text-gray-500 ml-2">
+                                        ({packageBookingForm.check_in} to{" "}
+                                        {packageBookingForm.check_out})
+                                      </span>
+                                    )}
+                                </label>
+                                {!packageBookingForm.check_in ||
+                                !packageBookingForm.check_out ? (
+                                  <div className="text-center py-8 text-gray-500 text-sm bg-gray-50 rounded-lg border">
+                                    <p>
+                                      Please select check-in and check-out dates
+                                      first
+                                    </p>
+                                    <p className="text-xs mt-1">
+                                      Available rooms will be shown here
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-lg border">
+                                    {packageRooms.length > 0 ? (
+                                      packageRooms.map((room) => (
+                                        <div
+                                          key={room.id}
+                                          onClick={() =>
+                                            handlePackageRoomSelect(room.id)
+                                          }
+                                          className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200
+                                                     ${packageBookingForm.room_ids.includes(room.id) ? "bg-indigo-500 text-white border-indigo-600" : "bg-white border-gray-300 hover:border-indigo-500"}
+                                `}
+                                        >
+                                          <p className="font-semibold">
+                                            Room {room.number}
+                                          </p>
+                                          <p
+                                            className={`text-sm ${packageBookingForm.room_ids.includes(room.id) ? "text-indigo-200" : "text-gray-600"}`}
+                                          >
+                                            {room.type}
+                                          </p>
+                                          <p
+                                            className={`text-xs ${packageBookingForm.room_ids.includes(room.id) ? "text-indigo-200" : "text-gray-500"}`}
+                                          >
+                                            {formatCurrency(room.price)}/night
+                                          </p>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="col-span-full text-center py-4 text-gray-500">
+                                        <p className="font-medium">
+                                          No rooms available for the selected
+                                          dates
+                                        </p>
+                                        <p className="text-sm mt-1">
+                                          Please try different dates
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
-              <button
-                type="submit"
-                className="mt-auto w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg shadow-md transition-transform transform hover:-translate-y-1 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                disabled={isSubmitting || isLoading}
-              >
-                {isSubmitting ? "Booking..." : "Book Package ✅"}
-              </button>
-            </form>
-              </>
-            )}
-          </motion.div>
-        </div>
-
-        {/* Bookings Table */}
-        <div className="bg-white p-3 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl shadow-lg overflow-x-auto -mx-2 sm:mx-0">
-          <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-between items-start sm:items-center mb-4 sm:mb-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-700">All Bookings</h2>
-              <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
-                Showing {filteredBookings.length} of {statusCounts.all} bookings
-              </span>
-            </div>
-            <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 items-stretch sm:items-center w-full sm:w-auto">
-              <div className="flex flex-col w-full sm:w-auto">
-                <label className="text-xs text-gray-600 mb-1 font-medium">Filter by Status:</label>
-                <select // Status Filter
-                  value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
-                  className="border-gray-300 rounded-lg p-2 shadow-sm text-sm w-full sm:w-auto bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
-                >
-                  <option value="All">All Statuses ({statusCounts.all})</option>
-                  <option value="booked">📅 Booked ({statusCounts.booked})</option>
-                  <option value="checked-in">✅ Checked-in ({statusCounts['checked-in']})</option>
-                  <option value="checked-out">🚪 Checked-out ({statusCounts['checked-out']})</option>
-                  <option value="cancelled">❌ Cancelled ({statusCounts.cancelled})</option>
-                </select>
-              </div>
-              <div className="flex flex-col w-full sm:w-auto">
-                <label className="text-xs text-gray-600 mb-1 font-medium">Filter by Room:</label>
-                <select // Room Number Filter
-                  value={roomNumberFilter} onChange={(e) => setRoomNumberFilter(e.target.value)}
-                  className="border-gray-300 rounded-lg p-2 shadow-sm text-sm w-full sm:w-auto bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
-                >
-                {allRoomNumbers.map(roomNumber => (
-                  <option key={roomNumber} value={roomNumber}>{roomNumber === "All" ? "All Rooms" : `Room ${roomNumber}`}</option>
-                ))}
-                </select>
-              </div>
-              <div className="flex flex-col w-full sm:w-auto">
-                <label className="text-xs text-gray-600 mb-1 font-medium">From Date:</label>
-                <input // From Date
-                  type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)}
-                  className="border-gray-300 rounded-lg p-2 shadow-sm text-sm w-full sm:w-auto bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
-                />
-              </div>
-              <div className="flex flex-col w-full sm:w-auto">
-                <label className="text-xs text-gray-600 mb-1 font-medium">To Date:</label>
-                <input // To Date
-                  type="date" value={toDate} onChange={(e) => setToDate(e.target.value)}
-                  className="border-gray-300 rounded-lg p-2 shadow-sm text-sm w-full sm:w-auto bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
-                />
-              </div>
-              {(statusFilter !== "All" || roomNumberFilter !== "All" || fromDate || toDate) && (
-                <button
-                  onClick={() => {
-                    setStatusFilter("All");
-                    setRoomNumberFilter("All");
-                    setFromDate("");
-                    setToDate("");
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-700 font-medium px-3 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors self-end sm:self-center"
-                  title="Clear all filters"
-                >
-                  Clear Filters
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="overflow-x-auto -mx-2 sm:mx-0">
-            <table className="min-w-full text-xs sm:text-sm border-collapse rounded-xl">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800">ID</th>
-                <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800">Guest</th>
-                <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800 hidden md:table-cell">Type</th>
-                <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800">Rooms</th>
-                <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800 hidden lg:table-cell">Check-in</th>
-                <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800 hidden lg:table-cell">Check-out</th>
-                <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800 hidden sm:table-cell">Guests</th>
-                <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800">Status</th>
-                <th className="p-2 sm:p-4 border-b border-gray-200 text-center text-xs font-semibold uppercase tracking-wider text-gray-800">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredBookings.length > 0 ? (
-                filteredBookings.map((b, index) => (
-                  <motion.tr
-                    key={b.id}
-                    className="hover:bg-gray-50 transition-colors"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
-                  >
-                    <td className="p-2 sm:p-4">
-                      <div className="font-mono text-xs sm:text-sm font-semibold text-gray-900">{generateBookingId(b)}</div>
-                    </td>
-                    <td className="p-2 sm:p-4 font-medium text-gray-900 text-xs sm:text-sm">
-                      {b.guest_name}
-                    </td>
-                    <td className="p-2 sm:p-4 hidden md:table-cell">
-                      {b.is_package ? (
-                        <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs font-semibold">
-                          {b.package?.title || 'Package'}
-                        </span>
-                      ) : (
-                        <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full text-xs font-semibold">Room</span>
-                      )}
-                    </td>
-                    <td className="p-2 sm:p-4 text-xs sm:text-sm">
-                      {b.rooms && b.rooms.length > 0 ? (
-                        b.rooms.map(room => {
-                          // Handle package bookings (nested room structure) vs regular bookings
-                          if (b.is_package) {
-                            // Package bookings: room has nested room object
-                            return room.room ? `${room.room.number}${room.room.type ? ` (${room.room.type})` : ''}` : '-';
-                          } else {
-                            // Regular bookings: room has number and type directly
-                            return `${room.number}${room.type ? ` (${room.type})` : ''}`;
                           }
-                        }).filter(Boolean).join(", ") || '-'
-                      ) : "-"}
-                    </td>
-                    <td className="p-2 sm:p-4 text-gray-800 text-xs hidden lg:table-cell">{b.check_in}</td>
-                    <td className="p-2 sm:p-4 text-gray-800 text-xs hidden lg:table-cell">{b.check_out}</td>
-                    <td className="p-2 sm:p-4 text-gray-800 text-xs hidden sm:table-cell">{b.adults} A, {b.children} C</td>
-                    <td className="p-2 sm:p-4">
-                      <BookingStatusBadge status={b.status || "Pending"} />
-                    </td>
-                    <td className="p-2 sm:p-4 text-center">
-                      <div className="flex flex-wrap gap-1 sm:gap-2 justify-center">
-                        <button
-                          onClick={() => viewDetails(b.id, b.is_package)}
-                          className="bg-blue-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-blue-700 transition-colors"
-                        >
-                          View
-                        </button>
-                        {b.status && b.status.toLowerCase().replace(/[-_]/g, '') === 'checkedin' && (
-                          <button
-                            onClick={async () => {
-                              try {
-                                const displayId = generateBookingId(b);
-                                const response = await API.get(`/bookings/details/${displayId}?is_package=${b.is_package}`, authHeader());
-                                setBookingForAllocation({ ...b, ...response.data });
-                              } catch (e) {
-                                setBookingForAllocation(b);
-                              }
-                            }}
-                            className="bg-green-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-green-700 transition-colors"
-                            title="Add Extra Allocation"
-                          >
-                            Add Items
-                          </button>
-                        )}
-                        <button
-                          onClick={async () => {
-                            try {
-                              // Use display ID for API call
-                              const displayId = generateBookingId(b);
-                              const response = await API.get(`/bookings/details/${displayId}?is_package=${b.is_package}`, authHeader());
-                              setBookingToCheckIn({ ...b, ...response.data });
-                            } catch (e) {
-                              // Fallback to existing data if details fetch fails
-                              setBookingToCheckIn(b);
-                            }
-                          }}
-                          className="bg-yellow-500 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-yellow-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                          disabled={b.status && b.status.toLowerCase().replace(/[-_]/g, '') !== 'booked'}
-                        >
-                          Check-in
-                        </button>
-                        <button
-                          onClick={() => {
-                            // Safety check: ensure booking has required properties before opening modal
-                            if (!b || !b.id || !b.check_out) {
-                              showBannerMessage("error", "Invalid booking data. Please refresh the page.");
-                              return;
-                            }
-                            
-                            // Additional safety check: prevent extending checked-out bookings
-                            // Be careful: "checked-in" normalizes to "checked-in", "checked-out" normalizes to "checked-out"
-                            const rawStatusLower = b.status?.toLowerCase().trim() || '';
-                            const normalizedStatus = rawStatusLower.replace(/[-_]/g, '-');
-                            const isCheckedOut = (
-                              normalizedStatus.includes('out') && normalizedStatus.startsWith('checked-') && normalizedStatus.endsWith('-out')
-                            ) || ['checked_out', 'checked-out', 'checked out'].includes(rawStatusLower);
-                            
-                            if (isCheckedOut) {
-                              showBannerMessage("error", `Cannot extend checkout for booking with status '${b.status}'. The guest has already checked out.`);
-                              return;
-                            }
-                            
-                            setBookingToExtend(b);
-                          }}
-                          className="bg-green-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                          disabled={(() => {
-                            if (!b || !b.status) return true;
-                            const rawStatusLower = b.status.toLowerCase().trim();
-                            const normalizedStatus = rawStatusLower.replace(/[-_]/g, '-');
-                            
-                            // Explicitly reject checked-out/checked_out statuses (guest has already left)
-                            // Be careful: "checked-in" normalizes to "checked-in", "checked-out" normalizes to "checked-out"
-                            const isCheckedOut = (
-                              normalizedStatus.includes('out') && normalizedStatus.startsWith('checked-') && normalizedStatus.endsWith('-out')
-                            ) || ['checked_out', 'checked-out', 'checked out'].includes(rawStatusLower);
-                            
-                            if (isCheckedOut) {
-                              return true; // Disable button for checked-out bookings
-                            }
-                            
-                            // Enable extend button for both "booked" and "checked-in" statuses (for both room and package bookings)
-                            // Handle both "checked-in" and "checked_in" formats
-                            const isValidStatus = normalizedStatus === 'booked' || normalizedStatus === 'checked-in';
-                            return !isValidStatus;
-                          })()}
-                        >
-                          Extend
-                        </button>
-                        <button
-                          onClick={() => cancelBooking(b.id, b.is_package)}
-                          className="bg-red-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-red-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
-                          disabled={b.status && b.status.toLowerCase().replace(/[-_]/g, '') !== 'booked'}
-                        >
-                          Cancel
-                        </button>
-                        {b.guest_email && (
-                          <button
-                            onClick={() => shareViaEmail(b)}
-                            className="bg-purple-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-purple-700 transition-colors"
-                            title={`Share Booking ID: ${generateBookingId(b)} via Email`}
-                          >
-                            📧
-                          </button>
-                        )}
-                        {b.guest_mobile && (
-                          <button
-                            onClick={() => shareViaWhatsApp(b)}
-                            className="bg-green-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-green-700 transition-colors"
-                            title={`Share Booking ID: ${generateBookingId(b)} via WhatsApp`}
-                          >
-                            💬
-                          </button>
-                        )}
+
+                          // Show room selection for room_type packages
+                          if (!isRoomType) {
+                            return null; // Don't show room selection if package type is unclear
+                          }
+
+                          return (
+                            <div>
+                              <label className="block text-gray-600 font-medium mb-2">
+                                Select Rooms for Package
+                                {selectedPackage.room_types && (
+                                  <span className="text-xs text-indigo-600 ml-2">
+                                    (Filtered by: {selectedPackage.room_types})
+                                  </span>
+                                )}
+                                {packageBookingForm.check_in &&
+                                  packageBookingForm.check_out && (
+                                    <span className="text-xs text-gray-500 ml-2">
+                                      ({packageBookingForm.check_in} to{" "}
+                                      {packageBookingForm.check_out})
+                                    </span>
+                                  )}
+                              </label>
+                              {!packageBookingForm.check_in ||
+                              !packageBookingForm.check_out ? (
+                                <div className="text-center py-8 text-gray-500 text-sm bg-gray-50 rounded-lg border">
+                                  <p>
+                                    Please select check-in and check-out dates
+                                    first
+                                  </p>
+                                  <p className="text-xs mt-1">
+                                    Available rooms will be shown here
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-lg border">
+                                  {(() => {
+                                    // Filter rooms by package's room_types (only for room_type packages with room_types set)
+                                    // Use case-insensitive comparison to handle "Cottage" vs "cottage"
+                                    let roomsToShow = packageRooms;
+                                    if (
+                                      selectedPackage.booking_type ===
+                                        "room_type" &&
+                                      selectedPackage.room_types
+                                    ) {
+                                      const allowedRoomTypes =
+                                        selectedPackage.room_types
+                                          .split(",")
+                                          .map((t) => t.trim().toLowerCase());
+                                      roomsToShow = packageRooms.filter(
+                                        (room) => {
+                                          const roomType = room.type
+                                            ? room.type.trim().toLowerCase()
+                                            : "";
+                                          return allowedRoomTypes.includes(
+                                            roomType,
+                                          );
+                                        },
+                                      );
+                                    }
+                                    // If booking_type is 'room_type' but no room_types specified, show all available rooms
+
+                                    return roomsToShow.length > 0 ? (
+                                      roomsToShow.map((room) => (
+                                        <div
+                                          key={room.id}
+                                          onClick={() =>
+                                            handlePackageRoomSelect(room.id)
+                                          }
+                                          className={`p-4 rounded-lg border-2 cursor-pointer transition-all duration-200
+                                                     ${packageBookingForm.room_ids.includes(room.id) ? "bg-indigo-500 text-white border-indigo-600" : "bg-white border-gray-300 hover:border-indigo-500"}
+                                `}
+                                        >
+                                          <p className="font-semibold">
+                                            Room {room.number}
+                                          </p>
+                                          <p
+                                            className={`text-sm ${packageBookingForm.room_ids.includes(room.id) ? "text-indigo-200" : "text-gray-600"}`}
+                                          >
+                                            {room.type}
+                                          </p>
+                                          <p
+                                            className={`text-xs ${packageBookingForm.room_ids.includes(room.id) ? "text-indigo-200" : "text-gray-500"}`}
+                                          >
+                                            {formatCurrency(room.price)}/night
+                                          </p>
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="col-span-full text-center py-4 text-gray-500">
+                                        <p className="font-medium">
+                                          No rooms available for the selected
+                                          dates
+                                        </p>
+                                        {selectedPackage.room_types && (
+                                          <p className="text-sm mt-1">
+                                            No rooms match the selected room
+                                            types: {selectedPackage.room_types}
+                                          </p>
+                                        )}
+                                        {!selectedPackage.room_types && (
+                                          <p className="text-sm mt-1">
+                                            Please try different dates
+                                          </p>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
-                    </td>
-                  </motion.tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="9" className="text-center py-6 text-gray-500 italic text-sm sm:text-base">
-                    No bookings found.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-            </table>
-          </div>
-          {filteredBookings.length > 0 && hasMoreBookings && (
-            <div ref={loadMoreRef} className="text-center p-4">
-              {isSubmitting && <span className="text-indigo-600">Loading more bookings...</span>}
+                      <button
+                        type="submit"
+                        className="mt-auto w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg shadow-md transition-transform transform hover:-translate-y-1 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                        disabled={isSubmitting || isLoading}
+                      >
+                        {isSubmitting ? "Booking..." : "Book Package ✅"}
+                      </button>
+                    </form>
+                  </>
+                )}
+              </motion.div>
             </div>
-          )}
-        </div>
+
+            {/* Bookings Table */}
+            <div className="bg-white p-3 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl shadow-lg overflow-x-auto -mx-2 sm:mx-0">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-between items-start sm:items-center mb-4 sm:mb-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-700">
+                    All Bookings
+                  </h2>
+                  <span className="text-sm text-gray-500 bg-gray-100 px-3 py-1 rounded-full">
+                    Showing {filteredBookings.length} of {statusCounts.all}{" "}
+                    bookings
+                  </span>
+                </div>
+                <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3 items-stretch sm:items-center w-full sm:w-auto">
+                  <div className="flex flex-col w-full sm:w-auto">
+                    <label className="text-xs text-gray-600 mb-1 font-medium">
+                      Filter by Status:
+                    </label>
+                    <select // Status Filter
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="border-gray-300 rounded-lg p-2 shadow-sm text-sm w-full sm:w-auto bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                    >
+                      <option value="All">
+                        All Statuses ({statusCounts.all})
+                      </option>
+                      <option value="booked">
+                        📅 Booked ({statusCounts.booked})
+                      </option>
+                      <option value="checked-in">
+                        ✅ Checked-in ({statusCounts["checked-in"]})
+                      </option>
+                      <option value="checked-out">
+                        🚪 Checked-out ({statusCounts["checked-out"]})
+                      </option>
+                      <option value="cancelled">
+                        ❌ Cancelled ({statusCounts.cancelled})
+                      </option>
+                    </select>
+                  </div>
+                  <div className="flex flex-col w-full sm:w-auto">
+                    <label className="text-xs text-gray-600 mb-1 font-medium">
+                      Filter by Room:
+                    </label>
+                    <select // Room Number Filter
+                      value={roomNumberFilter}
+                      onChange={(e) => setRoomNumberFilter(e.target.value)}
+                      className="border-gray-300 rounded-lg p-2 shadow-sm text-sm w-full sm:w-auto bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                    >
+                      {allRoomNumbers.map((roomNumber) => (
+                        <option key={roomNumber} value={roomNumber}>
+                          {roomNumber === "All"
+                            ? "All Rooms"
+                            : `Room ${roomNumber}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex flex-col w-full sm:w-auto">
+                    <label className="text-xs text-gray-600 mb-1 font-medium">
+                      From Date:
+                    </label>
+                    <input // From Date
+                      type="date"
+                      value={fromDate}
+                      onChange={(e) => setFromDate(e.target.value)}
+                      className="border-gray-300 rounded-lg p-2 shadow-sm text-sm w-full sm:w-auto bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                    />
+                  </div>
+                  <div className="flex flex-col w-full sm:w-auto">
+                    <label className="text-xs text-gray-600 mb-1 font-medium">
+                      To Date:
+                    </label>
+                    <input // To Date
+                      type="date"
+                      value={toDate}
+                      onChange={(e) => setToDate(e.target.value)}
+                      className="border-gray-300 rounded-lg p-2 shadow-sm text-sm w-full sm:w-auto bg-white hover:border-blue-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-colors"
+                    />
+                  </div>
+                  {(statusFilter !== "All" ||
+                    roomNumberFilter !== "All" ||
+                    fromDate ||
+                    toDate) && (
+                    <button
+                      onClick={() => {
+                        setStatusFilter("All");
+                        setRoomNumberFilter("All");
+                        setFromDate("");
+                        setToDate("");
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-700 font-medium px-3 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors self-end sm:self-center"
+                      title="Clear all filters"
+                    >
+                      Clear Filters
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="overflow-x-auto -mx-2 sm:mx-0">
+                <table className="min-w-full text-xs sm:text-sm border-collapse rounded-xl">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800">
+                        ID
+                      </th>
+                      <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800">
+                        Guest
+                      </th>
+                      <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800 hidden md:table-cell">
+                        Type
+                      </th>
+                      <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800">
+                        Rooms
+                      </th>
+                      <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800 hidden lg:table-cell">
+                        Check-in
+                      </th>
+                      <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800 hidden lg:table-cell">
+                        Check-out
+                      </th>
+                      <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800 hidden sm:table-cell">
+                        Guests
+                      </th>
+                      <th className="p-2 sm:p-4 border-b border-gray-200 text-left text-xs font-semibold uppercase tracking-wider text-gray-800">
+                        Status
+                      </th>
+                      <th className="p-2 sm:p-4 border-b border-gray-200 text-center text-xs font-semibold uppercase tracking-wider text-gray-800">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredBookings.length > 0 ? (
+                      filteredBookings.map((b, index) => (
+                        <motion.tr
+                          key={b.id}
+                          className="hover:bg-gray-50 transition-colors"
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ duration: 0.3, delay: index * 0.05 }}
+                        >
+                          <td className="p-2 sm:p-4">
+                            <div className="font-mono text-xs sm:text-sm font-semibold text-gray-900">
+                              {generateBookingId(b)}
+                            </div>
+                          </td>
+                          <td className="p-2 sm:p-4 font-medium text-gray-900 text-xs sm:text-sm">
+                            {b.guest_name}
+                          </td>
+                          <td className="p-2 sm:p-4 hidden md:table-cell">
+                            {b.is_package ? (
+                              <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs font-semibold">
+                                {b.package?.title || "Package"}
+                              </span>
+                            ) : (
+                              <span className="bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full text-xs font-semibold">
+                                Room
+                              </span>
+                            )}
+                          </td>
+                          <td className="p-2 sm:p-4 text-xs sm:text-sm">
+                            {b.rooms && b.rooms.length > 0
+                              ? b.rooms
+                                  .map((room) => {
+                                    // Handle package bookings (nested room structure) vs regular bookings
+                                    if (b.is_package) {
+                                      // Package bookings: room has nested room object
+                                      return room.room
+                                        ? `${room.room.number}${room.room.type ? ` (${room.room.type})` : ""}`
+                                        : "-";
+                                    } else {
+                                      // Regular bookings: room has number and type directly
+                                      return `${room.number}${room.type ? ` (${room.type})` : ""}`;
+                                    }
+                                  })
+                                  .filter(Boolean)
+                                  .join(", ") || "-"
+                              : "-"}
+                          </td>
+                          <td className="p-2 sm:p-4 text-gray-800 text-xs hidden lg:table-cell">
+                            {b.check_in}
+                          </td>
+                          <td className="p-2 sm:p-4 text-gray-800 text-xs hidden lg:table-cell">
+                            {b.check_out}
+                          </td>
+                          <td className="p-2 sm:p-4 text-gray-800 text-xs hidden sm:table-cell">
+                            {b.adults} A, {b.children} C
+                          </td>
+                          <td className="p-2 sm:p-4">
+                            <BookingStatusBadge
+                              status={b.status || "Pending"}
+                            />
+                          </td>
+                          <td className="p-2 sm:p-4 text-center">
+                            <div className="flex flex-wrap gap-1 sm:gap-2 justify-center">
+                              <button
+                                onClick={() => viewDetails(b.id, b.is_package)}
+                                className="bg-blue-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-blue-700 transition-colors"
+                              >
+                                View
+                              </button>
+                              {b.status &&
+                                b.status.toLowerCase().replace(/[-_]/g, "") ===
+                                  "checkedin" && (
+                                  <button
+                                    onClick={async () => {
+                                      try {
+                                        const displayId = generateBookingId(b);
+                                        const response = await API.get(
+                                          `/bookings/details/${displayId}?is_package=${b.is_package}`,
+                                          authHeader(),
+                                        );
+                                        setBookingForAllocation({
+                                          ...b,
+                                          ...response.data,
+                                        });
+                                      } catch (e) {
+                                        setBookingForAllocation(b);
+                                      }
+                                    }}
+                                    className="bg-green-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-green-700 transition-colors"
+                                    title="Add Extra Allocation"
+                                  >
+                                    Add Items
+                                  </button>
+                                )}
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    // Use display ID for API call
+                                    const displayId = generateBookingId(b);
+                                    const response = await API.get(
+                                      `/bookings/details/${displayId}?is_package=${b.is_package}`,
+                                      authHeader(),
+                                    );
+                                    setBookingToCheckIn({
+                                      ...b,
+                                      ...response.data,
+                                    });
+                                  } catch (e) {
+                                    // Fallback to existing data if details fetch fails
+                                    setBookingToCheckIn(b);
+                                  }
+                                }}
+                                className="bg-yellow-500 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-yellow-600 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                disabled={
+                                  b.status &&
+                                  b.status
+                                    .toLowerCase()
+                                    .replace(/[-_]/g, "") !== "booked"
+                                }
+                              >
+                                Check-in
+                              </button>
+                              <button
+                                onClick={() => {
+                                  // Safety check: ensure booking has required properties before opening modal
+                                  if (!b || !b.id || !b.check_out) {
+                                    showBannerMessage(
+                                      "error",
+                                      "Invalid booking data. Please refresh the page.",
+                                    );
+                                    return;
+                                  }
+
+                                  // Additional safety check: prevent extending checked-out bookings
+                                  // Be careful: "checked-in" normalizes to "checked-in", "checked-out" normalizes to "checked-out"
+                                  const rawStatusLower =
+                                    b.status?.toLowerCase().trim() || "";
+                                  const normalizedStatus =
+                                    rawStatusLower.replace(/[-_]/g, "-");
+                                  const isCheckedOut =
+                                    (normalizedStatus.includes("out") &&
+                                      normalizedStatus.startsWith("checked-") &&
+                                      normalizedStatus.endsWith("-out")) ||
+                                    [
+                                      "checked_out",
+                                      "checked-out",
+                                      "checked out",
+                                    ].includes(rawStatusLower);
+
+                                  if (isCheckedOut) {
+                                    showBannerMessage(
+                                      "error",
+                                      `Cannot extend checkout for booking with status '${b.status}'. The guest has already checked out.`,
+                                    );
+                                    return;
+                                  }
+
+                                  setBookingToExtend(b);
+                                }}
+                                className="bg-green-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-green-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                disabled={(() => {
+                                  if (!b || !b.status) return true;
+                                  const rawStatusLower = b.status
+                                    .toLowerCase()
+                                    .trim();
+                                  const normalizedStatus =
+                                    rawStatusLower.replace(/[-_]/g, "-");
+
+                                  // Explicitly reject checked-out/checked_out statuses (guest has already left)
+                                  // Be careful: "checked-in" normalizes to "checked-in", "checked-out" normalizes to "checked-out"
+                                  const isCheckedOut =
+                                    (normalizedStatus.includes("out") &&
+                                      normalizedStatus.startsWith("checked-") &&
+                                      normalizedStatus.endsWith("-out")) ||
+                                    [
+                                      "checked_out",
+                                      "checked-out",
+                                      "checked out",
+                                    ].includes(rawStatusLower);
+
+                                  if (isCheckedOut) {
+                                    return true; // Disable button for checked-out bookings
+                                  }
+
+                                  // Enable extend button for both "booked" and "checked-in" statuses (for both room and package bookings)
+                                  // Handle both "checked-in" and "checked_in" formats
+                                  const isValidStatus =
+                                    normalizedStatus === "booked" ||
+                                    normalizedStatus === "checked-in";
+                                  return !isValidStatus;
+                                })()}
+                              >
+                                Extend
+                              </button>
+                              <button
+                                onClick={() =>
+                                  cancelBooking(b.id, b.is_package)
+                                }
+                                className="bg-red-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-red-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                                disabled={
+                                  b.status &&
+                                  b.status
+                                    .toLowerCase()
+                                    .replace(/[-_]/g, "") !== "booked"
+                                }
+                              >
+                                Cancel
+                              </button>
+                              {b.guest_email && (
+                                <button
+                                  onClick={() => shareViaEmail(b)}
+                                  className="bg-purple-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-purple-700 transition-colors"
+                                  title={`Share Booking ID: ${generateBookingId(b)} via Email`}
+                                >
+                                  📧
+                                </button>
+                              )}
+                              {b.guest_mobile && (
+                                <button
+                                  onClick={() => shareViaWhatsApp(b)}
+                                  className="bg-green-600 text-white px-2 sm:px-3 py-1 rounded-full text-xs font-semibold hover:bg-green-700 transition-colors"
+                                  title={`Share Booking ID: ${generateBookingId(b)} via WhatsApp`}
+                                >
+                                  💬
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </motion.tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan="9"
+                          className="text-center py-6 text-gray-500 italic text-sm sm:text-base"
+                        >
+                          No bookings found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {filteredBookings.length > 0 && hasMoreBookings && (
+                <div ref={loadMoreRef} className="text-center p-4">
+                  {isSubmitting && (
+                    <span className="text-indigo-600">
+                      Loading more bookings...
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </>
         )}
 
         {/* Package Management Tab */}
-        {mainTab === "package" && (
-          <Packages noLayout={true} />
-        )}
+        {mainTab === "package" && <Packages noLayout={true} />}
 
         {/* Room Management Tab */}
-        {mainTab === "room" && (
-          <Rooms noLayout={true} />
-        )}
+        {mainTab === "room" && <Rooms noLayout={true} />}
       </div>
       <AnimatePresence>
         {modalBooking && (
@@ -3912,7 +5419,7 @@ const Bookings = () => {
             authHeader={authHeader}
             onSuccess={() => {
               // Trigger refresh
-              window.dispatchEvent(new CustomEvent('inventory-refresh'));
+              window.dispatchEvent(new CustomEvent("inventory-refresh"));
               // The modal will refresh items automatically after adding
             }}
           />
@@ -3936,7 +5443,12 @@ const Bookings = () => {
             inventoryItems={inventoryItems}
           />
         )}
-        {selectedImage && <ImageModal imageUrl={selectedImage} onClose={() => setSelectedImage(null)} />}
+        {selectedImage && (
+          <ImageModal
+            imageUrl={selectedImage}
+            onClose={() => setSelectedImage(null)}
+          />
+        )}
       </AnimatePresence>
     </DashboardLayout>
   );

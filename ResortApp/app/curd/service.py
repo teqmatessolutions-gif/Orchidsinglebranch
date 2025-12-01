@@ -583,10 +583,24 @@ def update_assigned_service_status(db: Session, assigned_id: int, update_data: A
     if not assigned:
         return None
     
+    # Handle employee reassignment if provided
+    if update_data.employee_id is not None:
+        employee = db.query(Employee).filter(Employee.id == update_data.employee_id).first()
+        if not employee:
+            raise ValueError(f"Employee with ID {update_data.employee_id} not found")
+        assigned.employee_id = update_data.employee_id
+        print(f"[DEBUG] Reassigned service {assigned_id} to employee {employee.name} (ID: {employee.id})")
+    
+    # Handle status update if provided
     old_status = assigned.status
-    # Handle both enum and string status values
-    new_status = update_data.status.value if hasattr(update_data.status, 'value') else str(update_data.status)
-    assigned.status = update_data.status
+    new_status = None
+    if update_data.status is not None:
+        # Handle both enum and string status values
+        new_status = update_data.status.value if hasattr(update_data.status, 'value') else str(update_data.status)
+        assigned.status = update_data.status
+    else:
+        # If no status update, use current status
+        new_status = old_status.value if hasattr(old_status, 'value') else str(old_status)
     
     # If status changed to completed, set completed time and handle inventory returns
     if new_status == "completed" and str(old_status) != "completed":

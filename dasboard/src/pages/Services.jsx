@@ -734,6 +734,19 @@ const Services = () => {
     }
   };
 
+  const handleReassignEmployee = (assignedService) => {
+    if (employees.length === 0) {
+      alert("No employees available. Please add employees first.");
+      return;
+    }
+    // Open modal with current employee pre-selected
+    setQuickAssignModal({
+      assignedService: assignedService,
+      employeeId: assignedService.employee_id ? assignedService.employee_id.toString() : "",
+      isReassignment: true
+    });
+  };
+
   const handleClearAllServices = async () => {
     const confirmMessage = `⚠️ WARNING: This will delete ALL services and assigned services!\n\n` +
       `This includes:\n` +
@@ -964,14 +977,37 @@ const Services = () => {
   };
 
   // Service Request Handlers
-  const handleUpdateRequestStatus = async (requestId, newStatus) => {
+  const handleUpdateRequestStatus = async (requestId, newStatus, billingStatus = null) => {
+    // If completing a delivery request, show payment modal first
+    if (newStatus === "completed" && billingStatus === null) {
+      const request = serviceRequests.find(r => r.id === requestId);
+      if (request && request.food_order_id) {
+        // Show payment modal for delivery requests
+        setPaymentModal({ requestId, newStatus });
+        return;
+      }
+    }
+
+    // Optimistically update UI immediately
+    setServiceRequests(prev =>
+      prev.map(r => r.id === requestId ? { ...r, status: newStatus } : r)
+    );
+
     try {
-      await api.put(`/service-requests/${requestId}`, { status: newStatus });
-      fetchServiceRequests();
+      const payload = { status: newStatus };
+      if (billingStatus) {
+        payload.billing_status = billingStatus;
+      }
+      await api.put(`/service-requests/${requestId}`, payload);
+      // Fetch to confirm and get any server-side updates
+      await fetchServiceRequests();
+      setPaymentModal(null);
     } catch (error) {
       console.error("Failed to update request status:", error);
       const msg = error.response?.data?.detail || error.message || "Unknown error";
       alert(`Failed to update request status: ${msg}`);
+      // Revert optimistic update on error
+      await fetchServiceRequests();
     }
   };
 
@@ -1037,6 +1073,25 @@ const Services = () => {
     }
   };
 
+  const handleUpdateCheckoutRequestStatus = async (requestId, newStatus) => {
+    const checkoutRequestId = requestId > 1000000 ? requestId - 1000000 : requestId;
+    try {
+      if (newStatus === "completed") {
+        // For completed status, show the inventory modal to collect data
+        await handleViewCheckoutInventory(checkoutRequestId);
+      } else if (newStatus === "in_progress" || newStatus === "pending") {
+        // Use the new status update endpoint
+        await api.put(`/bill/checkout-request/${checkoutRequestId}/status?status=${newStatus}`);
+        alert(`Checkout request status updated to ${newStatus}`);
+        fetchServiceRequests();
+      }
+    } catch (error) {
+      console.error("Failed to update checkout request status:", error);
+      const msg = error.response?.data?.detail || error.message || "Unknown error";
+      alert(`Failed to update status: ${msg}`);
+    }
+  };
+
   const handleDeleteRequest = async (requestId) => {
     if (!window.confirm("Are you sure you want to delete this service request?")) {
       return;
@@ -1083,17 +1138,31 @@ const Services = () => {
       return;
     }
 
-    // Automatically find delivery service
-    const deliveryService = services.find(s =>
-      s.name.toLowerCase().includes("delivery") || s.name.toLowerCase() === "delivery"
-    );
-
-    if (!deliveryService) {
-      alert("Delivery service not found. Please create a delivery service first.");
-      return;
-    }
-
     try {
+      // Check if this is a reassignment
+      if (quickAssignModal.isReassignment && quickAssignModal.assignedService) {
+        // Update the employee for an existing assigned service
+        const assignedService = quickAssignModal.assignedService;
+        await api.patch(`/services/assigned/${assignedService.id}`, {
+          employee_id: parseInt(quickAssignModal.employeeId)
+        });
+        alert("Employee reassigned successfully!");
+        setQuickAssignModal(null);
+        fetchAll();
+        return;
+      }
+
+      // Otherwise, this is a new service assignment from a request
+      // Automatically find delivery service
+      const deliveryService = services.find(s =>
+        s.name.toLowerCase().includes("delivery") || s.name.toLowerCase() === "delivery"
+      );
+
+      if (!deliveryService) {
+        alert("Delivery service not found. Please create a delivery service first.");
+        return;
+      }
+
       const payload = {
         service_id: deliveryService.id,
         employee_id: parseInt(quickAssignModal.employeeId),
@@ -1537,6 +1606,86 @@ const Services = () => {
                 </div>
               </Card>
             </div>
+
+            {/* Recent Service Activity (Combined) */}
+            <Card title="Recent Service Activity (Assigned & Requests)">
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-200 rounded-lg">
+                  <thead className="bg-gray-100 text-gray-700 uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4 text-left">Type</th>
+                      <th className="py-3 px-4 text-left">Service / Description</th>
+                      <th className="py-3 px-4 text-left">Room</th>
+                      <th className="py-3 px-4 text-left">Employee</th>
+                      <th className="py-3 px-4 text-left">Status</th>
+                      <th className="py-3 px-4 text-left">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      ...assignedServices.map(s => ({
+                        id: `as-${s.id}`,
+                        type: 'Assigned',
+                        name: s.service?.name || s.service_name || 'Service',
+                        room: s.room?.number || s.room_number || '-',
+                        employee: s.employee?.name || s.employee_name || '-',
+                        status: s.status,
+                        date: s.assigned_at,
+                        isRequest: false
+                      })),
+                      ...serviceRequests.map(r => ({
+                        id: `req-${r.id}`,
+                        type: r.request_type === 'cleaning' ? 'Cleaning' : r.request_type === 'refill' ? 'Refill' : 'Request',
+                        name: r.description || r.request_type,
+                        room: r.room_number || '-',
+                        employee: r.employee_name || '-',
+                        status: r.status,
+                        date: r.created_at,
+                        isRequest: true
+                      }))
+                    ]
+                      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+                      .slice(0, 15)
+                      .map((item, idx) => (
+                        <tr key={item.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors`}>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${item.type === 'Assigned' ? 'bg-blue-100 text-blue-800' :
+                              item.type === 'Cleaning' ? 'bg-orange-100 text-orange-800' :
+                                'bg-purple-100 text-purple-800'
+                              }`}>
+                              {item.type}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="max-w-xs truncate" title={item.name}>{item.name}</div>
+                          </td>
+                          <td className="py-3 px-4 font-medium">Room {item.room}</td>
+                          <td className="py-3 px-4 text-gray-600">{item.employee}</td>
+                          <td className="py-3 px-4">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${item.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              item.status === 'in_progress' ? 'bg-yellow-100 text-yellow-800' :
+                                item.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                                  'bg-gray-100 text-gray-800'
+                              }`}>
+                              {item.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-sm text-gray-500">
+                            {item.date ? new Date(item.date).toLocaleString() : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    {[...assignedServices, ...serviceRequests].length === 0 && (
+                      <tr>
+                        <td colSpan="6" className="py-8 text-center text-gray-500">
+                          No recent activity found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
 
             {/* Service Requests Section */}
             <Card title={`Service Requests (${serviceRequests.length})`}>
@@ -2696,7 +2845,7 @@ const Services = () => {
                         <th className="py-3 px-4 text-left">Service</th>
                         <th className="py-3 px-4 text-left">Employee</th>
                         <th className="py-3 px-4 text-left">Room</th>
-                        <th className="py-3 px-4 text-left">In Progress</th>
+                        <th className="py-3 px-4 text-left">Status</th>
                         <th className="py-3 px-4 text-left">Avg. Completion Time</th>
                         <th className="py-3 px-4 text-left">Assigned At</th>
                         <th className="py-3 px-4 text-left">Status Changed</th>
@@ -2708,7 +2857,18 @@ const Services = () => {
                       {filteredAssigned.map((s, idx) => (
                         <tr key={s.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors`}>
                           <td className="p-3 border-t border-gray-200">{s.service?.name}</td>
-                          <td className="p-3 border-t border-gray-200">{s.employee?.name}</td>
+                          <td className="p-3 border-t border-gray-200">
+                            <div className="flex items-center gap-2">
+                              <span>{s.employee?.name}</span>
+                              <button
+                                onClick={() => handleReassignEmployee(s)}
+                                className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-1 rounded border border-blue-200 transition-colors"
+                                title="Reassign to different employee"
+                              >
+                                Change
+                              </button>
+                            </div>
+                          </td>
                           <td className="p-3 border-t border-gray-200">Room {s.room?.number}</td>
                           <td className="p-3 border-t border-gray-200">
                             <select value={s.status} onChange={(e) => handleStatusChange(s.id, e.target.value)} className="border p-2 rounded-lg bg-white">
@@ -2945,13 +3105,19 @@ const Services = () => {
                               </td>
                               <td className="p-3 border-t border-gray-200">
                                 {isCheckoutRequest ? (
-                                  <span className={`px-2 py-1 rounded text-xs font-medium ${request.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                    request.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                      request.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                        'bg-gray-100 text-gray-800'
-                                    }`}>
-                                    {request.status || 'pending'}
-                                  </span>
+                                  <select
+                                    value={request.status || 'pending'}
+                                    onChange={(e) => handleUpdateCheckoutRequestStatus(request.id, e.target.value)}
+                                    className={`border p-2 rounded-lg bg-white text-sm ${request.status === 'completed' ? 'bg-green-50' :
+                                      request.status === 'in_progress' ? 'bg-blue-50' :
+                                        request.status === 'pending' ? 'bg-yellow-50' :
+                                          'bg-gray-50'
+                                      }`}
+                                  >
+                                    <option value="pending">Pending</option>
+                                    <option value="in_progress">In Progress</option>
+                                    <option value="completed">Completed</option>
+                                  </select>
                                 ) : (
                                   <select
                                     value={request.status}
@@ -3058,7 +3224,9 @@ const Services = () => {
             <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full">
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
-                  <h2 className="text-2xl font-bold text-gray-800">Assign Service</h2>
+                  <h2 className="text-2xl font-bold text-gray-800">
+                    {quickAssignModal.isReassignment ? "Reassign Employee" : "Assign Service"}
+                  </h2>
                   <button
                     onClick={() => setQuickAssignModal(null)}
                     className="text-gray-400 hover:text-gray-600 text-2xl font-bold"
@@ -3068,33 +3236,75 @@ const Services = () => {
                 </div>
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Room
-                    </label>
-                    <input
-                      type="text"
-                      value={`Room ${quickAssignModal.request.room_number || quickAssignModal.request.room_id}`}
-                      disabled
-                      className="w-full border p-3 rounded-lg bg-gray-100 text-gray-600"
-                    />
-                  </div>
+                  {quickAssignModal.isReassignment ? (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Service
+                        </label>
+                        <input
+                          type="text"
+                          value={quickAssignModal.assignedService?.service?.name || "N/A"}
+                          disabled
+                          className="w-full border p-3 rounded-lg bg-gray-100 text-gray-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Room
+                        </label>
+                        <input
+                          type="text"
+                          value={`Room ${quickAssignModal.assignedService?.room?.number || "N/A"}`}
+                          disabled
+                          className="w-full border p-3 rounded-lg bg-gray-100 text-gray-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Current Employee
+                        </label>
+                        <input
+                          type="text"
+                          value={quickAssignModal.assignedService?.employee?.name || "N/A"}
+                          disabled
+                          className="w-full border p-3 rounded-lg bg-gray-100 text-gray-600"
+                        />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Room
+                        </label>
+                        <input
+                          type="text"
+                          value={`Room ${quickAssignModal.request.room_number || quickAssignModal.request.room_id}`}
+                          disabled
+                          className="w-full border p-3 rounded-lg bg-gray-100 text-gray-600"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Service
+                        </label>
+                        <input
+                          type="text"
+                          value="Delivery"
+                          disabled
+                          className="w-full border p-3 rounded-lg bg-gray-100 text-gray-600"
+                        />
+                      </div>
+                    </>
+                  )}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Service
-                    </label>
-                    <input
-                      type="text"
-                      value="Delivery"
-                      disabled
-                      className="w-full border p-3 rounded-lg bg-gray-100 text-gray-600"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Select Employee <span className="text-red-500">*</span>
+                      {quickAssignModal.isReassignment ? "New Employee" : "Select Employee"} <span className="text-red-500">*</span>
                     </label>
                     <select
                       value={quickAssignModal.employeeId}
@@ -3122,7 +3332,7 @@ const Services = () => {
                     onClick={handleQuickAssignSubmit}
                     className="px-6 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
-                    Assign Service
+                    {quickAssignModal.isReassignment ? "Reassign Employee" : "Assign Service"}
                   </button>
                 </div>
               </div>
@@ -3634,44 +3844,47 @@ const Services = () => {
         </div>
       )}
 
-      {/* Payment Modal */}
+      {/* Payment Modal - For Service Request Completion */}
       {paymentModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-            <h2 className="text-xl font-bold mb-4">Mark Order as Paid</h2>
-
-            <div className="mb-4">
-              <div className="text-sm text-gray-600 mb-1">Order Amount:</div>
-              <div className="text-2xl font-bold">₹{paymentModal.amount?.toFixed(2)}</div>
-              <div className="text-xs text-gray-500 mt-1">+ 5% GST will be added</div>
-            </div>
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Complete Service Request</h2>
 
             <div className="mb-6">
-              <label className="block text-sm font-medium mb-2">Payment Method</label>
-              <select
-                className="w-full border rounded p-2"
-                value={paymentModal.paymentMethod}
-                onChange={(e) => setPaymentModal({ ...paymentModal, paymentMethod: e.target.value })}
-              >
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="upi">UPI</option>
-              </select>
+              <p className="text-gray-700 mb-4">
+                This delivery service request has an associated food order.
+                Please select the payment status for the food order:
+              </p>
             </div>
 
-            <div className="flex gap-2 justify-end">
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => handleUpdateRequestStatus(paymentModal.requestId, paymentModal.newStatus, "paid")}
+                className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors"
+              >
+                ✓ Mark as Paid & Complete
+              </button>
+
+              <button
+                onClick={() => handleUpdateRequestStatus(paymentModal.requestId, paymentModal.newStatus, "unpaid")}
+                className="w-full px-4 py-3 bg-orange-600 hover:bg-orange-700 text-white rounded-lg font-medium transition-colors"
+              >
+                Mark as Unpaid & Complete
+              </button>
+
               <button
                 onClick={() => setPaymentModal(null)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg"
+                className="w-full px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
               >
                 Cancel
               </button>
-              <button
-                onClick={handlePaymentSubmit}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-              >
-                Confirm Payment
-              </button>
+            </div>
+
+            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+              <p className="text-xs text-blue-800">
+                <strong>Note:</strong> The food order will be marked as completed.
+                If marked as unpaid, you can collect payment later from the billing section.
+              </p>
             </div>
           </div>
         </div>

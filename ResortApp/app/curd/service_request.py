@@ -6,6 +6,7 @@ from app.models.employee import Employee
 from app.schemas.service_request import ServiceRequestCreate, ServiceRequestUpdate
 from typing import List, Optional
 from datetime import datetime
+from app.curd import notification as notification_crud
 
 def create_service_request(db: Session, request_data: ServiceRequestCreate):
     request = ServiceRequest(
@@ -19,6 +20,15 @@ def create_service_request(db: Session, request_data: ServiceRequestCreate):
     db.add(request)
     db.commit()
     db.refresh(request)
+    
+    # Send notification
+    try:
+        room = db.query(Room).filter(Room.id == request.room_id).first()
+        room_number = room.number if room else str(request.room_id)
+        notification_crud.notify_service_request_created(db, request.request_type, room_number, request.id)
+    except Exception as e:
+        print(f"Failed to send notification: {e}")
+    
     return request
 
 def create_cleaning_service_request(db: Session, room_id: int, room_number: str, guest_name: str = None):
@@ -37,6 +47,13 @@ def create_cleaning_service_request(db: Session, room_id: int, room_number: str,
     db.add(request)
     db.commit()
     db.refresh(request)
+    
+    # Send notification
+    try:
+        notification_crud.notify_service_request_created(db, "cleaning", room_number, request.id)
+    except Exception as e:
+        print(f"Failed to send notification: {e}")
+    
     return request
 
 def create_refill_service_request(db: Session, room_id: int, room_number: str, guest_name: str = None, checkout_id: int = None):
@@ -155,10 +172,33 @@ def update_service_request(db: Session, request_id: int, update_data: ServiceReq
     if not request:
         return None
     
+    old_status = request.status
+    
+    # Track if status is changing to completed
+    is_completing = False
+    if update_data.status is not None and update_data.status == "completed" and request.status != "completed":
+        is_completing = True
+    
     if update_data.status is not None:
         request.status = update_data.status
         if update_data.status == "completed":
             request.completed_at = datetime.utcnow()
+            
+            # If this is a delivery request with a food order, update the food order status
+            if request.food_order_id and is_completing:
+                food_order = db.query(FoodOrder).filter(FoodOrder.id == request.food_order_id).first()
+                if food_order:
+                    # Mark food order as completed
+                    food_order.status = "completed"
+                    
+                    # Use billing_status from update_data if provided, otherwise default to unpaid
+                    if update_data.billing_status:
+                        food_order.billing_status = update_data.billing_status
+                    elif food_order.billing_status != "paid":
+                        food_order.billing_status = "unpaid"
+                    
+                    print(f"[INFO] Food order {food_order.id} marked as completed (billing: {food_order.billing_status}) due to delivery service completion")
+    
     if update_data.employee_id is not None:
         request.employee_id = update_data.employee_id
     if update_data.description is not None:
@@ -166,6 +206,16 @@ def update_service_request(db: Session, request_id: int, update_data: ServiceReq
     
     db.commit()
     db.refresh(request)
+    
+    # Send notification if status changed
+    if update_data.status and old_status != request.status:
+        try:
+            room = db.query(Room).filter(Room.id == request.room_id).first()
+            room_number = room.number if room else str(request.room_id)
+            notification_crud.notify_service_request_status_changed(db, request.request_type, room_number, request.status, request.id)
+        except Exception as e:
+            print(f"Failed to send notification: {e}")
+    
     return request
 
 def delete_service_request(db: Session, request_id: int):

@@ -5,6 +5,7 @@ from app.models.Package import PackageBooking, PackageBookingRoom
 from app.models.service_request import ServiceRequest
 from app.schemas.foodorder import FoodOrderCreate, FoodOrderUpdate
 from datetime import datetime
+from app.curd import notification as notification_crud
 
 def get_guest_for_room(room_id, db: Session):
     """Get guest name for a room from either regular or package bookings"""
@@ -81,6 +82,27 @@ def create_food_order(db: Session, order_data: FoodOrderCreate):
             db.add(service_request)
             db.commit()
     
+    # Send notification
+    try:
+        # Get room number
+        from app.models.room import Room
+        room = db.query(Room).filter(Room.id == order.room_id).first()
+        room_number = room.number if room else "Unknown"
+        notification_crud.notify_food_order_created(db, room_number, order.id)
+    except Exception as e:
+        print(f"Failed to send notification: {e}")
+    
+    # Reload order with relationships to ensure response has all data (especially food_item_name)
+    from sqlalchemy.orm import joinedload
+    order = (
+        db.query(FoodOrder)
+        .options(
+            joinedload(FoodOrder.items).joinedload(FoodOrderItem.food_item)
+        )
+        .filter(FoodOrder.id == order.id)
+        .first()
+    )
+
     return order
 
 def get_food_orders(db: Session, skip: int = 0, limit: int = 100):
@@ -144,6 +166,14 @@ def update_food_order_status(db: Session, order_id: int, status: str):
         order.status = status
         db.commit()
         db.refresh(order)
+        
+        # Send notification
+        try:
+            room_number = order.room.number if order.room else "Unknown"
+            notification_crud.notify_food_order_status_changed(db, room_number, status, order.id)
+        except Exception as e:
+            print(f"Failed to send notification: {e}")
+            
     return order
 
 def update_food_order(db: Session, order_id: int, update_data: FoodOrderUpdate):
@@ -175,6 +205,14 @@ def update_food_order(db: Session, order_id: int, update_data: FoodOrderUpdate):
                     status="pending"
                 )
                 db.add(service_request)
+        
+        # Send notification for status change
+        try:
+            room_number = order.room.number if order.room else "Unknown"
+            notification_crud.notify_food_order_status_changed(db, room_number, update_data.status, order.id)
+        except Exception as e:
+            print(f"Failed to send notification: {e}")
+
     if update_data.billing_status is not None:
         order.billing_status = update_data.billing_status
     if update_data.order_type is not None:

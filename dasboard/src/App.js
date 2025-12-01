@@ -1,5 +1,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import { NotificationProvider } from "./contexts/NotificationContext";
 import Login from "./pages/Login.jsx";
 import { ProtectedRoute } from "./layout/DashboardLayout";
 import Dashboard from "./pages/Dashboard.jsx";
@@ -47,158 +49,161 @@ const getRouterBasename = () => {
 function App() {
   const basename = getRouterBasename();
   return (
-    <Router basename={basename}>
-      <Routes>
-        <Route path="/" element={<Login />} />
-        <Route path="/dashboard" element={
-          <ProtectedRoute requiredPermission="/dashboard">
-            <Dashboard />
-          </ProtectedRoute>
-        } />
-        <Route path="/bookings" element={
-          <ProtectedRoute requiredPermission="/bookings">
-            <Bookings />
-          </ProtectedRoute>
-        } />
-        <Route path="/rooms" element={
-          <ProtectedRoute requiredPermission="/rooms">
-            <CreateRooms />
-          </ProtectedRoute>
-        } />
-        <Route path="/users" element={
-          <ProtectedRoute requiredPermission="/users">
-            <Users />
-          </ProtectedRoute>
-        } />
-        <Route path="/services" element={
-          <ProtectedRoute requiredPermission="/services">
-            <Services />
-          </ProtectedRoute>
-        } />
-        <Route path="/expenses" element={
-          <ProtectedRoute requiredPermission="/expenses">
-            <Expenses />
-          </ProtectedRoute>
-        } />
-        {/* Protected Routes */}
-        <Route
-          path="/roles"
-          element={
-            <ProtectedRoute requiredPermission="/roles">
-              <RoleForm />
+    <NotificationProvider>
+      <Router basename={basename}>
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/dashboard" element={
+            <ProtectedRoute requiredPermission="/dashboard">
+              <Dashboard />
             </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/billing"
-          element={
-            <ProtectedRoute requiredPermission="/billing">
-              <Billing />
+          } />
+          <Route path="/bookings" element={
+            <ProtectedRoute requiredPermission="/bookings">
+              <Bookings />
             </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/food-orders"
-          element={
-            <ProtectedRoute requiredPermission="/food-orders">
-              <FoodOrder />
+          } />
+          <Route path="/rooms" element={
+            <ProtectedRoute requiredPermission="/rooms">
+              <CreateRooms />
             </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/food-categories"
-          element={
-            <ProtectedRoute requiredPermission="/food-categories">
-              <FoodOrder />
+          } />
+          <Route path="/users" element={
+            <ProtectedRoute requiredPermission="/users">
+              <Users />
             </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/food-items"
-          element={
-            <ProtectedRoute requiredPermission="/food-items">
-              <FoodOrder />
+          } />
+          <Route path="/services" element={
+            <ProtectedRoute requiredPermission="/services">
+              <Services />
             </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/account"
-          element={
-            <ProtectedRoute requiredPermission="/account">
-              <Account />
+          } />
+          <Route path="/expenses" element={
+            <ProtectedRoute requiredPermission="/expenses">
+              <Expenses />
             </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/accounting"
-          element={<Navigate to="/account" replace />}
-        />
-        <Route
-          path="/Userfrontend_data"
-          element={
-            <ProtectedRoute requiredPermission="/Userfrontend_data">
-              <Userfrontend_data />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/package"
-          element={
-            <ProtectedRoute requiredPermission="/package">
-              <Package />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/report"
-          element={
-            <ProtectedRoute requiredPermission="/report">
-              <ComprehensiveReport />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/guestprofiles"
-          element={
-            <ProtectedRoute requiredPermission="/guestprofiles">
-              <GuestProfile />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/user-history"
-          element={
-            <ProtectedRoute requiredPermission="/user-history">
-              <UserHistory />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/employee-management"
-          element={
-            <ProtectedRoute requiredPermission="/employee-management">
-              <EmployeeManagement />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/inventory"
-          element={
-            <ProtectedRoute requiredPermission="/inventory">
-              <Inventory />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/settings"
-          element={
-            <ProtectedRoute requiredPermission="/settings">
-              <Settings />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </Router>
+          } />
+          {/* Protected Routes */}
+          <Route
+            path="/roles"
+            element={
+              <ProtectedRoute requiredPermission="/roles">
+                <RoleForm />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/billing"
+            element={
+              <ProtectedRoute requiredPermission="/billing">
+                <Billing />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/food-orders"
+            element={
+              <ProtectedRoute requiredPermission="/food-orders">
+                <FoodOrder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/food-categories"
+            element={
+              <ProtectedRoute requiredPermission="/food-categories">
+                <FoodOrder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/food-items"
+            element={
+              <ProtectedRoute requiredPermission="/food-items">
+                <FoodOrder />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/account"
+            element={
+              <ProtectedRoute requiredPermission="/account">
+                <Account />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/accounting"
+            element={<Navigate to="/account" replace />}
+          />
+          <Route
+            path="/Userfrontend_data"
+            element={
+              <ProtectedRoute requiredPermission="/Userfrontend_data">
+                <Userfrontend_data />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/package"
+            element={
+              <ProtectedRoute requiredPermission="/package">
+                <Package />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/report"
+            element={
+              <ProtectedRoute requiredPermission="/report">
+                <ComprehensiveReport />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/guestprofiles"
+            element={
+              <ProtectedRoute requiredPermission="/guestprofiles">
+                <GuestProfile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/user-history"
+            element={
+              <ProtectedRoute requiredPermission="/user-history">
+                <UserHistory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/employee-management"
+            element={
+              <ProtectedRoute requiredPermission="/employee-management">
+                <EmployeeManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory"
+            element={
+              <ProtectedRoute requiredPermission="/inventory">
+                <Inventory />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute requiredPermission="/settings">
+                <Settings />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Router>
+      <Toaster position="top-right" />
+    </NotificationProvider>
   );
 }
 

@@ -1,7 +1,7 @@
 import requests
 import json
 
-BASE_URL = "http://localhost:8011/api"
+BASE_URL = "http://127.0.0.1:8011/api"
 
 def test_status_update():
     # 1. Get all assigned services

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import DashboardLayout from '../layout/DashboardLayout';
 import api from '../services/api';
-import { User, Mail, Phone, Bed, Utensils, ConciergeBell, FileText, Camera, Search, AlertCircle, Package } from 'lucide-react';
+import { User, Mail, Phone, Bed, Utensils, ConciergeBell, FileText, Camera, Search, AlertCircle } from 'lucide-react';
 import { getApiBaseUrl } from '../utils/env';
 
 const InfoCard = ({ icon, label, value }) => (
@@ -271,55 +271,11 @@ const GuestProfile = () => {
                                             <td className="p-3">#{s.id}</td>
                                             <td className="p-3">{new Date(s.assigned_at).toLocaleString()}</td>
                                             <td className="p-3">{s.service_name}</td>
-                                            <td className="p-3">{s.room_number || '-'}</td>
+                                            <td className="p-3">{s.room_number || 'N/A'}</td>
                                             <td className="p-3 text-right font-semibold">₹{(s.charges || 0).toFixed(2)}</td>
                                             <td className="p-3 text-center"><span className={`px-2 py-1 text-xs rounded-full ${s.status === 'completed' ? 'bg-purple-100 text-purple-800' : 'bg-yellow-100 text-yellow-800'}`}>{s.status}</span></td>
                                         </tr>
                                     ))}
-                                </tbody>
-                            </table>
-                        </SectionCard>
-
-                        {/* Inventory Items Used */}
-                        <SectionCard title="Inventory Items Used">
-                            <table className="min-w-full text-sm">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="p-3 text-left">Item Name</th>
-                                        <th className="p-3 text-left">Date</th>
-                                        <th className="p-3 text-left">Room</th>
-                                        <th className="p-3 text-right">Quantity</th>
-                                        <th className="p-3 text-right">Unit Price</th>
-                                        <th className="p-3 text-right">Total Value</th>
-                                        <th className="p-3 text-center">Type</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {profile.inventory_items && profile.inventory_items.length > 0 ? (
-                                        profile.inventory_items.map((item, idx) => (
-                                            <tr key={idx}>
-                                                <td className="p-3 font-semibold">{item.item_name}</td>
-                                                <td className="p-3">{new Date(item.issue_date).toLocaleDateString()}</td>
-                                                <td className="p-3">{item.room_number || '-'}</td>
-                                                <td className="p-3 text-right">{item.quantity} {item.unit}</td>
-                                                <td className="p-3 text-right">{item.unit_price ? `₹${item.unit_price.toFixed(2)}` : '-'}</td>
-                                                <td className="p-3 text-right font-semibold">{item.total_value ? `₹${item.total_value.toFixed(2)}` : '-'}</td>
-                                                <td className="p-3 text-center">
-                                                    <span className={`px-2 py-1 text-xs rounded-full ${
-                                                        item.is_payable ? 'bg-orange-100 text-orange-800' : 'bg-green-100 text-green-800'
-                                                    }`}>
-                                                        {item.is_payable ? 'Payable' : 'Complimentary'}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))
-                                    ) : (
-                                        <tr>
-                                            <td colSpan="7" className="p-6 text-center text-gray-500">
-                                                No inventory items found for this guest
-                                            </td>
-                                        </tr>
-                                    )}
                                 </tbody>
                             </table>
                         </SectionCard>

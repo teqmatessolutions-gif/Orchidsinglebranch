@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { jwtDecode } from "jwt-decode";
 import orchidLogo from "../assets/orchidlogo.png";
+import { NotificationBell } from "../contexts/NotificationContext";
 
 import { CreditCard } from "lucide-react";
 
@@ -315,14 +316,17 @@ export default function DashboardLayout({ children }) {
                 <img src={orchidLogo} className="h-20 w-auto object-contain drop-shadow-md" alt="Orchid Resort Logo" />
               </div>
             </div>
-            {/* Right side: Menu Toggle */}
-            <button
-              onClick={() => setCollapsed(!collapsed)}
-              className="p-2 rounded-full transition-colors duration-200"
-              style={{ color: 'var(--text-secondary)' }}
-            >
-              <Menu size={20} />
-            </button>
+            {/* Right side: Notification Bell and Menu Toggle */}
+            <div className="flex items-center gap-2">
+              {!collapsed && <NotificationBell />}
+              <button
+                onClick={() => setCollapsed(!collapsed)}
+                className="p-2 rounded-full transition-colors duration-200"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                <Menu size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Theme Switcher UI with image previews */}

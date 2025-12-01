@@ -34,3 +34,7 @@ class FoodOrderItem(Base):
 
     order = relationship("FoodOrder", back_populates="items")
     food_item = relationship("FoodItem")
+
+    @property
+    def food_item_name(self):
+        return self.food_item.name if self.food_item else None

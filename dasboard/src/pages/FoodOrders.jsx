@@ -13,7 +13,7 @@ import { formatDateTimeIST, formatDateIST } from "../utils/dateUtils";
 export default function FoodOrders() {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState("dashboard"); // "dashboard", "orders", "requests", or "management"
-  
+
   // Set active tab based on route
   useEffect(() => {
     if (location.pathname.includes("/food-categories") || location.pathname.includes("/food-items")) {
@@ -24,12 +24,12 @@ export default function FoodOrders() {
       setActiveTab("dashboard");
     }
   }, [location.pathname]);
-  
+
   // Food Order Requests state
   const [foodOrderRequests, setFoodOrderRequests] = useState([]);
   const [assigningRequestId, setAssigningRequestId] = useState(null);
   const [selectedEmployeeForRequest, setSelectedEmployeeForRequest] = useState("");
-  
+
   // Dashboard state
   const [dashboardData, setDashboardData] = useState({
     totalRevenue: 0,
@@ -84,7 +84,7 @@ export default function FoodOrders() {
   const [deliveryRequestText, setDeliveryRequestText] = useState("");
   const [showCompleteModal, setShowCompleteModal] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState("unpaid");
-  
+
   // Food Management states (from FoodCategory.jsx)
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -104,15 +104,15 @@ export default function FoodOrders() {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState("");
   const [editCategoryId, setEditCategoryId] = useState(null);
-  
+
   // Extra inventory items for food item
   const [extraInventoryItems, setExtraInventoryItems] = useState([]);
   const [inventoryItemsList, setInventoryItemsList] = useState([]);
-  
+
   // Available time for food item
   const [availableFromTime, setAvailableFromTime] = useState("");
   const [availableToTime, setAvailableToTime] = useState("");
-  
+
   // Time-wise pricing
   const [timeWisePrices, setTimeWisePrices] = useState([]);
 
@@ -156,7 +156,7 @@ export default function FoodOrders() {
       fetchAllOrdersForDashboard();
     }
   }, [activeTab]);
-  
+
   // Fetch inventory items for extra items selection
   const fetchInventoryItems = async () => {
     try {
@@ -167,43 +167,43 @@ export default function FoodOrders() {
       setInventoryItemsList([]);
     }
   };
-  
+
   // Handle extra inventory items
   const handleAddExtraInventoryItem = () => {
     setExtraInventoryItems([...extraInventoryItems, { inventory_item_id: "", quantity: 1 }]);
   };
-  
+
   const handleUpdateExtraInventoryItem = (index, field, value) => {
     const updated = [...extraInventoryItems];
     updated[index][field] = field === "quantity" ? parseFloat(value) || 0 : value;
     setExtraInventoryItems(updated);
   };
-  
+
   const handleRemoveExtraInventoryItem = (index) => {
     setExtraInventoryItems(extraInventoryItems.filter((_, i) => i !== index));
   };
-  
+
   // Handle time-wise pricing
   const handleAddTimeWisePrice = () => {
     setTimeWisePrices([...timeWisePrices, { from_time: "", to_time: "", price: "" }]);
   };
-  
+
   const handleUpdateTimeWisePrice = (index, field, value) => {
     const updated = [...timeWisePrices];
     updated[index][field] = value;
     setTimeWisePrices(updated);
   };
-  
+
   const handleRemoveTimeWisePrice = (index) => {
     setTimeWisePrices(timeWisePrices.filter((_, i) => i !== index));
   };
-  
+
   useEffect(() => {
     if (activeTab === "dashboard") {
       calculateDashboardData();
     }
   }, [activeTab, allOrdersForDashboard, dashboardFilters, recipesData]);
-  
+
   // Fetch all orders for dashboard analysis
   const fetchAllOrdersForDashboard = async () => {
     try {
@@ -226,35 +226,35 @@ export default function FoodOrders() {
           return { data: [] };
         })
       ]);
-      
+
       const orders = ordersRes.data || [];
       const foodItems = foodItemsRes.data || [];
       const employees = employeesRes.data || [];
       const inventoryItems = inventoryRes.data || [];
-      
+
       // Create lookup maps
       const foodItemsMap = {};
       foodItems.forEach(item => {
         foodItemsMap[item.id] = item;
       });
-      
+
       const employeesMap = {};
       employees.forEach(emp => {
         employeesMap[emp.id] = emp;
       });
-      
+
       const inventoryItemsMap = {};
       inventoryItems.forEach(item => {
         inventoryItemsMap[item.id] = item;
       });
-      
+
       // Store inventory items map for cost calculations
       setInventoryItemsList(inventoryItems);
-      
+
       // Enrich orders with food item and employee details
       const enrichedOrders = orders.map(order => {
         const enrichedOrder = { ...order };
-        
+
         // Enrich items with food item details
         if (enrichedOrder.items && Array.isArray(enrichedOrder.items)) {
           enrichedOrder.items = enrichedOrder.items.map(item => {
@@ -265,7 +265,7 @@ export default function FoodOrders() {
             };
           });
         }
-        
+
         // Enrich employee details
         if (enrichedOrder.assigned_employee_id) {
           enrichedOrder.assigned_employee = employeesMap[enrichedOrder.assigned_employee_id] || {
@@ -273,12 +273,12 @@ export default function FoodOrders() {
             name: `Employee ${enrichedOrder.assigned_employee_id}`
           };
         }
-        
+
         return enrichedOrder;
       });
-      
+
       setAllOrdersForDashboard(enrichedOrders);
-      
+
       // Also fetch recipes for inventory usage tracking
       fetchRecipesForInventory(foodItems);
     } catch (error) {
@@ -286,15 +286,15 @@ export default function FoodOrders() {
       setAllOrdersForDashboard([]);
     }
   };
-  
+
   // Fetch recipes for inventory usage tracking
   const fetchRecipesForInventory = async (foodItems) => {
     try {
-      const recipePromises = foodItems.map(item => 
+      const recipePromises = foodItems.map(item =>
         api.get(`/recipes?food_item_id=${item.id}`).catch(() => ({ data: [] }))
       );
       const recipeResponses = await Promise.all(recipePromises);
-      
+
       const recipesMap = {};
       recipeResponses.forEach((res, idx) => {
         const recipes = res.data || [];
@@ -302,45 +302,45 @@ export default function FoodOrders() {
           recipesMap[foodItems[idx].id] = recipes[0]; // Take first recipe if multiple
         }
       });
-      
+
       setRecipesData(recipesMap);
     } catch (error) {
       console.error("Failed to fetch recipes:", error);
     }
   };
-  
+
   // Calculate dashboard metrics
   const calculateDashboardData = () => {
     let filteredOrders = [...allOrdersForDashboard];
-    
+
     // Apply date filters
     if (dashboardFilters.fromDate) {
-      filteredOrders = filteredOrders.filter(order => 
+      filteredOrders = filteredOrders.filter(order =>
         order.created_at && order.created_at >= dashboardFilters.fromDate
       );
     }
     if (dashboardFilters.toDate) {
-      filteredOrders = filteredOrders.filter(order => 
+      filteredOrders = filteredOrders.filter(order =>
         order.created_at && order.created_at <= `${dashboardFilters.toDate}T23:59:59`
       );
     }
     if (dashboardFilters.orderType !== "all") {
-      filteredOrders = filteredOrders.filter(order => 
+      filteredOrders = filteredOrders.filter(order =>
         order.order_type === dashboardFilters.orderType
       );
     }
-    
+
     // Calculate totals
     const totalRevenue = filteredOrders
       .filter(o => o.status === "completed")
       .reduce((sum, o) => sum + (parseFloat(o.amount) || 0), 0);
-    
+
     const totalOrders = filteredOrders.length;
     const completedOrders = filteredOrders.filter(o => o.status === "completed").length;
     const pendingOrders = filteredOrders.filter(o => o.status === "pending").length;
     const deliveryOrders = filteredOrders.filter(o => o.order_type === "room_service").length;
     const dineInOrders = filteredOrders.filter(o => o.order_type === "dine_in").length;
-    
+
     // Calculate items sold
     const itemsMap = {};
     let totalItemsSold = 0;
@@ -350,7 +350,7 @@ export default function FoodOrders() {
           const itemId = item.food_item_id;
           const quantity = item.quantity || 0;
           totalItemsSold += quantity;
-          
+
           if (!itemsMap[itemId]) {
             itemsMap[itemId] = {
               food_item_id: itemId,
@@ -367,12 +367,12 @@ export default function FoodOrders() {
         });
       }
     });
-    
+
     // Top items by quantity
     const topItems = Object.values(itemsMap)
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 10);
-    
+
     // Sales by date
     const salesByDateMap = {};
     filteredOrders
@@ -390,7 +390,7 @@ export default function FoodOrders() {
     const salesByDate = Object.values(salesByDateMap)
       .sort((a, b) => new Date(a.date) - new Date(b.date))
       .slice(-30); // Last 30 days
-    
+
     // Orders by status
     const statusCounts = {};
     filteredOrders.forEach(order => {
@@ -401,7 +401,7 @@ export default function FoodOrders() {
       name: status.replace("_", " ").toUpperCase(),
       value: count
     }));
-    
+
     // Employee performance
     const employeeMap = {};
     filteredOrders
@@ -422,7 +422,7 @@ export default function FoodOrders() {
     const employeePerformance = Object.values(employeeMap)
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
-    
+
     // Revenue by type
     const revenueByType = [
       {
@@ -438,7 +438,7 @@ export default function FoodOrders() {
           .reduce((sum, o) => sum + (parseFloat(o.amount) || 0), 0)
       }
     ];
-    
+
     // Items usage (inventory items used in food items)
     const itemsUsageMap = {};
     filteredOrders.forEach(order => {
@@ -447,7 +447,7 @@ export default function FoodOrders() {
           // Get recipe from recipesData map
           const foodItemId = item.food_item_id;
           const recipe = recipesData[foodItemId];
-          
+
           if (recipe && recipe.ingredients && Array.isArray(recipe.ingredients)) {
             recipe.ingredients.forEach(ing => {
               const invId = ing.inventory_item_id;
@@ -469,13 +469,13 @@ export default function FoodOrders() {
     const itemsUsage = Object.values(itemsUsageMap)
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 20);
-    
+
     // Calculate Cost of Goods Sold (COGS) and Profit
     const completedOrdersList = filteredOrders.filter(o => o.status === "completed");
     let totalCOGS = 0;
     let totalProfit = 0;
     const orderCosts = [];
-    
+
     completedOrdersList.forEach(order => {
       let orderCOGS = 0;
       if (order.items && Array.isArray(order.items)) {
@@ -483,11 +483,11 @@ export default function FoodOrders() {
           const foodItemId = item.food_item_id;
           const quantity = item.quantity || 0;
           const recipe = recipesData[foodItemId];
-          
+
           if (recipe && recipe.ingredients && Array.isArray(recipe.ingredients)) {
             const servings = recipe.servings || 1;
             const recipeMultiplier = quantity / servings;
-            
+
             recipe.ingredients.forEach(ing => {
               const invItem = inventoryItemsList.find(inv => inv.id === ing.inventory_item_id);
               if (invItem && invItem.unit_price) {
@@ -496,7 +496,7 @@ export default function FoodOrders() {
               }
             });
           }
-          
+
           // Add extra inventory items cost for room service
           if (order.order_type === "room_service" && item.food_item?.extra_inventory_items) {
             item.food_item.extra_inventory_items.forEach(extra => {
@@ -508,12 +508,12 @@ export default function FoodOrders() {
           }
         });
       }
-      
+
       const orderRevenue = parseFloat(order.amount) || 0;
       const orderProfit = orderRevenue - orderCOGS;
       totalCOGS += orderCOGS;
       totalProfit += orderProfit;
-      
+
       orderCosts.push({
         orderId: order.id,
         revenue: orderRevenue,
@@ -522,18 +522,18 @@ export default function FoodOrders() {
         margin: orderRevenue > 0 ? ((orderProfit / orderRevenue) * 100) : 0
       });
     });
-    
+
     const profitMargin = totalRevenue > 0 ? ((totalProfit / totalRevenue) * 100) : 0;
     const averageOrderValue = completedOrders > 0 ? totalRevenue / completedOrders : 0;
     const averageCOGS = completedOrders > 0 ? totalCOGS / completedOrders : 0;
     const averageProfit = completedOrders > 0 ? totalProfit / completedOrders : 0;
-    
+
     // Calculate item costs and profits
     Object.keys(itemsMap).forEach(itemId => {
       const item = itemsMap[itemId];
       const recipe = recipesData[itemId];
       let itemCost = 0;
-      
+
       if (recipe && recipe.ingredients && Array.isArray(recipe.ingredients)) {
         const servings = recipe.servings || 1;
         const recipeMultiplier = item.quantity / servings;
@@ -544,12 +544,12 @@ export default function FoodOrders() {
           }
         });
       }
-      
+
       item.cost = itemCost;
       item.profit = item.revenue - itemCost;
       item.margin = item.revenue > 0 ? ((item.profit / item.revenue) * 100) : 0;
     });
-    
+
     setDashboardData({
       totalRevenue,
       totalOrders,
@@ -574,7 +574,7 @@ export default function FoodOrders() {
       orderCosts
     });
   };
-  
+
   // Fetch food order requests (service requests with food_order_id)
   const fetchFoodOrderRequests = async () => {
     try {
@@ -587,7 +587,7 @@ export default function FoodOrders() {
       setFoodOrderRequests([]);
     }
   };
-  
+
   // Accept a food order request (change status to in_progress)
   const handleAcceptRequest = async (requestId) => {
     try {
@@ -602,7 +602,7 @@ export default function FoodOrders() {
       toast.error("Failed to accept request.");
     }
   };
-  
+
   // Assign employee to a food order request
   const handleAssignEmployeeToRequest = async (requestId) => {
     if (!selectedEmployeeForRequest) {
@@ -624,7 +624,7 @@ export default function FoodOrders() {
       toast.error("Failed to assign employee.");
     }
   };
-  
+
   // Update request status
   const handleUpdateRequestStatus = async (requestId, newStatus) => {
     try {
@@ -639,7 +639,7 @@ export default function FoodOrders() {
       toast.error("Failed to update request status.");
     }
   };
-  
+
   // Delete a food order request
   const handleDeleteRequest = async (requestId) => {
     if (!window.confirm("Are you sure you want to delete this request?")) return;
@@ -737,7 +737,7 @@ export default function FoodOrders() {
     formData.append("available", available);
     formData.append("always_available", alwaysAvailable);
     images.forEach((img) => formData.append("images", img));
-    
+
     // Add available time (only if not always available)
     if (!alwaysAvailable) {
       if (availableFromTime) {
@@ -747,7 +747,7 @@ export default function FoodOrders() {
         formData.append("available_to_time", availableToTime);
       }
     }
-    
+
     // Add extra inventory items (only for parcel/room service)
     // These are automatically applied to room service orders only
     if (extraInventoryItems.length > 0) {
@@ -759,7 +759,7 @@ export default function FoodOrders() {
         }))
       ));
     }
-    
+
     // Add time-wise pricing
     if (timeWisePrices.length > 0) {
       formData.append("time_wise_prices", JSON.stringify(
@@ -929,36 +929,36 @@ export default function FoodOrders() {
         }),
       ]);
       setOrders(ordersRes.data);
-      setHasMore(ordersRes.data.length === 12);
+      setHasMore(ordersRes.data.length === 20);
       setEmployees(employeesRes.data);
       setFoodItems(foodItemsRes.data);
-      
+
       // Filter rooms to only show checked-in rooms (similar to Services page)
       const allRooms = roomsRes.data;
       const regularBookings = bookingsRes.data?.bookings || [];
       const packageBookings = (packageBookingsRes.data || []).map(pb => ({ ...pb, is_package: true }));
-      
+
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const checkedInRoomIds = new Set();
-      
+
       // Helper function to normalize status
       const normalizeStatus = (status) => {
         if (!status) return '';
         return status.toLowerCase().replace(/[-_\s]/g, '');
       };
-      
+
       // Helper function to check if status is checked-in or booked (active booking)
       const isActiveBooking = (status) => {
         if (!status) return false;
         const normalized = status.toLowerCase().replace(/[-_\s]/g, '');
         // Accept: 'checkedin', 'checked-in', 'checked_in', 'checked in', or 'booked' (for active bookings)
         // Exclude: 'cancelled', 'checkedout', 'checked-out', 'checked_out'
-        return (normalized === 'checkedin' || normalized === 'booked') && 
-               normalized !== 'cancelled' && 
-               !normalized.includes('checkedout');
+        return (normalized === 'checkedin' || normalized === 'booked') &&
+          normalized !== 'cancelled' &&
+          !normalized.includes('checkedout');
       };
-      
+
       // Get room IDs from active regular bookings (checked-in or booked, not cancelled)
       regularBookings.forEach(booking => {
         if (isActiveBooking(booking.status)) {
@@ -967,7 +967,7 @@ export default function FoodOrders() {
           const checkOutDate = new Date(booking.check_out);
           checkInDate.setHours(0, 0, 0, 0);
           checkOutDate.setHours(0, 0, 0, 0);
-          
+
           // Check if booking is active (today is between check-in and check-out)
           // Also allow if check-out is today (room is still checked in)
           if (checkInDate <= today && checkOutDate >= today) {
@@ -991,7 +991,7 @@ export default function FoodOrders() {
           console.log(`Regular booking ${booking.id} status '${booking.status}' is not active (normalized: '${normalizeStatus(booking.status)}')`);
         }
       });
-      
+
       // Get room IDs from active package bookings (checked-in or booked, not cancelled)
       // Note: Package bookings have rooms as PackageBookingRoomOut objects with a nested 'room' property
       packageBookings.forEach(booking => {
@@ -1001,7 +1001,7 @@ export default function FoodOrders() {
           const checkOutDate = new Date(booking.check_out);
           checkInDate.setHours(0, 0, 0, 0);
           checkOutDate.setHours(0, 0, 0, 0);
-          
+
           // Check if booking is active (today is between check-in and check-out)
           // Also allow if check-out is today (room is still checked in)
           if (checkInDate <= today && checkOutDate >= today) {
@@ -1030,23 +1030,23 @@ export default function FoodOrders() {
           console.log(`Package booking ${booking.id} status '${booking.status}' is not active (normalized: '${normalizeStatus(booking.status)}')`);
         }
       });
-      
+
       // Also check room status directly as a fallback
       // Include rooms with status: checked-in, booked, occupied (regardless of booking status)
       allRooms.forEach(room => {
         const roomStatusNormalized = normalizeStatus(room.status);
         // Accept: checkedin, booked, occupied, checked-in (any variation)
-        if (roomStatusNormalized === 'checkedin' || 
-            roomStatusNormalized === 'booked' || 
-            roomStatusNormalized === 'occupied' ||
-            roomStatusNormalized.includes('checkedin')) {
+        if (roomStatusNormalized === 'checkedin' ||
+          roomStatusNormalized === 'booked' ||
+          roomStatusNormalized === 'occupied' ||
+          roomStatusNormalized.includes('checkedin')) {
           checkedInRoomIds.add(room.id);
         }
       });
-      
+
       // Filter rooms to only show checked-in/active rooms
       const checkedInRooms = allRooms.filter(room => checkedInRoomIds.has(room.id));
-      
+
       // Detailed debug logging (matching Services.jsx pattern)
       console.log(`Food Orders - Total checked-in room IDs: ${checkedInRoomIds.size}`, Array.from(checkedInRoomIds));
       console.log(`Food Orders - Filtered checked-in rooms: ${checkedInRooms.length}`, checkedInRooms.map(r => `${r.number || r.id} (status: ${r.status})`));
@@ -1061,7 +1061,7 @@ export default function FoodOrders() {
         today: today.toISOString(),
         allRoomStatuses: allRooms.map(r => ({ id: r.id, number: r.number, status: r.status }))
       });
-      
+
       setRooms(checkedInRooms);
     } catch (error) {
       console.error("Failed to fetch data:", error);
@@ -1070,6 +1070,18 @@ export default function FoodOrders() {
       setRooms([]);
       setEmployees([]);
       setFoodItems([]);
+    }
+  };
+
+  const fetchOrders = async () => {
+    try {
+      const ordersRes = await api.get("/food-orders/?skip=0&limit=20");
+      setOrders(ordersRes.data || []);
+      setPage(1);
+      setHasMore(ordersRes.data?.length === 20);
+    } catch (error) {
+      console.error("Failed to fetch orders:", error);
+      setOrders([]);
     }
   };
 
@@ -1130,8 +1142,20 @@ export default function FoodOrders() {
     };
 
     try {
-      await api.post("/food-orders/", payload);
-      fetchAll();
+      const res = await api.post("/food-orders/", payload);
+      toast.success("Order created successfully!");
+
+      // Manually add to state to ensure immediate visibility
+      if (res.data) {
+        setOrders(prev => [res.data, ...prev]);
+      }
+
+      // Only refresh orders table, not all data
+      fetchOrders();
+      // Also refresh dashboard data if on dashboard tab
+      if (activeTab === "dashboard") {
+        fetchAllOrdersForDashboard();
+      }
       setSelectedItems([]);
       setRoomId("");
       setEmployeeId("");
@@ -1140,7 +1164,7 @@ export default function FoodOrders() {
       setDeliveryRequest("");
     } catch (err) {
       console.error(err);
-      alert("Failed to submit order.");
+      toast.error("Failed to submit order.");
     }
   };
 
@@ -1152,20 +1176,25 @@ export default function FoodOrders() {
       setPaymentStatus(order.billing_status === "paid" ? "paid" : "unpaid");
       return;
     }
-    
+
     // For other status changes, update directly
     try {
       await api.put(`/food-orders/${id}`, { status: newStatus });
-      fetchAll();
+      toast.success("Order status updated successfully!");
+      fetchOrders();
+      // Also refresh dashboard data if on dashboard tab
+      if (activeTab === "dashboard") {
+        fetchAllOrdersForDashboard();
+      }
     } catch (error) {
       console.error("Failed to update status:", error);
-      alert("Failed to update order status.");
+      toast.error("Failed to update order status.");
     }
   };
 
   const handleCompleteOrder = async () => {
     if (!showCompleteModal) return;
-    
+
     try {
       await api.put(`/food-orders/${showCompleteModal.id}`, {
         status: "completed",
@@ -1173,11 +1202,15 @@ export default function FoodOrders() {
       });
       setShowCompleteModal(null);
       setPaymentStatus("unpaid");
-      fetchAll();
-      alert("Order completed successfully!");
+      toast.success("Order completed successfully!");
+      fetchOrders();
+      // Also refresh dashboard data if on dashboard tab
+      if (activeTab === "dashboard") {
+        fetchAllOrdersForDashboard();
+      }
     } catch (error) {
       console.error("Failed to complete order:", error);
-      alert("Failed to complete order.");
+      toast.error("Failed to complete order.");
     }
   };
 
@@ -1193,11 +1226,11 @@ export default function FoodOrders() {
       });
       setShowDeliveryRequestModal(null);
       setDeliveryRequestText("");
-      fetchAll();
-      alert("Delivery request updated successfully!");
+      toast.success("Delivery request updated successfully!");
+      fetchOrders();
     } catch (error) {
       console.error("Failed to update delivery request:", error);
-      alert("Failed to update delivery request.");
+      toast.error("Failed to update delivery request.");
     }
   };
 
@@ -1227,7 +1260,7 @@ export default function FoodOrders() {
       const ingredientMap = new Map(); // inventory_item_id -> { name, code, totalQuantity, unit, notes }
 
       // Fetch recipes for all food items in the order
-      const recipePromises = order.items.map(item => 
+      const recipePromises = order.items.map(item =>
         fetchRecipeForFoodItem(item.food_item_id)
       );
       const recipeArrays = await Promise.all(recipePromises);
@@ -1287,7 +1320,7 @@ export default function FoodOrders() {
   // Handle view ingredients button click
   const handleViewIngredients = async (order) => {
     setViewingIngredients(order.id);
-    
+
     // If already calculated, use cached data
     if (ingredientsData[order.id]) {
       return;
@@ -1375,11 +1408,10 @@ export default function FoodOrders() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`px-6 py-3 font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? "text-indigo-600 border-b-2 border-indigo-600"
-                    : "text-gray-600 hover:text-gray-900"
-                }`}
+                className={`px-6 py-3 font-medium transition-colors ${activeTab === tab.id
+                  ? "text-indigo-600 border-b-2 border-indigo-600"
+                  : "text-gray-600 hover:text-gray-900"
+                  }`}
               >
                 {tab.label}
               </button>
@@ -1461,8 +1493,8 @@ export default function FoodOrders() {
                     <p className="text-sm font-medium opacity-90">Completed Orders</p>
                     <p className="text-3xl font-bold mt-1">{dashboardData.completedOrders}</p>
                     <p className="text-xs opacity-75 mt-1">
-                      {dashboardData.totalOrders > 0 
-                        ? ((dashboardData.completedOrders / dashboardData.totalOrders) * 100).toFixed(1) 
+                      {dashboardData.totalOrders > 0
+                        ? ((dashboardData.completedOrders / dashboardData.totalOrders) * 100).toFixed(1)
                         : 0}% completion rate
                     </p>
                   </div>
@@ -1549,8 +1581,8 @@ export default function FoodOrders() {
                     <p className="text-sm font-medium text-gray-600">Dine In Orders</p>
                     <p className="text-2xl font-bold text-blue-600 mt-1">{dashboardData.dineInOrders}</p>
                     <p className="text-xs text-gray-500 mt-1">
-                      {dashboardData.totalOrders > 0 
-                        ? ((dashboardData.dineInOrders / dashboardData.totalOrders) * 100).toFixed(1) 
+                      {dashboardData.totalOrders > 0
+                        ? ((dashboardData.dineInOrders / dashboardData.totalOrders) * 100).toFixed(1)
                         : 0}% of total
                     </p>
                   </div>
@@ -1563,8 +1595,8 @@ export default function FoodOrders() {
                     <p className="text-sm font-medium text-gray-600">Room Service</p>
                     <p className="text-2xl font-bold text-indigo-600 mt-1">{dashboardData.deliveryOrders}</p>
                     <p className="text-xs text-gray-500 mt-1">
-                      {dashboardData.totalOrders > 0 
-                        ? ((dashboardData.deliveryOrders / dashboardData.totalOrders) * 100).toFixed(1) 
+                      {dashboardData.totalOrders > 0
+                        ? ((dashboardData.deliveryOrders / dashboardData.totalOrders) * 100).toFixed(1)
                         : 0}% of total
                     </p>
                   </div>
@@ -1689,7 +1721,7 @@ export default function FoodOrders() {
                         legend: { display: false },
                         tooltip: {
                           callbacks: {
-                            label: function(context) {
+                            label: function (context) {
                               return '₹' + context.parsed.y.toLocaleString('en-IN');
                             }
                           }
@@ -1699,7 +1731,7 @@ export default function FoodOrders() {
                         y: {
                           beginAtZero: true,
                           ticks: {
-                            callback: function(value) {
+                            callback: function (value) {
                               return '₹' + value.toLocaleString('en-IN');
                             }
                           }
@@ -1848,7 +1880,7 @@ export default function FoodOrders() {
                 </div>
               </div>
             </div>
-            
+
             {/* Profitability Analysis */}
             <div className="bg-white rounded-xl shadow-lg p-6">
               <h3 className="text-xl font-bold text-gray-800 mb-4">Profitability Analysis</h3>
@@ -1861,8 +1893,8 @@ export default function FoodOrders() {
                 <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg">
                   <p className="text-sm text-gray-600 mb-1">Revenue to Cost Ratio</p>
                   <p className="text-3xl font-bold text-blue-600">
-                    {dashboardData.totalCOGS > 0 
-                      ? (dashboardData.totalRevenue / dashboardData.totalCOGS).toFixed(2) 
+                    {dashboardData.totalCOGS > 0
+                      ? (dashboardData.totalRevenue / dashboardData.totalCOGS).toFixed(2)
                       : '0.00'}x
                   </p>
                   <p className="text-xs text-gray-500 mt-1">For every ₹1 cost</p>
@@ -2009,11 +2041,10 @@ export default function FoodOrders() {
                         setOrderType("dine_in");
                         setDeliveryRequest("");
                       }}
-                      className={`flex items-center justify-center gap-2 p-4 border-2 rounded-lg transition-all ${
-                        orderType === "dine_in"
-                          ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
-                          : "border-gray-300 hover:border-indigo-300 text-gray-700 bg-white"
-                      }`}
+                      className={`flex items-center justify-center gap-2 p-4 border-2 rounded-lg transition-all ${orderType === "dine_in"
+                        ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
+                        : "border-gray-300 hover:border-indigo-300 text-gray-700 bg-white"
+                        }`}
                     >
                       <UtensilsCrossed size={20} />
                       <span className="font-semibold">Dine In</span>
@@ -2021,11 +2052,10 @@ export default function FoodOrders() {
                     <button
                       type="button"
                       onClick={() => setOrderType("room_service")}
-                      className={`flex items-center justify-center gap-2 p-4 border-2 rounded-lg transition-all ${
-                        orderType === "room_service"
-                          ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
-                          : "border-gray-300 hover:border-indigo-300 text-gray-700 bg-white"
-                      }`}
+                      className={`flex items-center justify-center gap-2 p-4 border-2 rounded-lg transition-all ${orderType === "room_service"
+                        ? "border-indigo-500 bg-indigo-50 text-indigo-700 shadow-sm"
+                        : "border-gray-300 hover:border-indigo-300 text-gray-700 bg-white"
+                        }`}
                     >
                       <Home size={20} />
                       <span className="font-semibold">Room Service</span>
@@ -2181,18 +2211,16 @@ export default function FoodOrders() {
                           </div>
                           <div className="flex flex-col gap-2 items-end">
                             <span
-                              className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                order.order_type === "room_service"
-                                  ? "bg-purple-100 text-purple-700"
-                                  : "bg-blue-100 text-blue-700"
-                              }`}
+                              className={`px-2.5 py-1 rounded-full text-xs font-semibold ${order.order_type === "room_service"
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-blue-100 text-blue-700"
+                                }`}
                             >
                               {order.order_type === "room_service" ? "Room Service" : "Dine In"}
                             </span>
                             <span
-                              className={`px-2.5 py-1 rounded-full text-xs font-semibold ${
-                                statusColors[order.status] || "bg-gray-100 text-gray-800"
-                              }`}
+                              className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[order.status] || "bg-gray-100 text-gray-800"
+                                }`}
                             >
                               {order.status.replace("_", " ")}
                             </span>
@@ -2346,7 +2374,7 @@ export default function FoodOrders() {
           const order = orders.find(o => o.id === viewingIngredients);
           const ingredients = ingredientsData[viewingIngredients] || [];
           const roomData = rooms.find((r) => r.id === order?.room_id);
-          
+
           return (
             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden flex flex-col">
@@ -2358,8 +2386,8 @@ export default function FoodOrders() {
                       Order Ingredients
                     </h3>
                     <p className="text-indigo-100 mt-1">
-                      Room: {roomData?.number || roomData?.room_number || order?.room_id} | 
-                      Order #{order?.id} | 
+                      Room: {roomData?.number || roomData?.room_number || order?.room_id} |
+                      Order #{order?.id} |
                       {order?.items?.length || 0} item(s)
                     </p>
                   </div>
@@ -2481,7 +2509,7 @@ export default function FoodOrders() {
                       Delivery Request
                     </h3>
                     <p className="text-purple-100 mt-1">
-                      Room: {roomData?.number || roomData?.room_number || order?.room_id} | 
+                      Room: {roomData?.number || roomData?.room_number || order?.room_id} |
                       Order #{order?.id} | Room Service
                     </p>
                   </div>
@@ -2566,22 +2594,20 @@ export default function FoodOrders() {
                     <button
                       type="button"
                       onClick={() => setPaymentStatus("paid")}
-                      className={`p-3 border-2 rounded-xl transition-all ${
-                        paymentStatus === "paid"
-                          ? "border-green-500 bg-green-50 text-green-700"
-                          : "border-gray-300 hover:border-green-300 text-gray-700"
-                      }`}
+                      className={`p-3 border-2 rounded-xl transition-all ${paymentStatus === "paid"
+                        ? "border-green-500 bg-green-50 text-green-700"
+                        : "border-gray-300 hover:border-green-300 text-gray-700"
+                        }`}
                     >
                       <span className="font-semibold">Paid</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setPaymentStatus("unpaid")}
-                      className={`p-3 border-2 rounded-xl transition-all ${
-                        paymentStatus === "unpaid"
-                          ? "border-red-500 bg-red-50 text-red-700"
-                          : "border-gray-300 hover:border-red-300 text-gray-700"
-                      }`}
+                      className={`p-3 border-2 rounded-xl transition-all ${paymentStatus === "unpaid"
+                        ? "border-red-500 bg-red-50 text-red-700"
+                        : "border-gray-300 hover:border-red-300 text-gray-700"
+                        }`}
                     >
                       <span className="font-semibold">Unpaid</span>
                     </button>
@@ -2644,7 +2670,7 @@ export default function FoodOrders() {
                 </p>
               </div>
             </div>
-            
+
             {/* Performance Metrics */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
               <div className="bg-gradient-to-r from-emerald-500 to-emerald-700 rounded-xl shadow-lg p-6 text-white">
@@ -2667,7 +2693,7 @@ export default function FoodOrders() {
               <div className="bg-gradient-to-r from-blue-500 to-blue-700 rounded-xl shadow-lg p-6 text-white">
                 <h3 className="text-sm font-medium opacity-90 mb-2">Completion Rate</h3>
                 <p className="text-2xl font-bold">
-                  {foodOrderRequests.length > 0 
+                  {foodOrderRequests.length > 0
                     ? ((foodOrderRequests.filter(r => r.status === "completed").length / foodOrderRequests.length) * 100).toFixed(1)
                     : 0}%
                 </p>
@@ -2676,7 +2702,7 @@ export default function FoodOrders() {
               <div className="bg-gradient-to-r from-purple-500 to-purple-700 rounded-xl shadow-lg p-6 text-white">
                 <h3 className="text-sm font-medium opacity-90 mb-2">Assigned Rate</h3>
                 <p className="text-2xl font-bold">
-                  {foodOrderRequests.length > 0 
+                  {foodOrderRequests.length > 0
                     ? ((foodOrderRequests.filter(r => r.employee_id).length / foodOrderRequests.length) * 100).toFixed(1)
                     : 0}%
                 </p>
@@ -2741,15 +2767,14 @@ export default function FoodOrders() {
                           </td>
                           <td className="py-3 px-4">
                             <span
-                              className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                request.status === "pending"
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : request.status === "in_progress"
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${request.status === "pending"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : request.status === "in_progress"
                                   ? "bg-blue-100 text-blue-800"
                                   : request.status === "completed"
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
                             >
                               {request.status?.replace("_", " ").toUpperCase() || "PENDING"}
                             </span>
@@ -2860,14 +2885,14 @@ export default function FoodOrders() {
         {activeTab === "management" && (
           <div className="space-y-6">
             {error && <div className="p-4 mb-4 text-center text-red-700 bg-red-100 border border-red-200 rounded-lg">{error}</div>}
-            
+
             {/* KPI Section */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               <KpiCard title="Total Food Items" value={totalItems} color="bg-gradient-to-r from-green-500 to-green-700" icon={<i className="fas fa-utensils"></i>} />
               <KpiCard title="Item Categories" value={totalCategories} color="bg-gradient-to-r from-blue-500 to-blue-700" icon={<i className="fas fa-tags"></i>} />
               <KpiCard title="Items Available" value={availableItemsCount} color="bg-gradient-to-r from-purple-500 to-purple-700" icon={<i className="fas fa-check-circle"></i>} />
             </div>
-            
+
             {/* Business Performance KPIs */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               <div className="bg-gradient-to-r from-emerald-500 to-emerald-700 rounded-xl shadow-lg p-6 text-white">
@@ -2875,7 +2900,7 @@ export default function FoodOrders() {
                   <div>
                     <p className="text-sm font-medium opacity-90">Avg Item Price</p>
                     <p className="text-3xl font-bold mt-1">
-                      ₹{totalItems > 0 
+                      ₹{totalItems > 0
                         ? (foodItems.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0) / totalItems).toLocaleString('en-IN', { maximumFractionDigits: 2 })
                         : '0.00'}
                     </p>
@@ -2929,7 +2954,7 @@ export default function FoodOrders() {
                 <h2 className="text-2xl font-bold text-gray-800 mb-2">🍽️ Food Item Management</h2>
                 <p className="text-sm text-gray-500">Create and manage food items for your menu</p>
               </div>
-              
+
               <form onSubmit={handleFoodSubmit} className="space-y-6">
                 {/* Basic Information Section */}
                 <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
@@ -3323,24 +3348,23 @@ export default function FoodOrders() {
                         {/* Item Image */}
                         {item.images && item.images.length > 0 && (
                           <div className="relative h-40 bg-gray-100">
-                            <img 
-                              src={getImageUrl(item.images[0].image_url)} 
-                              alt={item.name} 
-                              className="w-full h-full object-cover" 
+                            <img
+                              src={getImageUrl(item.images[0].image_url)}
+                              alt={item.name}
+                              className="w-full h-full object-cover"
                             />
-                            <span className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium ${
-                              item.available ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
-                            }`}>
+                            <span className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium ${item.available ? 'bg-green-500 text-white' : 'bg-red-500 text-white'
+                              }`}>
                               {item.available ? 'Available' : 'Unavailable'}
                             </span>
                           </div>
                         )}
-                        
+
                         {/* Item Details */}
                         <div className="p-4">
                           <h3 className="font-semibold text-lg text-gray-800 mb-1">{item.name}</h3>
                           <p className="text-sm text-gray-600 mb-3 line-clamp-2">{item.description}</p>
-                          
+
                           {/* Pricing */}
                           <div className="mb-3 space-y-2">
                             <div className="flex justify-between items-center">
@@ -3354,7 +3378,7 @@ export default function FoodOrders() {
                               </div>
                             )}
                           </div>
-                          
+
                           {/* Cost & Profit (if recipe exists) */}
                           {(() => {
                             const recipe = recipesData[item.id];
@@ -3393,7 +3417,7 @@ export default function FoodOrders() {
                               </div>
                             ) : null;
                           })()}
-                          
+
                           {/* Actions */}
                           <div className="flex gap-2 mt-4">
                             <button

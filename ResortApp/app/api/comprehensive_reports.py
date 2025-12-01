@@ -116,8 +116,8 @@ class ServiceReport(BaseModel):
 @router.get("/inventory/category-wise")
 @apply_api_optimizations
 def get_inventory_category_report(
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -154,22 +154,21 @@ def get_inventory_category_report(
 @router.get("/inventory/department-wise")
 @apply_api_optimizations
 def get_inventory_department_report(
-    start_date: Optional[date] = Query(None),
-    end_date: Optional[date] = Query(None),
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Inventory report grouped by department/location"""
     try:
-        # Use left join to include items without location
         query = db.query(
-            func.coalesce(Location.name, 'Unassigned').label('department'),
+            Location.name.label('department'),
             func.count(InventoryItem.id).label('total_items'),
             func.coalesce(func.sum(InventoryItem.current_stock), 0).label('total_quantity'),
             func.coalesce(func.sum(InventoryItem.current_stock * InventoryItem.unit_price), 0).label('total_value')
-        ).outerjoin(
-            Location, InventoryItem.location_id == Location.id
-        ).group_by(func.coalesce(Location.name, 'Unassigned'))
+        ).join(
+            InventoryItem, InventoryItem.location_id == Location.id
+        ).group_by(Location.name)
         
         results = query.all()
         
@@ -178,8 +177,7 @@ def get_inventory_department_report(
                 "department": r.department,
                 "total_items": r.total_items,
                 "total_quantity": float(r.total_quantity or 0),
-                "total_value": float(r.total_value or 0),
-                "low_stock_items": 0  # Add for consistency with category report
+                "total_value": float(r.total_value or 0)
             }
             for r in results
         ]
@@ -484,7 +482,7 @@ def get_services_report(
                     filtered_assigned.append(a)
                 assigned = filtered_assigned
             
-            total_revenue = sum([float(a.service.charges or 0) if a.service and a.service.charges else 0 for a in assigned])
+            total_revenue = sum([float(a.service.charges or 0) for a in assigned if a.service])
             completed = len([a for a in assigned if a.status == "completed"])
             pending = len([a for a in assigned if a.status == "pending" or a.status == "in_progress"])
             
