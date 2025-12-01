@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from app.utils.auth import get_current_user
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.database import SessionLocal
@@ -46,7 +47,8 @@ def create_room_test(
     garden: bool = Form(False),
     dining: bool = Form(False),
     breakfast: bool = Form(False),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     try:
         filename = None
@@ -140,7 +142,7 @@ def test_simple():
 
 # Test delete endpoint
 @router.delete("/test/{room_id}")
-def delete_room_test(room_id: int, db: Session = Depends(get_db)):
+def delete_room_test(room_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     try:
         db_room = db.query(Room).filter(Room.id == room_id).first()
         if db_room is None:
@@ -162,7 +164,7 @@ def delete_room_test(room_id: int, db: Session = Depends(get_db)):
 
 # Test GET endpoint for fetching rooms
 @router.get("/test", response_model=list[RoomOut])
-def get_rooms_test(db: Session = Depends(get_db), skip: int = 0, limit: int = 100):
+def get_rooms_test(db: Session = Depends(get_db), skip: int = 0, limit: int = 100, current_user: dict = Depends(get_current_user)):
     try:
         # Update room statuses before fetching (non-blocking - continues even if update fails)
         try:
@@ -209,7 +211,8 @@ def create_room(
     garden: bool = Form(False),
     dining: bool = Form(False),
     breakfast: bool = Form(False),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     try:
         filename = None
@@ -298,7 +301,7 @@ def create_room(
 
 # ---------------- READ ----------------
 @router.post("/update-statuses")
-def update_room_statuses_endpoint(db: Session = Depends(get_db)):
+def update_room_statuses_endpoint(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """
     Manually trigger room status update based on current bookings.
     This endpoint can be called to refresh room statuses.
@@ -367,17 +370,17 @@ def _get_rooms_impl(db: Session, skip: int = 0, limit: int = 20):
         raise HTTPException(status_code=500, detail=f"Error fetching rooms: {str(e)}")
 
 @router.get("", response_model=list[RoomOut])
-def get_rooms(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
+def get_rooms(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
     return _get_rooms_impl(db, skip, limit)
 
 @router.get("/", response_model=list[RoomOut])  # Handle trailing slash
-def get_rooms_slash(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
+def get_rooms_slash(db: Session = Depends(get_db), skip: int = 0, limit: int = 20, current_user: dict = Depends(get_current_user)):
     return _get_rooms_impl(db, skip, limit)
 
 
 # ---------------- DELETE ----------------
 @router.delete("/{room_id}")
-def delete_room(room_id: int, db: Session = Depends(get_db)):
+def delete_room(room_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     db_room = db.query(Room).filter(Room.id == room_id).first()
     if db_room is None:
         raise HTTPException(status_code=404, detail="Room not found")
@@ -416,7 +419,8 @@ def update_room(
     garden: bool = Form(None),
     dining: bool = Form(None),
     breakfast: bool = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     db_room = db.query(Room).filter(Room.id == room_id).first()
     if not db_room:

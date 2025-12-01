@@ -28,7 +28,7 @@ def create_new_role_slash(role: RoleCreate, db: Session = Depends(get_db), user:
     return crud_role.create_role(db, role)
 
 @router.get("", response_model=list[RoleOut])
-def list_roles(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
+def list_roles(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), skip: int = 0, limit: int = 20):
     roles = crud_role.get_roles(db, skip=skip, limit=limit)
     return roles
 

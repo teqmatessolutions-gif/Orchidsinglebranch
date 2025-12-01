@@ -10,6 +10,7 @@ from typing import Optional, List
 from decimal import Decimal
 
 from app.database import get_db
+from app.utils.auth import get_current_user
 from app.models import (
     Booking, BookingRoom, PackageBooking, PackageBookingRoom,
     Checkout,
@@ -35,7 +36,8 @@ def get_daily_arrival_report(
     report_date: Optional[date] = Query(None, description="Date for arrival report (default: today)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Daily Arrival Report: List of guests checking in today"""
     if not report_date:
@@ -97,7 +99,8 @@ def get_daily_departure_report(
     report_date: Optional[date] = Query(None, description="Date for departure report (default: today)"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Daily Departure Report: List of guests checking out"""
     if not report_date:
@@ -136,7 +139,8 @@ def get_daily_departure_report(
 @apply_api_optimizations
 def get_occupancy_report(
     report_date: Optional[date] = Query(None, description="Date for occupancy report (default: today)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Occupancy Report: % of rooms occupied vs vacant"""
     if not report_date:
@@ -181,7 +185,8 @@ def get_police_c_form_report(
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Police / C-Form Report: List of foreign nationals (Legal Requirement)"""
     # Note: This requires passport/visa fields in Booking model
@@ -218,7 +223,8 @@ def get_police_c_form_report(
 @apply_api_optimizations
 def get_night_audit_report(
     audit_date: Optional[date] = Query(None, description="Date for night audit (default: yesterday)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Night Audit Report: Summary of day's total business closed at midnight"""
     if not audit_date:
@@ -270,7 +276,8 @@ def get_no_show_cancellation_report(
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """No-Show & Cancellation Report: Revenue loss tracking"""
     query = db.query(Booking).filter(
@@ -314,7 +321,8 @@ def get_no_show_cancellation_report(
 def get_in_house_guest_list(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """In-House Guest List: Currently checked-in guests (Emergency evacuation list)"""
     today = date.today()
@@ -377,7 +385,8 @@ def get_in_house_guest_list(
 @apply_api_optimizations
 def get_daily_sales_summary(
     report_date: Optional[date] = Query(None, description="Date for sales summary (default: today)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Daily Sales Summary: Food vs Beverage vs Alcohol sales by meal period"""
     if not report_date:
@@ -443,7 +452,8 @@ def get_item_wise_sales_report(
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Item-wise Sales Report: Which dish is selling the most?"""
     query = db.query(
@@ -488,7 +498,8 @@ def get_kot_analysis(
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """KOT Analysis: Time between Order (KOT) and Service (Kitchen Efficiency)"""
     # Note: Requires order_time and service_time fields in FoodOrder
@@ -536,7 +547,8 @@ def get_void_cancellation_report(
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Void / Cancellation Report: Tracks orders deleted after being punched (Security)"""
     # Note: Requires a deleted_at or voided_at field in FoodOrder
@@ -579,7 +591,8 @@ def get_discount_complimentary_report(
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Discount & Complimentary Report: Free meals given (Manager approval tracking)"""
     # Get orders with amount = 0 or discount > 0
@@ -624,7 +637,8 @@ def get_nc_report(
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """NC (Non-Chargeable) Report: Food given to Staff or Owners"""
     # Get orders marked as non-chargeable
@@ -675,7 +689,8 @@ def get_stock_status_report(
     location: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Stock Status Report: Current quantity and value of every item"""
     query = db.query(InventoryItem).options(
@@ -712,7 +727,8 @@ def get_stock_status_report(
 @router.get("/inventory/low-stock-alert")
 @apply_api_optimizations
 def get_low_stock_alert(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Low Stock Alert Report: Items below minimum level"""
     items = db.query(InventoryItem).filter(
@@ -744,7 +760,8 @@ def get_low_stock_alert(
 @apply_api_optimizations
 def get_expiry_aging_report(
     days_ahead: int = Query(3, ge=1, le=30, description="Days ahead to check for expiry"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Expiry / Aging Report: Perishable items expiring in next N days"""
     # Note: Requires expiry_date field in InventoryTransaction or InventoryItem
@@ -788,7 +805,8 @@ def get_stock_movement_register(
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Stock Movement Register: History of item (In -> Move -> Out)"""
     query = db.query(InventoryTransaction).options(
@@ -829,7 +847,8 @@ def get_waste_spoilage_report(
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Waste & Spoilage Report: Value of items thrown away"""
     query = db.query(WasteLog).options(
@@ -873,7 +892,8 @@ def get_purchase_register(
     vendor_id: Optional[int] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Purchase Register: List of all Vendor Bills entered"""
     query = db.query(PurchaseMaster).options(
@@ -912,7 +932,8 @@ def get_variance_report(
     location: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Variance Report: Difference between System Stock and Physical Audit Stock"""
     # Note: Requires physical_count field from audit
@@ -955,7 +976,8 @@ def get_variance_report(
 @router.get("/housekeeping/room-discrepancy")
 @apply_api_optimizations
 def get_room_discrepancy_report(
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Room Discrepancy Report: Front Desk vs Housekeeping status mismatch"""
     # Get all rooms
@@ -997,7 +1019,8 @@ def get_room_discrepancy_report(
 def get_laundry_cost_report(
     start_date: Optional[date] = Query(None),
     end_date: Optional[date] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Laundry Cost Report: Linen sent vs returned, torn/damaged tracking"""
     # Note: Requires laundry tracking in InventoryTransaction
@@ -1046,7 +1069,8 @@ def get_minibar_consumption_report(
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Minibar Consumption: Items consumed from room minibars"""
     # Get checkout verifications with consumables audit
@@ -1091,7 +1115,8 @@ def get_lost_found_register(
     status: Optional[str] = Query(None, description="Filter by status: found, claimed, disposed"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Lost & Found Register: Items left behind by guests"""
     # Note: Requires LostFound model - creating placeholder response
@@ -1110,7 +1135,8 @@ def get_maintenance_ticket_log(
     status: Optional[str] = Query(None, description="Filter by status: pending, in_progress, completed"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Maintenance Ticket Log: Status of repairs"""
     # Note: Requires MaintenanceTicket model - creating placeholder response
@@ -1129,7 +1155,8 @@ def get_asset_audit_report(
     location: Optional[str] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Asset Audit Report: Fixed Assets mapped to locations vs actually found"""
     # Get fixed assets
@@ -1180,7 +1207,8 @@ def get_visitor_log(
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Visitor Log: Non-resident guests entering premises"""
     # Note: Requires VisitorLog model - creating placeholder response
@@ -1201,7 +1229,8 @@ def get_key_card_audit(
     end_date: Optional[date] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Key Card Audit: Who opened which room? (Staff Name + Timestamp)"""
     # Note: Requires KeyCardLog model - creating placeholder response
@@ -1222,7 +1251,8 @@ def get_staff_attendance_report(
     employee_id: Optional[int] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Staff Attendance: Shift In/Out times"""
     query = db.query(WorkingLog).options(
@@ -1267,7 +1297,8 @@ def get_payroll_register(
     year: Optional[int] = Query(None),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Payroll Register: Salary calculation (Basic + OT - Deductions)"""
     if not year:
@@ -1352,7 +1383,8 @@ def get_payroll_register(
 @apply_api_optimizations
 def get_management_dashboard(
     report_date: Optional[date] = Query(None, description="Date for dashboard (default: today)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Management Dashboard: ADR, RevPAR, Food Cost %, Occupancy %"""
     if not report_date:

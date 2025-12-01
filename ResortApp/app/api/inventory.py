@@ -41,7 +41,8 @@ def create_category(
 def get_categories(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     return inventory_crud.get_all_categories(db, skip=skip, limit=limit)
 
@@ -172,7 +173,8 @@ def get_items(
     skip: int = 0,
     limit: int = 100,
     category_id: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Optimized endpoint with eager loading - no N+1 queries"""
     try:
@@ -195,7 +197,7 @@ def get_items(
 
 
 @router.get("/items/{item_id}", response_model=InventoryItemOut)
-def get_item(item_id: int, db: Session = Depends(get_db)):
+def get_item(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     item = inventory_crud.get_item_by_id(db, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -223,13 +225,14 @@ def get_vendors(
     skip: int = 0,
     limit: int = 100,
     active_only: bool = False,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     return inventory_crud.get_all_vendors(db, skip=skip, limit=limit, active_only=active_only)
 
 
 @router.get("/vendors/{vendor_id}", response_model=VendorOut)
-def get_vendor(vendor_id: int, db: Session = Depends(get_db)):
+def get_vendor(vendor_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     vendor = inventory_crud.get_vendor_by_id(db, vendor_id)
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor not found")
@@ -341,7 +344,8 @@ def get_purchases(
     skip: int = 0,
     limit: int = 100,
     status: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Optimized with eager loading - no N+1 queries"""
     purchases = inventory_crud.get_all_purchases(db, skip=skip, limit=limit, status=status)
@@ -369,7 +373,7 @@ def get_purchases(
 
 
 @router.get("/purchases/{purchase_id}", response_model=PurchaseMasterOut)
-def get_purchase(purchase_id: int, db: Session = Depends(get_db)):
+def get_purchase(purchase_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     purchase = inventory_crud.get_purchase_by_id(db, purchase_id)
     if not purchase:
         raise HTTPException(status_code=404, detail="Purchase not found")
@@ -422,7 +426,8 @@ def get_transactions(
     skip: int = 0,
     limit: int = 100,
     item_id: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Optimized with eager loading - no N+1 queries"""
     from app.models.inventory import InventoryTransaction, StockIssue
@@ -495,7 +500,8 @@ def get_requisitions(
     skip: int = 0,
     limit: int = 100,
     status: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Optimized with eager loading - no N+1 queries"""
     requisitions = inventory_crud.get_all_requisitions(db, skip=skip, limit=limit, status=status)
@@ -604,7 +610,8 @@ def create_issue(
 def get_issues(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Optimized with eager loading - no N+1 queries"""
     issues = inventory_crud.get_all_issues(db, skip=skip, limit=limit)
@@ -769,7 +776,8 @@ def create_waste_log(
 def get_waste_logs(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Optimized with eager loading"""
     from app.models.inventory import WasteLog
@@ -809,7 +817,8 @@ def create_location(
 def get_locations(
     skip: int = 0,
     limit: int = 10000,  # Increased limit to show all rooms
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     # Auto-sync rooms to locations
     from app.models.room import Room
@@ -886,7 +895,8 @@ def get_locations(
 @router.get("/locations/{location_id}/items")
 def get_location_items(
     location_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     """Get all inventory items and their stock levels for a specific location"""
     from app.models.inventory import InventoryItem, AssetMapping, AssetRegistry, StockIssueDetail, StockIssue
@@ -1312,7 +1322,8 @@ def get_asset_mappings(
     skip: int = 0,
     limit: int = 100,
     location_id: Optional[int] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     mappings = inventory_crud.get_all_asset_mappings(db, skip=skip, limit=limit, location_id=location_id)
     result = []
@@ -1368,7 +1379,8 @@ def get_asset_registry(
     limit: int = 100,
     location_id: Optional[int] = None,
     status: Optional[str] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
 ):
     assets = inventory_crud.get_all_asset_registry(db, skip=skip, limit=limit, location_id=location_id, status=status)
     result = []
@@ -1384,7 +1396,7 @@ def get_asset_registry(
 
 
 @router.get("/asset-registry/{asset_id}", response_model=AssetRegistryOut)
-def get_asset_registry_by_id(asset_id: int, db: Session = Depends(get_db)):
+def get_asset_registry_by_id(asset_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     asset = inventory_crud.get_asset_registry_by_id(db, asset_id)
     if not asset:
         raise HTTPException(status_code=404, detail="Asset not found")

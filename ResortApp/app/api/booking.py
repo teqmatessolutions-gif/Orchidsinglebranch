@@ -31,6 +31,7 @@ router = APIRouter(prefix="/bookings", tags=["Bookings"])
 @router.get("", response_model=PaginatedBookingResponse)
 def get_bookings(
     db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user), 
     skip: int = 0, 
     limit: int = 20, 
     order_by: str = "id", 
@@ -150,7 +151,7 @@ def get_bookings(
 # This is a more reliable way to get full details for the modal view.
 # ----------------------------------------------------------------
 @router.get("/details/{booking_id}", response_model=BookingOut)
-def get_booking_details(booking_id: Union[str, int], is_package: bool, db: Session = Depends(get_db)):
+def get_booking_details(booking_id: Union[str, int], is_package: bool, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     # Parse display ID (BK-000001 or PK-000001) or accept numeric ID
     numeric_id, booking_type = parse_display_id(str(booking_id))
     if numeric_id is None:

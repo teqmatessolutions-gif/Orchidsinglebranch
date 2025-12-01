@@ -134,13 +134,16 @@ export const ProtectedRoute = ({ children, requiredPermission }) => {
   const hasAccess = role === 'admin' || permissions.includes(requiredPermission);
 
   if (!hasAccess) {
-    // Redirect to dashboard with a message instead of showing blank page
-    return <Navigate to="/dashboard" replace />;
+    // Redirect to the first available permission if dashboard access is denied
+    if (permissions.length > 0) {
+      return <Navigate to={permissions[0]} replace />;
+    }
+    return <div className="flex items-center justify-center h-screen text-red-600 font-bold text-xl">Access Denied: No permissions assigned.</div>;
   }
 
   // Ensure children are rendered properly
   if (!children) {
-    return <Navigate to="/dashboard" replace />;
+    return null;
   }
 
   return <>{children}</>;

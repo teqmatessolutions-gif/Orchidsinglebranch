@@ -5,6 +5,7 @@ import shutil
 import os
 from datetime import datetime
 from app.database import get_db
+from app.utils.auth import get_current_user
 from app.models.legal import LegalDocument
 from pydantic import BaseModel
 
@@ -31,7 +32,8 @@ async def upload_legal_document(
     name: str = Form(...),
     document_type: str = Form(None),
     description: str = Form(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     # Generate unique filename
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
@@ -56,11 +58,11 @@ async def upload_legal_document(
     return db_document
 
 @router.get("/", response_model=List[LegalDocumentResponse])
-def get_legal_documents(db: Session = Depends(get_db)):
+def get_legal_documents(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     return db.query(LegalDocument).order_by(LegalDocument.uploaded_at.desc()).all()
 
 @router.delete("/{document_id}")
-def delete_legal_document(document_id: int, db: Session = Depends(get_db)):
+def delete_legal_document(document_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     document = db.query(LegalDocument).filter(LegalDocument.id == document_id).first()
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")

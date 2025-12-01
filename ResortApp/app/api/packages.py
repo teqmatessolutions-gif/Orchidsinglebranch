@@ -423,7 +423,7 @@ def book_package_guest_api(
         )
 
 @router.get("/bookingsall", response_model=List[PackageBookingOut])
-def get_bookings(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
+def get_bookings(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), skip: int = 0, limit: int = 20):
     try:
         # Optimized for low network - reduced to 50
         if limit > 50:
@@ -473,16 +473,16 @@ def _list_packages_impl(db: Session, skip: int = 0, limit: int = 20):
         return []
 
 @router.get("", response_model=List[PackageOut])
-def list_packages(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
+def list_packages(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), skip: int = 0, limit: int = 20):
     return _list_packages_impl(db, skip, limit)
 
 @router.get("/", response_model=List[PackageOut])  # Handle trailing slash
-def list_packages_slash(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
+def list_packages_slash(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), skip: int = 0, limit: int = 20):
     return _list_packages_impl(db, skip, limit)
 
 
 @router.get("/{package_id}", response_model=PackageOut)
-def get_package_api(package_id: int, db: Session = Depends(get_db)):
+def get_package_api(package_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     return crud_package.get_package(db, package_id)
 
 

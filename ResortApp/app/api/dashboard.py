@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, Date, or_
 from datetime import date, timedelta
 
-from app.utils.auth import get_db
+from app.utils.auth import get_db, get_current_user
 from app.models.checkout import Checkout
 from app.models.room import Room
 from app.models.booking import Booking, BookingRoom
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 
 @router.get("/kpis")
-def get_kpis(db: Session = Depends(get_db)):
+def get_kpis(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """
     Calculates and returns key performance indicators for the dashboard.
     """
@@ -121,7 +121,7 @@ def get_kpis(db: Session = Depends(get_db)):
         }]
 
 @router.get("/charts")
-def get_chart_data(db: Session = Depends(get_db)):
+def get_chart_data(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Dashboard chart data with sensible fallbacks.
     - Primary source: Checkout totals (actual billed revenue)
     - Fallback: Estimated revenue from current bookings if no checkouts exist
@@ -221,7 +221,7 @@ def get_chart_data(db: Session = Depends(get_db)):
     }
 
 @router.get("/reports")
-def get_reports_data(db: Session = Depends(get_db)):
+def get_reports_data(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """
     Provides a consolidated dataset for the main reports/account page.
     """
@@ -275,7 +275,7 @@ def get_date_range(period: str):
 
 
 @router.get("/summary")
-def get_summary(period: str = "all", db: Session = Depends(get_db)):
+def get_summary(period: str = "all", db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """
     Provides a comprehensive summary of KPIs for a given period (day, week, month, all).
     """

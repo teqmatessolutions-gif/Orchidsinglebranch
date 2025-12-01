@@ -455,7 +455,7 @@ def _list_services_impl(db: Session, skip: int = 0, limit: int = 20):
             raise e
 
 @router.get("", response_model=List[service_schema.ServiceOut])
-def list_services(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
+def list_services(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), skip: int = 0, limit: int = 20):
     try:
         print(f"[DEBUG] list_services called with skip={skip}, limit={limit}")
         
@@ -548,7 +548,7 @@ def list_services(db: Session = Depends(get_db), skip: int = 0, limit: int = 20)
         return []
 
 @router.get("/", response_model=List[service_schema.ServiceOut])  # Handle trailing slash
-def list_services_slash(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
+def list_services_slash(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), skip: int = 0, limit: int = 20):
     # Use the same implementation as the main endpoint
     return list_services(db, skip, limit)
 
@@ -643,7 +643,7 @@ def assign_service(
         raise HTTPException(status_code=500, detail=error_detail)
 
 @router.get("/assigned", response_model=List[service_schema.AssignedServiceOut])
-def get_all_assigned_services(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
+def get_all_assigned_services(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), skip: int = 0, limit: int = 20):
     try:
         # Cap limit to prevent performance issues
         # Optimized for low network

@@ -132,7 +132,7 @@ async def create_expense(
     }
 
 @router.get("", response_model=list[ExpenseOut])
-def get_expenses(db: Session = Depends(get_db), skip: int = 0, limit: int = 20):
+def get_expenses(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), skip: int = 0, limit: int = 20):
     # Cap limit to prevent performance issues
     # Optimized for low network
     limit = optimize_limit(limit, MAX_LIMIT_LOW_NETWORK)

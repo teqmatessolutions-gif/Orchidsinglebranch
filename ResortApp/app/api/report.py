@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List, Optional, Dict, Any
 from datetime import date, timedelta, datetime
-from app.utils.auth import get_db
+from app.utils.auth import get_db, get_current_user
 from app import models as models
 from app.schemas import booking as booking_schema, packages as package_schema, suggestion as suggestion_schema
 from app.schemas.foodorder import FoodOrderItemOut
@@ -70,7 +70,8 @@ def get_guest_profile(
     guest_email: Optional[str] = Query(None, description="Guest's email address"),
     guest_mobile: Optional[str] = Query(None, description="Guest's mobile number"),
     guest_name: Optional[str] = Query(None, description="Guest's name (case-insensitive search)"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """Generates a complete profile for a guest, including all bookings, orders, and services."""
     if not guest_email and not guest_mobile and not guest_name:
@@ -83,7 +84,8 @@ def get_food_orders(
     to_date: Optional[date] = Query(None, description="End date for filtering (YYYY-MM-DD)"),
     db: Session = Depends(get_db),
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
 ):
     query = (
         db.query(models.FoodOrder)
@@ -156,7 +158,8 @@ def get_user_history(
     user_id: int,
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Generates a complete history of activities for a specific user within a date range.
@@ -242,7 +245,8 @@ def get_service_charges(
     to_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
 ):
     query = (
         db.query(models.AssignedService)
@@ -279,7 +283,8 @@ def get_room_charges(
     to_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
 ):
     query = (
         db.query(models.Checkout)
@@ -311,7 +316,8 @@ def get_rent_records(
     to_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
 ):
     if not hasattr(models, "Rent"):
         raise HTTPException(status_code=404, detail="Rent model not found")
@@ -344,7 +350,8 @@ def get_all_expenses(
     to_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
 ):
     """Retrieves a list of all expenses."""
     query = db.query(models.Expense)
@@ -372,7 +379,8 @@ def get_all_room_bookings(
     to_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
 ):
     """Retrieves a list of all standard room bookings."""
     query = db.query(models.Booking)
@@ -404,7 +412,8 @@ def get_all_package_bookings(
     to_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
 ):
     """Retrieves a list of all package bookings."""
     # Use an inner join to filter out orphaned bookings where the package has been deleted.
@@ -423,7 +432,8 @@ def get_all_employees(
     to_date: Optional[date] = Query(None),
     db: Session = Depends(get_db),
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
 ):
     """Retrieves a list of all active employees and their salaries."""
     # The Employee model itself doesn't have an 'is_active' flag. We assume all listed employees are active.
@@ -448,7 +458,8 @@ def get_all_employees(
 def get_checkin_by_employee_report(
     from_date: Optional[date] = Query(None),
     to_date: Optional[date] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Generates a report of how many check-ins each employee has performed.
@@ -485,7 +496,8 @@ class GuestSuggestion(BaseModel):
 def get_guest_suggestions(
     db: Session = Depends(get_db),
     skip: int = 0,
-    limit: int = 20
+    limit: int = 20,
+    current_user: dict = Depends(get_current_user)
 ):
     """
     Retrieves a list of recent, unique guests for quick search suggestions.

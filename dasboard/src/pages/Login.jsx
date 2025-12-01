@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../services/api";
 import orchidLogo from "../assets/orchidlogo.png";
+import { jwtDecode } from "jwt-decode";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -16,7 +17,27 @@ export default function LoginPage() {
       const response = await api.post("/auth/login", { email, password });
       if (response.data && response.data.access_token) {
         localStorage.setItem("token", response.data.access_token);
-        navigate("/dashboard", { replace: true });
+
+        try {
+          const decoded = jwtDecode(response.data.access_token);
+          const permissions = decoded.permissions || [];
+          const role = decoded.role ? decoded.role.toLowerCase() : 'guest';
+
+          if (role === 'admin') {
+            navigate("/dashboard", { replace: true });
+          } else if (permissions.includes('/dashboard')) {
+            navigate("/dashboard", { replace: true });
+          } else if (permissions.length > 0) {
+            // Navigate to the first available permission
+            navigate(permissions[0], { replace: true });
+          } else {
+            // Fallback if no permissions
+            navigate("/dashboard", { replace: true });
+          }
+        } catch (error) {
+          console.error("Token decode error:", error);
+          navigate("/dashboard", { replace: true });
+        }
       } else {
         alert("Login failed: No token received from server.");
       }
@@ -56,9 +77,9 @@ export default function LoginPage() {
           <div className="relative">
             <div className="absolute inset-0 bg-gray-800/30 rounded-full blur-xl"></div>
             <div className="relative bg-gradient-to-br from-gray-800 via-gray-900 to-black p-4 rounded-2xl shadow-lg border-2" style={{ borderColor: 'rgba(212, 175, 55, 0.3)' }}>
-              <img 
-                src={orchidLogo} 
-                alt="Orchid Resort Logo" 
+              <img
+                src={orchidLogo}
+                alt="Orchid Resort Logo"
                 className="h-28 md:h-32 w-auto object-contain drop-shadow-md"
               />
             </div>

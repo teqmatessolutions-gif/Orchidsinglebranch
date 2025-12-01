@@ -28,7 +28,7 @@ def create_voucher(voucher: VoucherCreate, db: Session = Depends(get_db), curren
     return crud.create_voucher(db, voucher)
 
 @router.get("/voucher/{code}", response_model=VoucherOut)
-def get_voucher(code: str, db: Session = Depends(get_db)):
+def get_voucher(code: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     voucher = crud.get_voucher_by_code(db, code)
     if not voucher:
         raise HTTPException(status_code=404, detail="Invalid or expired voucher")

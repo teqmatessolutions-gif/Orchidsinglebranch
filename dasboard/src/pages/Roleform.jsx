@@ -2,24 +2,121 @@
 import React, { useState, useEffect } from "react";
 import API from "../services/api";
 import DashboardLayout from "../layout/DashboardLayout";
-import { Trash2, CheckCircle, XCircle, Edit } from "lucide-react";
+import { Trash2, CheckCircle, XCircle, Edit, ChevronDown, ChevronRight } from "lucide-react";
 
 const availablePermissions = [
-    { label: "Dashboard", value: "/dashboard" },
-    { label: "Account", value: "/account" },
-    { label: "Bookings", value: "/bookings" },
-    { label: "Rooms", value: "/rooms" },
-    { label: "Services", value: "/services" },
-    { label: "Food Orders", value: "/food-orders" },
-    { label: "Employee", value: "/employee" },
-    { label: "Role", value: "/roles" },
-    { label: "Expenses", value: "/expenses" },
-    { label: "Food Management", value: "/food-categories" },
-    { label: "Billing", value: "/billing" },
-    { label: "WEB Management", value: "/Userfrontend_data" },
-    { label: "Packages", value: "/package" },
-    { label: "Reports", value: "/report" },
-    { label: "GuestProfiles", value: "/guestprofiles" },
+  { label: "Dashboard", value: "/dashboard" },
+  {
+    label: "Account",
+    value: "/account",
+    tabs: [
+      { label: "Reports Dashboard", value: "/account/reports" },
+      { label: "Chart of Accounts", value: "/account/chart-of-accounts" },
+      { label: "Journal Entries", value: "/account/journal-entries" },
+      { label: "Trial Balance", value: "/account/trial-balance" },
+      { label: "Auto Report", value: "/account/auto-report" },
+      { label: "Comprehensive Report", value: "/account/comprehensive-report" },
+      { label: "GST Reports", value: "/account/gst-reports" }
+    ]
+  },
+  { label: "Bookings", value: "/bookings" },
+  { label: "Rooms", value: "/rooms" },
+  {
+    label: "Services",
+    value: "/services",
+    tabs: [
+      { label: "Dashboard", value: "/services/dashboard" },
+      { label: "Create Service", value: "/services/create" },
+      { label: "Assign Service", value: "/services/assign" },
+      { label: "Assigned Services", value: "/services/assigned" },
+      { label: "Service Requests", value: "/services/requests" },
+      { label: "Report", value: "/services/report" }
+    ]
+  },
+  {
+    label: "Food Orders",
+    value: "/food-orders",
+    tabs: [
+      { label: "Dashboard", value: "/food-orders/dashboard" },
+      { label: "Orders", value: "/food-orders/orders" },
+      { label: "Requests", value: "/food-orders/requests" },
+      { label: "Management", value: "/food-orders/management" }
+    ]
+  },
+  {
+    label: "Employee Management",
+    value: "/employee-management",
+    tabs: [
+      { label: "Overview", value: "/employee-management/overview" },
+      { label: "Directory", value: "/employee-management/directory" },
+      { label: "Attendance", value: "/employee-management/attendance" },
+      { label: "Leave", value: "/employee-management/leave" },
+      { label: "Reports", value: "/employee-management/reports" },
+      { label: "Status", value: "/employee-management/status" },
+      { label: "Activity", value: "/employee-management/activity" }
+    ]
+  },
+  { label: "Role", value: "/roles" },
+  { label: "Expenses", value: "/expenses" },
+  {
+    label: "Food Management",
+    value: "/food-categories",
+    tabs: [
+      { label: "Categories", value: "/food-categories" },
+      { label: "Food Items", value: "/food-items" }
+    ]
+  },
+  {
+    label: "Billing",
+    value: "/billing",
+    tabs: [
+      { label: "Checkout", value: "/billing/checkout" },
+      { label: "History", value: "/billing/history" }
+    ]
+  },
+  {
+    label: "WEB Management",
+    value: "/Userfrontend_data",
+    tabs: [
+      { label: "Banners", value: "/Userfrontend_data/banners" },
+      { label: "Gallery", value: "/Userfrontend_data/gallery" },
+      { label: "Reviews", value: "/Userfrontend_data/reviews" },
+      { label: "Resort Info", value: "/Userfrontend_data/resortInfo" },
+      { label: "Experiences", value: "/Userfrontend_data/signatureExperiences" },
+      { label: "Weddings", value: "/Userfrontend_data/planWeddings" },
+      { label: "Attractions", value: "/Userfrontend_data/nearbyAttractions" },
+      { label: "Attraction Banners", value: "/Userfrontend_data/nearbyAttractionBanners" }
+    ]
+  },
+  { label: "Packages", value: "/package" },
+  { label: "Reports", value: "/report" },
+  { label: "GuestProfiles", value: "/guestprofiles" },
+  {
+    label: "Inventory",
+    value: "/inventory",
+    tabs: [
+      { label: "Items", value: "/inventory/items" },
+      { label: "Categories", value: "/inventory/categories" },
+      { label: "Vendors", value: "/inventory/vendors" },
+      { label: "Purchases", value: "/inventory/purchases" },
+      { label: "Transactions", value: "/inventory/transactions" },
+      { label: "Requisitions", value: "/inventory/requisitions" },
+      { label: "Issues", value: "/inventory/issues" },
+      { label: "Waste", value: "/inventory/waste" },
+      { label: "Locations", value: "/inventory/locations" },
+      { label: "Assets", value: "/inventory/assets" },
+      { label: "Location Stock", value: "/inventory/location-stock" },
+      { label: "Recipes", value: "/inventory/recipe" }
+    ]
+  },
+  {
+    label: "Settings",
+    value: "/settings",
+    tabs: [
+      { label: "System Settings", value: "/settings/system" },
+      { label: "Legal Documents", value: "/settings/legal" }
+    ]
+  }
 ];
 
 // Define roles that cannot be deleted from the UI
@@ -34,6 +131,7 @@ const RoleForm = () => {
   const [editRoleId, setEditRoleId] = useState(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [roleToDelete, setRoleToDelete] = useState(null);
+  const [expandedSections, setExpandedSections] = useState({});
 
   const fetchRoles = async () => {
     try {
@@ -62,13 +160,19 @@ const RoleForm = () => {
     });
   };
 
+  const toggleSection = (value) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [value]: !prev[value]
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
     setSuccess("");
     try {
-      // The backend expects permissions as a JSON string, not a direct array.
       const payload = {
         ...form,
         permissions: JSON.stringify(form.permissions),
@@ -86,7 +190,6 @@ const RoleForm = () => {
     } catch (err) {
       if (editRoleId && err.response && err.response.status === 404) {
         setError("Failed to update role. It may have been deleted by another user.");
-        // Exit edit mode and refresh the list as the role is gone
         setEditRoleId(null);
         setForm({ name: "", permissions: [] });
         await fetchRoles();
@@ -151,8 +254,8 @@ const RoleForm = () => {
     <DashboardLayout>
       <div className="max-w-6xl mx-auto p-8 bg-gray-50 rounded-2xl shadow-lg space-y-10">
         <h2 className="text-4xl font-extrabold text-blue-900 text-center tracking-tight">Role Management</h2>
-        
-        {/* Alerts for Success/Error */}
+
+        {/* Alerts */}
         {success && (
           <div className="flex items-center gap-2 p-4 text-sm font-medium text-green-700 bg-green-100 rounded-lg">
             <CheckCircle size={20} />
@@ -185,22 +288,54 @@ const RoleForm = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
               />
             </div>
+
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">Permissions</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 p-4 border rounded-lg bg-gray-50">
+              <div className="space-y-2 p-4 border rounded-lg bg-gray-50 max-h-96 overflow-y-auto">
                 {availablePermissions.map((permission) => (
-                  <label key={permission.value} className="flex items-center gap-2 text-sm text-gray-800 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={form.permissions.includes(permission.value)}
-                      onChange={() => handlePermissionChange(permission.value)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    {permission.label}
-                  </label>
+                  <div key={permission.value} className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      {permission.tabs && (
+                        <button
+                          type="button"
+                          onClick={() => toggleSection(permission.value)}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          {expandedSections[permission.value] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                        </button>
+                      )}
+                      <label className="flex items-center gap-2 text-sm text-gray-800 cursor-pointer font-medium">
+                        <input
+                          type="checkbox"
+                          checked={form.permissions.includes(permission.value)}
+                          onChange={() => handlePermissionChange(permission.value)}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        {permission.label}
+                      </label>
+                    </div>
+
+                    {/* Sub-tabs */}
+                    {permission.tabs && expandedSections[permission.value] && (
+                      <div className="ml-8 space-y-1 border-l-2 border-gray-200 pl-4">
+                        {permission.tabs.map((tab) => (
+                          <label key={tab.value} className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={form.permissions.includes(tab.value)}
+                              onChange={() => handlePermissionChange(tab.value)}
+                              className="h-3.5 w-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            {tab.label}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             </div>
+
             <div className="flex gap-4 pt-4">
               <button
                 type="submit"
@@ -221,7 +356,7 @@ const RoleForm = () => {
             </div>
           </form>
         </div>
-        
+
         {/* Existing Roles Table */}
         <div className="space-y-4 bg-white p-6 rounded-xl shadow-md">
           <h3 className="text-2xl font-semibold text-blue-800 border-b pb-4">Existing Roles</h3>
@@ -266,7 +401,7 @@ const RoleForm = () => {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="2" className="text-center text-gray-400 py-6">
+                    <td colSpan="3" className="text-center text-gray-400 py-6">
                       No roles found
                     </td>
                   </tr>
@@ -277,7 +412,7 @@ const RoleForm = () => {
         </div>
       </div>
 
-      {/* Confirmation Modal for Deletion */}
+      {/* Confirmation Modal */}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-50">
           <div className="bg-white p-8 rounded-lg shadow-2xl max-w-sm text-center space-y-4">

@@ -4,7 +4,7 @@ from pydantic import BaseModel
 from typing import Optional, List, Any
 from datetime import datetime
 
-from app.utils.auth import get_db
+from app.utils.auth import get_db, get_current_user
 from app.models.settings import SystemSetting
 
 router = APIRouter(prefix="/settings", tags=["Settings"])
@@ -22,11 +22,11 @@ class SettingOut(SettingBase):
         orm_mode = True
 
 @router.get("/", response_model=List[SettingOut])
-def get_settings(db: Session = Depends(get_db)):
+def get_settings(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     return db.query(SystemSetting).all()
 
 @router.post("/", response_model=SettingOut)
-def create_or_update_setting(setting: SettingBase, db: Session = Depends(get_db)):
+def create_or_update_setting(setting: SettingBase, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     db_setting = db.query(SystemSetting).filter(SystemSetting.key == setting.key).first()
     if db_setting:
         db_setting.value = setting.value
@@ -41,7 +41,7 @@ def create_or_update_setting(setting: SettingBase, db: Session = Depends(get_db)
     return db_setting
 
 @router.get("/{key}", response_model=SettingOut)
-def get_setting(key: str, db: Session = Depends(get_db)):
+def get_setting(key: str, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     setting = db.query(SystemSetting).filter(SystemSetting.key == key).first()
     if not setting:
         raise HTTPException(status_code=404, detail="Setting not found")

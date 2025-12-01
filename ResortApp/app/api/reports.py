@@ -5,7 +5,56 @@ from typing import List, Optional
 from datetime import date
 from pydantic import BaseModel
 
-from app.utils.auth import get_db
+from app.utils.auth import get_db, get_current_user
+from app.models.booking import Booking
+from app.models.user import User
+from app.models.expense import Expense
+from app.models.service import AssignedService
+from app.models.foodorder import FoodOrder
+from app.models.Package import PackageBooking
+
+
+router = APIRouter(prefix="/reports", tags=["Reports"])
+
+# --- Pydantic Schemas for Report Outputs ---
+
+class CheckinByEmployeeOut(BaseModel):
+    employee_name: str
+    checkin_count: int
+
+class ExpenseOut(BaseModel):
+    id: int
+    category: str
+    description: Optional[str]
+    amount: float
+    date: date
+    class Config: from_attributes = True
+
+class ServiceChargeOut(BaseModel):
+    id: int
+    room_number: Optional[str]
+    service_name: Optional[str]
+    amount: Optional[float]
+    employee_name: Optional[str]
+    status: str
+    created_at: date
+    class Config: from_attributes = True
+
+class FoodOrderOut(BaseModel):
+    id: int
+    room_number: Optional[str]
+    item_count: int
+    amount: float
+    employee_name: Optional[str]
+    status: str
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+from sqlalchemy import func
+from typing import List, Optional
+from datetime import date
+from pydantic import BaseModel
+
+from app.utils.auth import get_db, get_current_user
 from app.models.booking import Booking
 from app.models.user import User
 from app.models.expense import Expense
@@ -54,7 +103,7 @@ class FoodOrderOut(BaseModel):
 # --- Report Endpoints ---
 
 @router.get("/checkin-by-employee", response_model=List[CheckinByEmployeeOut])
-def get_checkin_by_employee_report(from_date: Optional[date] = None, to_date: Optional[date] = None, db: Session = Depends(get_db)):
+def get_checkin_by_employee_report(from_date: Optional[date] = None, to_date: Optional[date] = None, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """
     Generates a report of how many check-ins each employee has performed.
     Filters by the booking's check-in date.
@@ -81,14 +130,14 @@ def get_checkin_by_employee_report(from_date: Optional[date] = None, to_date: Op
     return results
 
 @router.get("/expenses", response_model=List[ExpenseOut])
-def get_expenses_report(from_date: Optional[date] = None, to_date: Optional[date] = None, db: Session = Depends(get_db)):
+def get_expenses_report(from_date: Optional[date] = None, to_date: Optional[date] = None, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     query = db.query(Expense)
     if from_date: query = query.filter(Expense.date >= from_date)
     if to_date: query = query.filter(Expense.date <= to_date)
     return query.order_by(Expense.date.desc()).all()
 
 @router.get("/room-bookings", response_model=List)
-def get_room_bookings_report(from_date: Optional[date] = None, to_date: Optional[date] = None, db: Session = Depends(get_db)):
+def get_room_bookings_report(from_date: Optional[date] = None, to_date: Optional[date] = None, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     query = db.query(Booking)
     if from_date: query = query.filter(Booking.check_in >= from_date)
     if to_date: query = query.filter(Booking.check_in <= to_date)
@@ -96,10 +145,10 @@ def get_room_bookings_report(from_date: Optional[date] = None, to_date: Optional
 
 # NOTE: Stubs for other report endpoints. You would implement these similarly.
 @router.get("/service-charges", response_model=List)
-def get_service_charges_report(db: Session = Depends(get_db)): return []
+def get_service_charges_report(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)): return []
 @router.get("/food-orders", response_model=List)
-def get_food_orders_report(db: Session = Depends(get_db)): return []
+def get_food_orders_report(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)): return []
 @router.get("/package-bookings", response_model=List)
-def get_package_bookings_report(db: Session = Depends(get_db)): return []
+def get_package_bookings_report(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)): return []
 @router.get("/employees", response_model=List)
-def get_employees_report(db: Session = Depends(get_db)): return []
+def get_employees_report(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)): return []
