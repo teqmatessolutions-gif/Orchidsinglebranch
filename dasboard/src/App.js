@@ -23,6 +23,7 @@ import ComprehensiveReport from "./pages/ComprehensiveReport.jsx";
 import GuestProfile from "./pages/GuestProfile.jsx";
 import UserHistory from "./pages/UserHistory.jsx";
 import EmployeeManagement from "./pages/EmployeeManagement.jsx";
+import EmployeeDashboard from "./pages/EmployeeDashboard.jsx";
 import Inventory from "./pages/Inventory.jsx";
 import Settings from "./pages/Settings.jsx";
 
@@ -181,6 +182,14 @@ function App() {
             element={
               <ProtectedRoute requiredPermission="/employee-management">
                 <EmployeeManagement />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/employee-dashboard"
+            element={
+              <ProtectedRoute requiredPermission="/employee-dashboard">
+                <EmployeeDashboard />
               </ProtectedRoute>
             }
           />
