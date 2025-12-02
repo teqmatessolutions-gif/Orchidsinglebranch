@@ -47,6 +47,19 @@ def get_categories(
     return inventory_crud.get_all_categories(db, skip=skip, limit=limit)
 
 
+@router.put("/categories/{category_id}", response_model=InventoryCategoryOut)
+def update_category(
+    category_id: int,
+    category: InventoryCategoryUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    updated = inventory_crud.update_category(db, category_id, category)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return updated
+
+
 # Item Endpoints
 @router.post("/items", response_model=InventoryItemOut)
 async def create_item(
@@ -208,6 +221,99 @@ def get_item(item_id: int, db: Session = Depends(get_db), current_user: User = D
         "department": category.parent_department if category else None,  # Add department from category
         "is_low_stock": item.current_stock <= item.min_stock_level
     }
+
+
+@router.put("/items/{item_id}", response_model=InventoryItemOut)
+async def update_item(
+    item_id: int,
+    name: Optional[str] = Form(None),
+    item_code: Optional[str] = Form(None),
+    description: Optional[str] = Form(None),
+    category_id: Optional[int] = Form(None),
+    sub_category: Optional[str] = Form(None),
+    hsn_code: Optional[str] = Form(None),
+    unit: Optional[str] = Form(None),
+    min_stock_level: Optional[float] = Form(None),
+    max_stock_level: Optional[float] = Form(None),
+    unit_price: Optional[float] = Form(None),
+    selling_price: Optional[float] = Form(None),
+    gst_rate: Optional[float] = Form(None),
+    location: Optional[str] = Form(None),
+    barcode: Optional[str] = Form(None),
+    is_perishable: Optional[bool] = Form(None),
+    track_serial_number: Optional[bool] = Form(None),
+    is_sellable_to_guest: Optional[bool] = Form(None),
+    track_laundry_cycle: Optional[bool] = Form(None),
+    is_asset_fixed: Optional[bool] = Form(None),
+    maintenance_schedule_days: Optional[int] = Form(None),
+    complimentary_limit: Optional[int] = Form(None),
+    ingredient_yield_percentage: Optional[float] = Form(None),
+    preferred_vendor_id: Optional[int] = Form(None),
+    vendor_item_code: Optional[str] = Form(None),
+    lead_time_days: Optional[int] = Form(None),
+    is_active: Optional[bool] = Form(None),
+    image: Optional[UploadFile] = File(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    try:
+        # Handle image upload if provided
+        image_path = None
+        if image and image.filename:
+            filename = f"item_{uuid.uuid4().hex}_{image.filename}"
+            file_path = os.path.join(UPLOAD_DIR, filename)
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(image.file, buffer)
+            image_path = f"uploads/inventory_items/{filename}".replace("\\", "/")
+        
+        # Construct update data
+        update_data = InventoryItemUpdate(
+            name=name,
+            item_code=item_code,
+            description=description,
+            category_id=category_id,
+            sub_category=sub_category,
+            hsn_code=hsn_code,
+            unit=unit,
+            min_stock_level=min_stock_level,
+            max_stock_level=max_stock_level,
+            unit_price=unit_price,
+            selling_price=selling_price,
+            gst_rate=gst_rate,
+            location=location,
+            barcode=barcode,
+            image_path=image_path,
+            is_perishable=is_perishable,
+            track_serial_number=track_serial_number,
+            is_sellable_to_guest=is_sellable_to_guest,
+            track_laundry_cycle=track_laundry_cycle,
+            is_asset_fixed=is_asset_fixed,
+            maintenance_schedule_days=maintenance_schedule_days,
+            complimentary_limit=complimentary_limit,
+            ingredient_yield_percentage=ingredient_yield_percentage,
+            preferred_vendor_id=preferred_vendor_id,
+            vendor_item_code=vendor_item_code,
+            lead_time_days=lead_time_days,
+            is_active=is_active
+        )
+        
+        updated = inventory_crud.update_item(db, item_id, update_data)
+        if not updated:
+            raise HTTPException(status_code=404, detail="Item not found")
+            
+        # Get category for response
+        category = inventory_crud.get_category_by_id(db, updated.category_id)
+        
+        return {
+            **updated.__dict__,
+            "category_name": category.name if category else None,
+            "department": category.parent_department if category else None,
+            "is_low_stock": updated.current_stock <= updated.min_stock_level if updated.min_stock_level else False
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error updating item: {str(e)}")
 
 
 # Vendor Endpoints
@@ -405,6 +511,107 @@ def get_purchase(purchase_id: int, db: Session = Depends(get_db), current_user: 
         "created_by_name": user.name if user else None,
         "details": details
     }
+
+
+@router.put("/purchases/{purchase_id}", response_model=PurchaseMasterOut)
+def update_purchase(
+    purchase_id: int,
+    purchase_update: PurchaseMasterUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    updated = inventory_crud.update_purchase_master(db, purchase_id, purchase_update)
+    if not updated:
+        # Check if it exists first
+        exists = inventory_crud.get_purchase_by_id(db, purchase_id)
+        if not exists:
+            raise HTTPException(status_code=404, detail="Purchase not found")
+        else:
+            raise HTTPException(status_code=400, detail="Cannot update purchase in current status (only draft or confirmed allowed for full update)")
+            
+    # Return full response with details
+    return get_purchase(purchase_id, db, current_user)
+
+
+@router.post("/purchases/{purchase_id}/payments")
+def create_purchase_payment(
+    purchase_id: int,
+    payment_data: dict,  # {amount: float, payment_method: str, notes: str}
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Record a payment for a purchase (Vendor Payment)"""
+    purchase = inventory_crud.get_purchase_by_id(db, purchase_id)
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Purchase not found")
+    
+    try:
+        amount = float(payment_data.get("amount", 0))
+        if amount <= 0:
+            raise HTTPException(status_code=400, detail="Invalid amount")
+            
+        payment_method = payment_data.get("payment_method", "Bank Transfer")
+        notes = payment_data.get("notes", "")
+        
+        # Create Journal Entry
+        # Debit: Accounts Payable (Vendor)
+        # Credit: Bank/Cash
+        
+        from app.utils.accounting_helpers import find_ledger_by_name, create_journal_entry
+        from app.schemas.account import JournalEntryCreate, JournalEntryLineCreateInEntry
+        
+        vendor_payable = find_ledger_by_name(db, "Accounts Payable (Vendor)", "Purchase")
+        
+        # Determine credit ledger
+        if payment_method.lower() in ["cash"]:
+            credit_ledger = find_ledger_by_name(db, "Cash in Hand", "Asset")
+        else:
+            credit_ledger = find_ledger_by_name(db, "Bank Account (HDFC)", "Asset") or find_ledger_by_name(db, "Bank Account", "Asset")
+            
+        if not all([vendor_payable, credit_ledger]):
+             raise HTTPException(status_code=400, detail="Required ledgers not found in Chart of Accounts")
+             
+        lines = [
+            JournalEntryLineCreateInEntry(
+                debit_ledger_id=vendor_payable.id,
+                credit_ledger_id=None,
+                amount=amount,
+                description=f"Payment for Purchase #{purchase.purchase_number}"
+            ),
+            JournalEntryLineCreateInEntry(
+                debit_ledger_id=None,
+                credit_ledger_id=credit_ledger.id,
+                amount=amount,
+                description=f"Payment to {purchase.vendor.name if purchase.vendor else 'Vendor'}"
+            )
+        ]
+        
+        entry = JournalEntryCreate(
+            entry_date=datetime.utcnow(),
+            reference_type="purchase_payment",
+            reference_id=purchase.id,
+            description=f"Vendor Payment - {purchase.purchase_number}",
+            notes=f"Method: {payment_method}. {notes}",
+            lines=lines
+        )
+        
+        journal_entry = create_journal_entry(db, entry, current_user.id)
+        
+        # Update purchase payment status
+        # This is a simplified logic; ideally we sum up all payments
+        if amount >= float(purchase.total_amount):
+            purchase.payment_status = "paid"
+        else:
+            purchase.payment_status = "partial"
+            
+        db.commit()
+        
+        return {"message": "Payment recorded successfully", "journal_entry_id": journal_entry.id, "payment_status": purchase.payment_status}
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error recording payment: {str(e)}")
 
 
 @router.patch("/purchases/{purchase_id}/status")

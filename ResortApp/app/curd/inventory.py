@@ -29,6 +29,19 @@ def get_category_by_id(db: Session, category_id: int):
     return db.query(InventoryCategory).filter(InventoryCategory.id == category_id).first()
 
 
+def update_category(db: Session, category_id: int, data: InventoryCategoryUpdate):
+    category = get_category_by_id(db, category_id)
+    if not category:
+        return None
+    
+    for field, value in data.dict(exclude_unset=True).items():
+        setattr(category, field, value)
+    
+    db.commit()
+    db.refresh(category)
+    return category
+
+
 # Item CRUD
 def create_item(db: Session, data: InventoryItemCreate):
     item = InventoryItem(**data.dict())
@@ -51,6 +64,19 @@ def get_all_items(db: Session, skip: int = 0, limit: int = 100, category_id: Opt
 
 def get_item_by_id(db: Session, item_id: int):
     return db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+
+
+def update_item(db: Session, item_id: int, data: InventoryItemUpdate):
+    item = get_item_by_id(db, item_id)
+    if not item:
+        return None
+    
+    for field, value in data.dict(exclude_unset=True).items():
+        setattr(item, field, value)
+    
+    db.commit()
+    db.refresh(item)
+    return item
 
 
 def update_item_stock(db: Session, item_id: int, quantity_change: float, transaction_type: str):
@@ -224,6 +250,93 @@ def get_all_purchases(db: Session, skip: int = 0, limit: int = 100, status: Opti
 
 def get_purchase_by_id(db: Session, purchase_id: int):
     return db.query(PurchaseMaster).filter(PurchaseMaster.id == purchase_id).first()
+
+
+def update_purchase_master(db: Session, purchase_id: int, data: PurchaseMasterUpdate):
+    purchase = get_purchase_by_id(db, purchase_id)
+    if not purchase:
+        return None
+    
+    # Only allow updates if status is not received or cancelled
+    if purchase.status in ["received", "cancelled"] and data.status != "cancelled":
+        # If trying to update other fields but not cancelling, restrict it
+        # But if just updating payment status, allow it
+        allowed_fields = ["payment_status", "payment_terms", "notes"]
+        update_data = data.dict(exclude_unset=True)
+        if any(field not in allowed_fields for field in update_data.keys()):
+             return None # Or raise error in API
+    
+    for field, value in data.dict(exclude_unset=True, exclude={"details"}).items():
+        setattr(purchase, field, value)
+    
+    # Handle details update if provided
+    if data.details is not None:
+        # Delete existing details
+        db.query(PurchaseDetail).filter(PurchaseDetail.purchase_master_id == purchase.id).delete()
+        
+        # Reset totals
+        sub_total = Decimal("0.00")
+        total_cgst = Decimal("0.00")
+        total_sgst = Decimal("0.00")
+        total_igst = Decimal("0.00")
+        total_discount = Decimal("0.00")
+        
+        # Check if interstate (based on current vendor)
+        vendor = get_vendor_by_id(db, purchase.vendor_id)
+        is_interstate = False
+        # Logic to determine interstate (simplified)
+        # In a real app, compare vendor state with company state
+        
+        for detail_data in data.details:
+            item = get_item_by_id(db, detail_data.item_id)
+            if not item:
+                continue
+            
+            hsn_code = detail_data.hsn_code or item.hsn_code
+            
+            # Calculate line total before GST
+            line_total = (Decimal(str(detail_data.quantity)) * Decimal(str(detail_data.unit_price))) - Decimal(str(detail_data.discount))
+            
+            # Calculate GST
+            cgst, sgst, igst = calculate_gst(line_total, Decimal(str(detail_data.gst_rate)), is_interstate)
+            line_total_with_gst = line_total + cgst + sgst + igst
+            
+            # Create purchase detail
+            purchase_detail = PurchaseDetail(
+                purchase_master_id=purchase.id,
+                item_id=detail_data.item_id,
+                hsn_code=hsn_code,
+                quantity=detail_data.quantity,
+                unit=detail_data.unit,
+                unit_price=Decimal(str(detail_data.unit_price)),
+                gst_rate=Decimal(str(detail_data.gst_rate)),
+                cgst_amount=cgst,
+                sgst_amount=sgst,
+                igst_amount=igst,
+                discount=Decimal(str(detail_data.discount)),
+                total_amount=line_total_with_gst,
+                notes=detail_data.notes
+            )
+            db.add(purchase_detail)
+            
+            # Accumulate totals
+            sub_total += line_total
+            total_cgst += cgst
+            total_sgst += sgst
+            total_igst += igst
+            total_discount += Decimal(str(detail_data.discount))
+        
+        # Update master totals
+        purchase.sub_total = sub_total
+        purchase.cgst = total_cgst
+        purchase.sgst = total_sgst
+        purchase.igst = total_igst
+        purchase.discount = total_discount
+        purchase.total_amount = sub_total + total_cgst + total_sgst + total_igst - total_discount
+    
+    db.commit()
+    db.refresh(purchase)
+    return purchase
 
 
 def update_purchase_status(db: Session, purchase_id: int, status: str):

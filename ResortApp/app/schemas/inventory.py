@@ -314,6 +314,7 @@ class PurchaseMasterUpdate(BaseModel):
     payment_status: Optional[str] = None
     status: Optional[str] = None
     notes: Optional[str] = None
+    details: Optional[List[PurchaseDetailCreate]] = None
 
 
 class PurchaseMasterOut(PurchaseMasterBase):
