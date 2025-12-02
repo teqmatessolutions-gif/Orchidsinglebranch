@@ -875,7 +875,7 @@ def get_waste_spoilage_report(
                 "quantity": float(waste.quantity),
                 "unit": waste.item.unit if waste.item else "N/A",
                 "waste_value": float(waste_value),
-                "reason": waste.reason,
+                "reason": waste.reason_code,
                 "waste_date": waste.created_at.isoformat() if waste.created_at else None,
                 "reported_by": getattr(waste, 'reported_by', 'N/A')
             })
