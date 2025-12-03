@@ -50,7 +50,7 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
   if (!locationData) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <div>
@@ -7347,7 +7347,7 @@ const WasteLogFormModal = ({
   const wasteReasons = ["Expired", "Damaged", "Spilled", "Theft", "Taste Test"];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">
@@ -7581,7 +7581,7 @@ const LocationFormModal = ({ form, setForm, locations, onSubmit, onClose }) => {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">Add Location</h2>
@@ -7788,7 +7788,7 @@ const AssetMappingFormModal = ({
   });
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">
@@ -7894,7 +7894,7 @@ const AssetMappingFormModal = ({
 // Requisition Details Modal
 const RequisitionDetailsModal = ({ requisition, items, onClose }) => {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -8055,7 +8055,7 @@ const RequisitionDetailsModal = ({ requisition, items, onClose }) => {
 // Issue Details Modal
 const IssueDetailsModal = ({ issue, items, locations, onClose }) => {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -8203,7 +8203,7 @@ const WasteLogDetailsModal = ({ wasteLog, items, locations, onClose }) => {
   const location = locations.find((l) => l.id === wasteLog.location_id);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -8354,7 +8354,7 @@ const LocationDetailsModal = ({ location, locations, onClose }) => {
   );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -8489,7 +8489,7 @@ const AssetDetailsModal = ({ asset, items, locations, onClose }) => {
   const location = locations.find((l) => l.id === asset.current_location_id);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -8673,7 +8673,7 @@ const RecipeFormModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-2xl font-bold text-gray-800">
