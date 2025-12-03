@@ -320,7 +320,7 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
                           {formatCurrency(item.unit_price || 0)}
                         </td>
                         <td className="px-3 py-2 text-sm font-semibold text-gray-900">
-                          {formatCurrency(item.stock_value || 0)}
+                          {formatCurrency((item.location_stock || 0) * (item.unit_price || 0))}
                         </td>
                         <td className="px-3 py-2">
                           {item.is_low_stock ? (

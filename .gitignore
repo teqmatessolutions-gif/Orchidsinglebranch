@@ -1,22 +1,7 @@
-# Node modules cache
+uploads/
+ResortApp/uploads/
 dasboard/node_modules/
 node_modules/
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-.venv/
-
-# IDE
-.vscode/
-.idea/
-
-# Environment
 .env
-
-# Logs
-*.log
+__pycache__/
+*.pyc

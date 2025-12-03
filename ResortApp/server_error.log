@@ -1,0 +1,617 @@
+INFO:     Will watch for changes in these directories: ['C:\\releasing\\orchid\\ResortApp']
+INFO:     Uvicorn running on http://0.0.0.0:8011 (Press CTRL+C to quit)
+INFO:     Started reloader process [34564] using StatReload
+INFO:     Started server process [22424]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [22424]
+INFO:     Started server process [26696]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'fix_recipe_ingredients_created_at.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [26696]
+INFO:     Started server process [29336]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'add_created_at_column.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [29336]
+INFO:     Started server process [31804]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'fix_item_id_column.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [31804]
+INFO:     Started server process [8244]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'fix_item_id.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [8244]
+INFO:     Started server process [29996]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'fix_item_id.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [29996]
+INFO:     Started server process [19168]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'fix_uom_column.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [19168]
+INFO:     Started server process [5692]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'fix_uom_column.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5692]
+INFO:     Started server process [5372]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\models\foodorder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [5372]
+INFO:     Started server process [688]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\schemas\foodorder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [688]
+WARNING:  StatReload detected changes in 'app\schemas\foodorder.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    from multiprocessing.spawn import spawn_main; spawn_main(parent_pid=34564, pipe_handle=1000)
+                                                  ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 131, in _main
+    prepare(preparation_data)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 246, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 297, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+                                  run_name="__mp_main__")
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\releasing\orchid\ResortApp\main.py", line 59, in <module>
+    Base.metadata.create_all(bind=engine)
+    ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\sql\schema.py", line 5924, in create_all
+    bind._run_ddl_visitor(
+    ~~~~~~~~~~~~~~~~~~~~~^
+        ddl.SchemaGenerator, self, checkfirst=checkfirst, tables=tables
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3251, in _run_ddl_visitor
+    with self.begin() as conn:
+         ~~~~~~~~~~^^
+  File "C:\Python313\Lib\contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3241, in begin
+    with self.connect() as conn:
+         ~~~~~~~~~~~~^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3277, in connect
+    return self._connection_cls(self)
+           ~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 143, in __init__
+    self._dbapi_connection = engine.raw_connection()
+                             ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\engine\base.py", line 3301, in raw_connection
+    return self.pool.connect()
+           ~~~~~~~~~~~~~~~~~^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 447, in connect
+    return _ConnectionFairy._checkout(self)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 1264, in _checkout
+    fairy = _ConnectionRecord.checkout(pool)
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 711, in checkout
+    rec = pool._do_get()
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\pool\impl.py", line 177, in _do_get
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\pool\impl.py", line 175, in _do_get
+    return self._create_connection()
+           ~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 388, in _create_connection
+    return _ConnectionRecord(self)
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 673, in __init__
+    self.__connect()
+    ~~~~~~~~~~~~~~^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 899, in __connect
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 224, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\pool\base.py", line 895, in __connect
+    self.dbapi_connection = connection = pool._invoke_creator(self)
+                                         ~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\engine\create.py", line 661, in connect
+    return dialect.connect(*cargs, **cparams)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\engine\default.py", line 629, in connect
+    return self.loaded_dbapi.connect(*cargs, **cparams)  # type: ignore[no-any-return]  # NOQA: E501
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\psycopg2\__init__.py", line 135, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+KeyboardInterrupt
+INFO:     Started server process [16768]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'add_food_order_fields.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [16768]
+INFO:     Started server process [23724]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\models\foodorder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [23724]
+INFO:     Started server process [15640]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\models\__init__.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [15640]
+INFO:     Started server process [24296]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'create_service_request_table.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [24296]
+INFO:     Started server process [35704]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\curd\foodorder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [35704]
+INFO:     Started server process [11508]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\curd\foodorder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [11508]
+INFO:     Started server process [25192]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\curd\foodorder.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25192]
+INFO:     Started server process [35532]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\curd\service_request.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [35532]
+INFO:     Started server process [34452]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [34452]
+INFO:     Started server process [28708]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [28708]
+INFO:     Started server process [16952]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [16952]
+INFO:     Started server process [22788]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\api\checkout.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [22788]
+INFO:     Started server process [20420]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [20420]
+WARNING:  StatReload detected changes in 'app\api\service_request.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    from multiprocessing.spawn import spawn_main; spawn_main(parent_pid=34564, pipe_handle=3816)
+                                                  ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 131, in _main
+    prepare(preparation_data)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 246, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 297, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+                                  run_name="__mp_main__")
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\releasing\orchid\ResortApp\main.py", line 12, in <module>
+    from app.api import (
+    ...<20 lines>...
+    )
+  File "C:\releasing\orchid\ResortApp\app\api\packages.py", line 2, in <module>
+    from sqlalchemy.orm import Session, joinedload
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\__init__.py", line 12, in <module>
+    from . import util as _util
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\__init__.py", line 14, in <module>
+    from ._collections import coerce_generator_arg as coerce_generator_arg
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\_collections.py", line 38, in <module>
+    from ._has_cy import HAS_CYEXTENSION
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\_has_cy.py", line 32, in <module>
+    _import_cy_extensions()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\_has_cy.py", line 20, in _import_cy_extensions
+    from ..cyextension import util
+  File "lib/sqlalchemy/cyextension/util.pyx", line 9, in init sqlalchemy.cyextension.util
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\exc.py", line 26, in <module>
+    from .util import compat
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\compat.py", line 48, in <module>
+    arm = "aarch" in platform.machine().lower()
+                     ~~~~~~~~~~~~~~~~^^
+  File "C:\Python313\Lib\platform.py", line 1110, in machine
+    return uname().machine
+           ~~~~~^^
+  File "C:\Python313\Lib\platform.py", line 999, in uname
+    release, version, csd, ptype = win32_ver()
+                                   ~~~~~~~~~^^
+  File "C:\Python313\Lib\platform.py", line 450, in win32_ver
+    version, csd, ptype, is_client = _win32_ver(version, csd, ptype)
+                                     ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\platform.py", line 391, in _win32_ver
+    (version, product_type, ptype, spmajor, spminor)  = _wmi_query(
+                                                        ~~~~~~~~~~^
+        'OS',
+        ^^^^^
+    ...<4 lines>...
+        'ServicePackMinorVersion',
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Python313\Lib\platform.py", line 330, in _wmi_query
+    data = _wmi.exec_query("SELECT {} FROM {}".format(
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ",".join(keys),
+        ^^^^^^^^^^^^^^^
+        table,
+        ^^^^^^
+    )).split("\0")
+    ^^
+KeyboardInterrupt
+INFO:     Started server process [17252]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\api\service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [17252]
+WARNING:  StatReload detected changes in 'add_last_used_at_migration.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    from multiprocessing.spawn import spawn_main; spawn_main(parent_pid=34564, pipe_handle=3816)
+                                                  ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 131, in _main
+    prepare(preparation_data)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 246, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 297, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+                                  run_name="__mp_main__")
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\releasing\orchid\ResortApp\main.py", line 12, in <module>
+    from app.api import (
+    ...<20 lines>...
+    )
+  File "C:\releasing\orchid\ResortApp\app\api\packages.py", line 2, in <module>
+    from sqlalchemy.orm import Session, joinedload
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\__init__.py", line 12, in <module>
+    from . import util as _util
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\__init__.py", line 14, in <module>
+    from ._collections import coerce_generator_arg as coerce_generator_arg
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\_collections.py", line 38, in <module>
+    from ._has_cy import HAS_CYEXTENSION
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\_has_cy.py", line 32, in <module>
+    _import_cy_extensions()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\_has_cy.py", line 20, in _import_cy_extensions
+    from ..cyextension import util
+  File "lib/sqlalchemy/cyextension/util.pyx", line 9, in init sqlalchemy.cyextension.util
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\exc.py", line 26, in <module>
+    from .util import compat
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\compat.py", line 48, in <module>
+    arm = "aarch" in platform.machine().lower()
+                     ~~~~~~~~~~~~~~~~^^
+  File "C:\Python313\Lib\platform.py", line 1110, in machine
+    return uname().machine
+           ~~~~~^^
+  File "C:\Python313\Lib\platform.py", line 999, in uname
+    release, version, csd, ptype = win32_ver()
+                                   ~~~~~~~~~^^
+  File "C:\Python313\Lib\platform.py", line 450, in win32_ver
+    version, csd, ptype, is_client = _win32_ver(version, csd, ptype)
+                                     ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\platform.py", line 391, in _win32_ver
+    (version, product_type, ptype, spmajor, spminor)  = _wmi_query(
+                                                        ~~~~~~~~~~^
+        'OS',
+        ^^^^^
+    ...<4 lines>...
+        'ServicePackMinorVersion',
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Python313\Lib\platform.py", line 330, in _wmi_query
+    data = _wmi.exec_query("SELECT {} FROM {}".format(
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ",".join(keys),
+        ^^^^^^^^^^^^^^^
+        table,
+        ^^^^^^
+    )).split("\0")
+    ^^
+KeyboardInterrupt
+WARNING:  StatReload detected changes in 'check_routes.py'. Reloading...
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    from multiprocessing.spawn import spawn_main; spawn_main(parent_pid=34564, pipe_handle=3816)
+                                                  ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 131, in _main
+    prepare(preparation_data)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 246, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 297, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+                                  run_name="__mp_main__")
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\releasing\orchid\ResortApp\main.py", line 12, in <module>
+    from app.api import (
+    ...<20 lines>...
+    )
+  File "C:\releasing\orchid\ResortApp\app\api\packages.py", line 2, in <module>
+    from sqlalchemy.orm import Session, joinedload
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\__init__.py", line 12, in <module>
+    from . import util as _util
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\__init__.py", line 14, in <module>
+    from ._collections import coerce_generator_arg as coerce_generator_arg
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\_collections.py", line 38, in <module>
+    from ._has_cy import HAS_CYEXTENSION
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\_has_cy.py", line 32, in <module>
+    _import_cy_extensions()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\_has_cy.py", line 20, in _import_cy_extensions
+    from ..cyextension import util
+  File "lib/sqlalchemy/cyextension/util.pyx", line 9, in init sqlalchemy.cyextension.util
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\exc.py", line 26, in <module>
+    from .util import compat
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\compat.py", line 48, in <module>
+    arm = "aarch" in platform.machine().lower()
+                     ~~~~~~~~~~~~~~~~^^
+  File "C:\Python313\Lib\platform.py", line 1110, in machine
+    return uname().machine
+           ~~~~~^^
+  File "C:\Python313\Lib\platform.py", line 999, in uname
+    release, version, csd, ptype = win32_ver()
+                                   ~~~~~~~~~^^
+  File "C:\Python313\Lib\platform.py", line 450, in win32_ver
+    version, csd, ptype, is_client = _win32_ver(version, csd, ptype)
+                                     ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\platform.py", line 391, in _win32_ver
+    (version, product_type, ptype, spmajor, spminor)  = _wmi_query(
+                                                        ~~~~~~~~~~^
+        'OS',
+        ^^^^^
+    ...<4 lines>...
+        'ServicePackMinorVersion',
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Python313\Lib\platform.py", line 330, in _wmi_query
+    data = _wmi.exec_query("SELECT {} FROM {}".format(
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ",".join(keys),
+        ^^^^^^^^^^^^^^^
+        table,
+        ^^^^^^
+    )).split("\0")
+    ^^
+KeyboardInterrupt
+INFO:     Started server process [29332]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'main.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [29332]
+INFO:     Started server process [20792]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\api\service_request.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [20792]
+INFO:     Started server process [31580]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\curd\service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [31580]
+WARNING:  StatReload detected changes in 'add_last_used_at_migration.py'. Reloading...
+Traceback (most recent call last):
+  File "C:\Python313\Lib\platform.py", line 330, in _wmi_query
+    data = _wmi.exec_query("SELECT {} FROM {}".format(
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        ",".join(keys),
+        ^^^^^^^^^^^^^^^
+        table,
+        ^^^^^^
+    )).split("\0")
+    ^^
+TimeoutError: [WinError 258] The wait operation timed out
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    from multiprocessing.spawn import spawn_main; spawn_main(parent_pid=34564, pipe_handle=3816)
+                                                  ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 122, in spawn_main
+    exitcode = _main(fd, parent_sentinel)
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 131, in _main
+    prepare(preparation_data)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 246, in prepare
+    _fixup_main_from_path(data['init_main_from_path'])
+    ~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\multiprocessing\spawn.py", line 297, in _fixup_main_from_path
+    main_content = runpy.run_path(main_path,
+                                  run_name="__mp_main__")
+  File "<frozen runpy>", line 287, in run_path
+  File "<frozen runpy>", line 98, in _run_module_code
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\releasing\orchid\ResortApp\main.py", line 12, in <module>
+    from app.api import (
+    ...<20 lines>...
+    )
+  File "C:\releasing\orchid\ResortApp\app\api\packages.py", line 2, in <module>
+    from sqlalchemy.orm import Session, joinedload
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\__init__.py", line 12, in <module>
+    from . import util as _util
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\__init__.py", line 14, in <module>
+    from ._collections import coerce_generator_arg as coerce_generator_arg
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\_collections.py", line 38, in <module>
+    from ._has_cy import HAS_CYEXTENSION
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\_has_cy.py", line 32, in <module>
+    _import_cy_extensions()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\_has_cy.py", line 20, in _import_cy_extensions
+    from ..cyextension import util
+  File "lib/sqlalchemy/cyextension/util.pyx", line 9, in init sqlalchemy.cyextension.util
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\exc.py", line 26, in <module>
+    from .util import compat
+  File "C:\releasing\orchid\ResortApp\venv\Lib\site-packages\sqlalchemy\util\compat.py", line 48, in <module>
+    arm = "aarch" in platform.machine().lower()
+                     ~~~~~~~~~~~~~~~~^^
+  File "C:\Python313\Lib\platform.py", line 1110, in machine
+    return uname().machine
+           ~~~~~^^
+  File "C:\Python313\Lib\platform.py", line 999, in uname
+    release, version, csd, ptype = win32_ver()
+                                   ~~~~~~~~~^^
+  File "C:\Python313\Lib\platform.py", line 450, in win32_ver
+    version, csd, ptype, is_client = _win32_ver(version, csd, ptype)
+                                     ~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python313\Lib\platform.py", line 391, in _win32_ver
+    (version, product_type, ptype, spmajor, spminor)  = _wmi_query(
+                                                        ~~~~~~~~~~^
+        'OS',
+        ^^^^^
+    ...<4 lines>...
+        'ServicePackMinorVersion',
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Python313\Lib\platform.py", line 336, in _wmi_query
+    raise OSError("not supported")
+          ~~~~~~~^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+INFO:     Started server process [25292]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\curd\service.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [25292]
+INFO:     Started server process [29388]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+WARNING:  StatReload detected changes in 'app\schemas\service_request.py'. Reloading...
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+INFO:     Finished server process [29388]
+INFO:     Started server process [36888]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+C:\releasing\orchid\ResortApp\venv\Lib\site-packages\pydantic\type_adapter.py:572: UserWarning: Pydantic serializer warnings:
+  PydanticSerializationUnexpectedValue(Expected `ServiceItem` - serialized value may not be as expected [input_value={'service_name': 'cleaning', 'charges': 20.0}, input_type=dict])
+  PydanticSerializationUnexpectedValue(Expected `ServiceItem` - serialized value may not be as expected [input_value={'service_name': 'cleaning', 'charges': 20.0}, input_type=dict])
+  return self.serializer.to_python(
