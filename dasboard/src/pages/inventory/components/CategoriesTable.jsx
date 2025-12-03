@@ -1,7 +1,8 @@
 import React from "react";
 import { formatDateIST } from "../../../utils/dateUtils";
+import { Trash2, Edit } from "lucide-react";
 
-const CategoriesTable = ({ categories }) => {
+const CategoriesTable = ({ categories, onEdit, onDelete }) => {
     return (
         <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -16,12 +17,15 @@ const CategoriesTable = ({ categories }) => {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                             Created
                         </th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                            Actions
+                        </th>
                     </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                     {categories.length === 0 ? (
                         <tr>
-                            <td colSpan="3" className="px-4 py-8 text-center text-gray-500">
+                            <td colSpan="4" className="px-4 py-8 text-center text-gray-500">
                                 No categories found
                             </td>
                         </tr>
@@ -36,6 +40,20 @@ const CategoriesTable = ({ categories }) => {
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600">
                                     {formatDateIST(cat.created_at)}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                    <button
+                                        onClick={() => onEdit(cat)}
+                                        className="text-blue-600 hover:text-blue-800 mr-2"
+                                    >
+                                        <Edit className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                        onClick={() => onDelete(cat.id)}
+                                        className="text-red-600 hover:text-red-800"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </button>
                                 </td>
                             </tr>
                         ))

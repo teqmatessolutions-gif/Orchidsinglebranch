@@ -1,6 +1,7 @@
 import React from "react";
+import { Edit, Eye } from "lucide-react";
 
-const VendorsTable = ({ vendors }) => {
+const VendorsTable = ({ vendors, onEdit, onView }) => {
     return (
         <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -21,18 +22,25 @@ const VendorsTable = ({ vendors }) => {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                             Status
                         </th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                            Actions
+                        </th>
                     </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                     {vendors.length === 0 ? (
                         <tr>
-                            <td colSpan="5" className="px-4 py-8 text-center text-gray-500">
+                            <td colSpan="6" className="px-4 py-8 text-center text-gray-500">
                                 No vendors found
                             </td>
                         </tr>
                     ) : (
                         vendors.map((vendor) => (
-                            <tr key={vendor.id} className="hover:bg-gray-50">
+                            <tr
+                                key={vendor.id}
+                                className="hover:bg-gray-50 cursor-pointer transition-colors"
+                                onClick={() => onView && onView(vendor)}
+                            >
                                 <td className="px-4 py-3 text-sm font-medium text-gray-900">
                                     {vendor.name}
                                 </td>
@@ -55,6 +63,24 @@ const VendorsTable = ({ vendors }) => {
                                             Inactive
                                         </span>
                                     )}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-right">
+                                    <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                                        <button
+                                            onClick={() => onEdit && onEdit(vendor)}
+                                            className="p-1 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                                            title="Edit Vendor"
+                                        >
+                                            <Edit className="w-4 h-4" />
+                                        </button>
+                                        <button
+                                            onClick={() => onView && onView(vendor)}
+                                            className="p-1 text-gray-600 hover:bg-gray-50 rounded-full transition-colors"
+                                            title="View Details"
+                                        >
+                                            <Eye className="w-4 h-4" />
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))

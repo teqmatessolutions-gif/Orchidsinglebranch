@@ -21,8 +21,11 @@ def create_category(db: Session, data: InventoryCategoryCreate):
     return category
 
 
-def get_all_categories(db: Session, skip: int = 0, limit: int = 100):
-    return db.query(InventoryCategory).offset(skip).limit(limit).all()
+def get_all_categories(db: Session, skip: int = 0, limit: int = 100, active_only: bool = True):
+    query = db.query(InventoryCategory)
+    if active_only:
+        query = query.filter(InventoryCategory.is_active == True)
+    return query.offset(skip).limit(limit).all()
 
 
 def get_category_by_id(db: Session, category_id: int):
@@ -51,7 +54,7 @@ def create_item(db: Session, data: InventoryItemCreate):
     return item
 
 
-def get_all_items(db: Session, skip: int = 0, limit: int = 100, category_id: Optional[int] = None):
+def get_all_items(db: Session, skip: int = 0, limit: int = 100, category_id: Optional[int] = None, active_only: bool = True):
     """Optimized with eager loading to prevent N+1 queries"""
     query = db.query(InventoryItem).options(
         joinedload(InventoryItem.category),
@@ -59,6 +62,8 @@ def get_all_items(db: Session, skip: int = 0, limit: int = 100, category_id: Opt
     )
     if category_id:
         query = query.filter(InventoryItem.category_id == category_id)
+    if active_only:
+        query = query.filter(InventoryItem.is_active == True)
     return query.offset(skip).limit(limit).all()
 
 

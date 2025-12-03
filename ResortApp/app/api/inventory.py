@@ -42,10 +42,11 @@ def create_category(
 def get_categories(
     skip: int = 0,
     limit: int = 100,
+    active_only: bool = True,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return inventory_crud.get_all_categories(db, skip=skip, limit=limit)
+    return inventory_crud.get_all_categories(db, skip=skip, limit=limit, active_only=active_only)
 
 
 @router.put("/categories/{category_id}", response_model=InventoryCategoryOut)
@@ -72,13 +73,14 @@ def delete_category(
     if not category:
         raise HTTPException(status_code=404, detail="Category not found")
     
-    # Check if category has items
+    # Check if category has active items
     from app.models.inventory import InventoryItem
-    items_count = db.query(InventoryItem).filter(InventoryItem.category_id == category_id).count()
+    items_count = db.query(InventoryItem).filter(InventoryItem.category_id == category_id, InventoryItem.is_active == True).count()
     if items_count > 0:
-        raise HTTPException(status_code=400, detail="Cannot delete category with associated items")
+        raise HTTPException(status_code=400, detail="Cannot delete category with active items")
         
-    db.delete(category)
+    # Soft delete
+    category.is_active = False
     db.commit()
     return {"message": "Category deleted successfully"}
 
@@ -209,12 +211,13 @@ def get_items(
     skip: int = 0,
     limit: int = 100,
     category_id: Optional[int] = None,
+    active_only: bool = True,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     """Optimized endpoint with eager loading - no N+1 queries"""
     try:
-        items = inventory_crud.get_all_items(db, skip=skip, limit=limit, category_id=category_id)
+        items = inventory_crud.get_all_items(db, skip=skip, limit=limit, category_id=category_id, active_only=active_only)
         result = []
         for item in items:
             # Category is already loaded via eager loading (when configured), no extra query needed
@@ -349,18 +352,8 @@ def delete_item(
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
     
-    # Check if item has transactions or stock
-    from app.models.inventory import InventoryTransaction, PurchaseDetail
-    trans_count = db.query(InventoryTransaction).filter(InventoryTransaction.item_id == item_id).count()
-    purchase_count = db.query(PurchaseDetail).filter(PurchaseDetail.item_id == item_id).count()
-    
-    if trans_count > 0 or purchase_count > 0:
-        # Soft delete instead
-        item.is_active = False
-        db.commit()
-        return {"message": "Item deactivated (cannot delete due to existing history)"}
-        
-    db.delete(item)
+    # Always soft delete
+    item.is_active = False
     db.commit()
     return {"message": "Item deleted successfully"}
 
@@ -422,6 +415,23 @@ def create_purchase(
 ):
     created = inventory_crud.create_purchase_master(db, purchase, created_by=current_user.id)
     
+    # Auto-update item prices from purchase details if purchase is confirmed/received
+    if purchase.status in ["confirmed", "received"]:
+        try:
+            from app.models.inventory import InventoryItem
+            for detail in created.details:
+                if detail.item_id and detail.unit_price:
+                    item = db.query(InventoryItem).filter(InventoryItem.id == detail.item_id).first()
+                    if item:
+                        # Update item's unit_price to latest purchase price
+                        item.unit_price = detail.unit_price
+                        print(f"[AUTO-UPDATE] Updated item {item.name} (ID: {item.id}) unit_price to {detail.unit_price}")
+            db.commit()
+        except Exception as e:
+            import traceback
+            print(f"Warning: Could not auto-update item prices: {str(e)}\\n{traceback.format_exc()}")
+            # Don't fail the purchase creation
+    
     # Automatically create journal entry for purchase (Scenario 1)
     # Only create if purchase is confirmed/received (not draft)
     if purchase.status in ["confirmed", "received"]:
@@ -461,7 +471,7 @@ def create_purchase(
         except Exception as e:
             # Log error but don't fail purchase creation
             import traceback
-            print(f"Warning: Could not create journal entry for purchase {created.id}: {str(e)}\n{traceback.format_exc()}")
+            print(f"Warning: Could not create journal entry for purchase {created.id}: {str(e)}\\n{traceback.format_exc()}")
     
     # Optimized: Batch load items to avoid N+1 queries
     from sqlalchemy.orm import joinedload
@@ -578,6 +588,20 @@ def update_purchase(
         else:
             raise HTTPException(status_code=400, detail="Cannot update purchase in current status (only draft or confirmed allowed for full update)")
             
+    # Auto-update item prices if status is confirmed/received
+    if updated.status in ["confirmed", "received"]:
+        try:
+            from app.models.inventory import InventoryItem
+            for detail in updated.details:
+                if detail.item_id and detail.unit_price:
+                    item = db.query(InventoryItem).filter(InventoryItem.id == detail.item_id).first()
+                    if item:
+                        item.unit_price = detail.unit_price
+                        print(f"[AUTO-UPDATE] Updated item {item.name} (ID: {item.id}) unit_price to {detail.unit_price}")
+            db.commit()
+        except Exception as e:
+            print(f"Warning: Could not auto-update item prices: {str(e)}")
+
     # Return full response with details
     return get_purchase(purchase_id, db, current_user)
 
@@ -696,7 +720,57 @@ def update_purchase_status(
     purchase = inventory_crud.update_purchase_status(db, purchase_id, status)
     if not purchase:
         raise HTTPException(status_code=404, detail="Purchase not found")
+        
+    # Auto-update item prices if status is confirmed/received
+    if purchase.status in ["confirmed", "received"]:
+        try:
+            from app.models.inventory import InventoryItem
+            for detail in purchase.details:
+                if detail.item_id and detail.unit_price:
+                    item = db.query(InventoryItem).filter(InventoryItem.id == detail.item_id).first()
+                    if item:
+                        item.unit_price = detail.unit_price
+                        print(f"[AUTO-UPDATE] Updated item {item.name} (ID: {item.id}) unit_price to {detail.unit_price}")
+            db.commit()
+        except Exception as e:
+            print(f"Warning: Could not auto-update item prices: {str(e)}")
+            
     return {"message": "Purchase status updated successfully", "status": purchase.status}
+
+
+@router.patch("/purchases/{purchase_id}/payment-status")
+def update_purchase_payment_status(
+    purchase_id: int,
+    payment_status: str,
+    payment_method: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Update payment status and payment method for a purchase order"""
+    purchase = inventory_crud.get_purchase_by_id(db, purchase_id)
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Purchase not found")
+    
+    # Validate payment status
+    valid_statuses = ["pending", "partial", "paid"]
+    if payment_status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid payment status. Must be one of: {', '.join(valid_statuses)}")
+    
+    # Update payment status
+    purchase.payment_status = payment_status
+    
+    # Update payment method if provided
+    if payment_method:
+        purchase.payment_method = payment_method
+    
+    db.commit()
+    db.refresh(purchase)
+    
+    return {
+        "message": "Payment status updated successfully",
+        "payment_status": purchase.payment_status,
+        "payment_method": purchase.payment_method
+    }
 
 
 # Transaction Endpoints

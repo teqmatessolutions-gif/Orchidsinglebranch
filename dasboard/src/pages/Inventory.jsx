@@ -406,6 +406,8 @@ const Inventory = () => {
   const [showPurchaseDetails, setShowPurchaseDetails] = useState(false);
   const [showUnitForm, setShowUnitForm] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [editingVendor, setEditingVendor] = useState(null);
 
   // New form states for Stock Issue & Consumption module
   const [showRequisitionForm, setShowRequisitionForm] = useState(false);
@@ -749,9 +751,17 @@ const Inventory = () => {
         }
       });
 
-      await API.post("/inventory/items", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      if (editingItem) {
+        await API.put(`/inventory/items/${editingItem.id}`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        alert("Item updated successfully!");
+      } else {
+        await API.post("/inventory/items", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        alert("Item created successfully!");
+      }
 
       // Reset form
       setItemForm({
@@ -798,19 +808,37 @@ const Inventory = () => {
   const handleDeleteItem = async (id) => {
     if (!window.confirm("Are you sure you want to delete this item?")) return;
     try {
-      // Delete logic would go here if API supports it
-      alert("Delete functionality not implemented in API");
+      await API.delete(`/inventory/items/${id}`);
+      alert("Item deleted successfully");
+      fetchData();
     } catch (error) {
       console.error("Error deleting item:", error);
-      alert("Failed to delete item");
+      alert("Failed to delete item: " + (error.response?.data?.detail || error.message));
     }
+  };
+
+  const handleEditItem = (item) => {
+    setEditingItem(item);
+    setItemForm({
+      ...item,
+      category_id: item.category_id,
+      image: null,
+    });
+    setShowItemForm(true);
   };
 
   // Category handlers
   const handleCategorySubmit = async (e) => {
     e.preventDefault();
     try {
-      await API.post("/inventory/categories", categoryForm);
+      if (editingCategory) {
+        await API.put(`/inventory/categories/${editingCategory.id}`, categoryForm);
+        alert("Category updated successfully!");
+      } else {
+        await API.post("/inventory/categories", categoryForm);
+        alert("Category created successfully!");
+      }
+
       setCategoryForm({
         name: "",
         description: "",
@@ -829,11 +857,34 @@ const Inventory = () => {
         allow_partial_usage: false,
         consumable_instant: false,
       });
+      setEditingCategory(null);
       setShowCategoryForm(false);
       fetchData();
     } catch (error) {
       console.error("Error submitting category:", error);
-      alert("Failed to submit category");
+      alert("Failed to submit category: " + (error.response?.data?.detail || error.message));
+    }
+  };
+
+  const handleEditCategory = (category) => {
+    setEditingCategory(category);
+    setCategoryForm({
+      ...category,
+      description: category.description || "",
+      parent_department: category.parent_department || "",
+    });
+    setShowCategoryForm(true);
+  };
+
+  const handleDeleteCategory = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this category?")) return;
+    try {
+      await API.delete(`/inventory/categories/${id}`);
+      alert("Category deleted successfully");
+      fetchData();
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      alert("Failed to delete category: " + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -887,7 +938,14 @@ const Inventory = () => {
     }
 
     try {
-      await API.post("/inventory/vendors", cleanedData);
+      if (editingVendor) {
+        await API.put(`/inventory/vendors/${editingVendor.id}`, cleanedData);
+        alert("Vendor updated successfully!");
+      } else {
+        await API.post("/inventory/vendors", cleanedData);
+        alert("Vendor created successfully!");
+      }
+
       setVendorForm({
         name: "",
         company_name: "",
@@ -926,6 +984,7 @@ const Inventory = () => {
         notes: "",
         is_active: true,
       });
+      setEditingVendor(null);
       setShowVendorForm(false);
       fetchData();
     } catch (error) {
@@ -937,6 +996,44 @@ const Inventory = () => {
         "Failed to submit vendor";
       alert(`Failed to submit vendor: ${errorMessage}`);
     }
+  };
+
+  const handleEditVendor = (vendor) => {
+    setEditingVendor(vendor);
+    setVendorForm({
+      ...vendor,
+      company_name: vendor.company_name || "",
+      gst_registration_type: vendor.gst_registration_type || "",
+      gst_number: vendor.gst_number || "",
+      legal_name: vendor.legal_name || "",
+      trade_name: vendor.trade_name || "",
+      pan_number: vendor.pan_number || "",
+      qmp_scheme: vendor.qmp_scheme || false,
+      msme_udyam_no: vendor.msme_udyam_no || "",
+      contact_person: vendor.contact_person || "",
+      email: vendor.email || "",
+      phone: vendor.phone || "",
+      billing_address: vendor.billing_address || "",
+      billing_state: vendor.billing_state || "",
+      shipping_address: vendor.shipping_address || "",
+      distance_km: vendor.distance_km || "",
+      address: vendor.address || "",
+      city: vendor.city || "",
+      state: vendor.state || "",
+      pincode: vendor.pincode || "",
+      bank_name: vendor.bank_name || "",
+      account_number: vendor.account_number || "",
+      account_number_confirm: vendor.account_number || "",
+      ifsc_code: vendor.ifsc_code || "",
+      branch_name: vendor.branch_name || "",
+      preferred_payment_method: vendor.preferred_payment_method || "Bank Transfer",
+      payment_terms_days: vendor.payment_terms_days || 30,
+      credit_limit: vendor.credit_limit || "",
+      opening_balance: vendor.opening_balance || 0,
+      opening_balance_type: vendor.opening_balance_type || "Credit",
+      notes: vendor.notes || "",
+    });
+    setShowVendorForm(true);
   };
 
   // Purchase handlers
@@ -1756,10 +1853,10 @@ const Inventory = () => {
               {activeTab === "items" && (
                 <button
                   onClick={() => setShowItemForm(true)}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+                  className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white rounded-lg hover:from-indigo-700 hover:to-indigo-800 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200 font-semibold text-base"
                 >
-                  <Plus className="w-4 h-4" />
-                  Add Item
+                  <Plus className="w-5 h-5" />
+                  Add New Item
                 </button>
               )}
               {activeTab === "categories" && (
@@ -1849,13 +1946,22 @@ const Inventory = () => {
                     items={filteredItems}
                     categories={categories}
                     onDelete={handleDeleteItem}
+                    onEdit={handleEditItem}
                   />
                 )}
                 {activeTab === "categories" && (
-                  <CategoriesTable categories={filteredCategories} />
+                  <CategoriesTable
+                    categories={filteredCategories}
+                    onEdit={handleEditCategory}
+                    onDelete={handleDeleteCategory}
+                  />
                 )}
                 {activeTab === "vendors" && (
-                  <VendorsTable vendors={filteredVendors} />
+                  <VendorsTable
+                    vendors={filteredVendors}
+                    onEdit={handleEditVendor}
+                    onView={handleEditVendor}
+                  />
                 )}
                 {activeTab === "purchases" && (
                   <PurchasesTable
@@ -2992,6 +3098,7 @@ const Inventory = () => {
           form={vendorForm}
           setForm={setVendorForm}
           onSubmit={handleVendorSubmit}
+          isEditing={!!editingVendor}
           onClose={() => {
             setShowVendorForm(false);
             setVendorForm({
@@ -4369,7 +4476,7 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
 };
 
 // Vendor Form Modal - GST Friendly
-const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
+const VendorFormModal = ({ form, setForm, onSubmit, onClose, isEditing }) => {
   // Indian States list
   const indianStates = [
     "Andhra Pradesh",
@@ -4439,7 +4546,7 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[95vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <div>
-            <h2 className="text-2xl font-bold text-gray-800">Add Vendor</h2>
+            <h2 className="text-2xl font-bold text-gray-800">{isEditing ? "Update Vendor" : "Add Vendor"}</h2>
             <p className="text-sm text-gray-500 mt-1">
               GST-friendly vendor setup for GSTR compliance
             </p>
@@ -5326,7 +5433,7 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose }) => {
               type="submit"
               className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
             >
-              Save Vendor
+              {isEditing ? "Update Vendor" : "Save Vendor"}
             </button>
           </div>
         </form>
@@ -5583,6 +5690,36 @@ const PurchaseFormModal = ({
                 <option value="received">Received</option>
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Payment Method
+              </label>
+              <select
+                value={form.payment_method || "Bank Transfer"}
+                onChange={(e) => setForm({ ...form, payment_method: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="Cash">Cash</option>
+                <option value="Bank Transfer">Bank Transfer</option>
+                <option value="UPI">UPI</option>
+                <option value="Cheque">Cheque</option>
+                <option value="Credit Card">Credit Card</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Payment Status
+              </label>
+              <select
+                value={form.payment_status}
+                onChange={(e) => setForm({ ...form, payment_status: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="pending">Pending</option>
+                <option value="partial">Partial</option>
+                <option value="paid">Paid</option>
+              </select>
+            </div>
           </div>
 
           <div className="border-t pt-4">
@@ -5593,60 +5730,60 @@ const PurchaseFormModal = ({
               <button
                 type="button"
                 onClick={onAddDetail}
-                className="px-3 py-1 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 flex items-center gap-1"
+                className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-indigo-700 text-white font-semibold rounded-lg hover:from-indigo-700 hover:to-indigo-800 flex items-center gap-2 shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-200"
               >
-                <Plus className="w-4 h-4" />
+                <Plus className="w-5 h-5" />
                 Add Item
               </button>
             </div>
 
             {/* Items Grid */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100">
+            <div className="overflow-x-auto border-2 border-indigo-200 rounded-lg">
+              <table className="w-full">
+                <thead className="bg-indigo-50">
                   <tr>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
                       Action
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
                       Item Name
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
                       Category
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
                       HSN Code
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
                       Unit
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
                       Serial/Batch
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
                       Expiry Date
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
                       Quantity
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
                       Unit Price
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
-                      Tax Inclusive?
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
+                      Tax Inc?
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
                       GST %
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
-                      Tax Amount
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
+                      Tax Amt
                     </th>
-                    <th className="px-2 py-2 text-left font-medium text-gray-700">
+                    <th className="px-3 py-3 text-left text-sm font-semibold text-indigo-900">
                       Net Total
                     </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="bg-white divide-y divide-gray-200">
                   {form.details.map((detail, index) => {
                     const itemDetails = getItemDetails(detail.item_id);
                     const isPerishable =
@@ -5865,8 +6002,8 @@ const PurchaseFormModal = ({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 
@@ -5874,14 +6011,20 @@ const PurchaseFormModal = ({
 // Purchase Details Modal - Shows all purchase information
 const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(
     purchase?.status || "draft",
   );
+  const [currentPaymentStatus, setCurrentPaymentStatus] = useState(
+    purchase?.payment_status || "pending",
+  );
   const [showStatusDropdown, setShowStatusDropdown] = useState(false);
+  const [showPaymentStatusDropdown, setShowPaymentStatusDropdown] = useState(false);
 
   useEffect(() => {
     if (purchase) {
       setCurrentStatus(purchase.status || "draft");
+      setCurrentPaymentStatus(purchase.payment_status || "pending");
     }
   }, [purchase]);
 
@@ -5924,6 +6067,47 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
     } finally {
       setUpdatingStatus(false);
       setShowStatusDropdown(false);
+    }
+  };
+
+  const handlePaymentStatusUpdate = async (newPaymentStatus) => {
+    if (newPaymentStatus === currentPaymentStatus) {
+      setShowPaymentStatusDropdown(false);
+      return;
+    }
+
+    setUpdatingPaymentStatus(true);
+    try {
+      const token = localStorage.getItem("token");
+      const apiBaseUrl = getApiBaseUrl();
+      const response = await fetch(
+        `${apiBaseUrl}/inventory/purchases/${purchase.id}`,
+        {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ payment_status: newPaymentStatus }),
+        },
+      );
+
+      if (response.ok) {
+        setCurrentPaymentStatus(newPaymentStatus);
+        if (onUpdate) {
+          onUpdate({ ...purchase, payment_status: newPaymentStatus });
+        }
+        alert("Payment status updated successfully!");
+      } else {
+        const error = await response.json();
+        alert(`Failed to update payment status: ${error.detail || "Unknown error"}`);
+      }
+    } catch (error) {
+      console.error("Error updating payment status:", error);
+      alert("Failed to update payment status. Please try again.");
+    } finally {
+      setUpdatingPaymentStatus(false);
+      setShowPaymentStatusDropdown(false);
     }
   };
 
@@ -6095,6 +6279,48 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
                 </div>
               )}
             </div>
+            {/* Payment Status Update Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowPaymentStatusDropdown(!showPaymentStatusDropdown)}
+                disabled={updatingPaymentStatus}
+                className="px-3 py-2 text-sm font-medium rounded-lg border border-gray-300 hover:bg-gray-50 flex items-center gap-2 disabled:opacity-50"
+              >
+                <span>Payment:</span>
+                <span
+                  className={`px-2 py-1 text-xs font-semibold rounded-full ${currentPaymentStatus === "paid"
+                    ? "bg-green-100 text-green-800"
+                    : currentPaymentStatus === "partial"
+                      ? "bg-yellow-100 text-yellow-800"
+                      : "bg-gray-100 text-gray-800"
+                    }`}
+                >
+                  {currentPaymentStatus}
+                </span>
+                {updatingPaymentStatus ? "..." : "▼"}
+              </button>
+              {showPaymentStatusDropdown && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
+                  {[{ value: "pending", label: "Pending", color: "bg-gray-100 text-gray-800" }, { value: "partial", label: "Partial", color: "bg-yellow-100 text-yellow-800" }, { value: "paid", label: "Paid", color: "bg-green-100 text-green-800" }].map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handlePaymentStatusUpdate(option.value)}
+                      disabled={
+                        updatingPaymentStatus || option.value === currentPaymentStatus
+                      }
+                      className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed ${option.value === currentPaymentStatus ? "bg-indigo-50" : ""
+                        }`}
+                    >
+                      <span
+                        className={`px-2 py-1 text-xs font-semibold rounded-full ${option.color}`}
+                      >
+                        {option.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             {/* Print Button */}
             <button
               onClick={handlePrint}
@@ -6191,14 +6417,14 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
               </label>
               <p className="mt-1">
                 <span
-                  className={`px-2 py-1 text-xs font-semibold rounded-full ${purchase.payment_status === "paid"
+                  className={`px-2 py-1 text-xs font-semibold rounded-full ${currentPaymentStatus === "paid"
                     ? "bg-green-100 text-green-800"
-                    : purchase.payment_status === "partial"
+                    : currentPaymentStatus === "partial"
                       ? "bg-yellow-100 text-yellow-800"
                       : "bg-gray-100 text-gray-800"
                     }`}
                 >
-                  {purchase.payment_status}
+                  {currentPaymentStatus}
                 </span>
               </p>
             </div>

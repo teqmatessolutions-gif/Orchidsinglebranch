@@ -34,6 +34,7 @@ class InventoryCategory(Base):
     consumable_instant = Column(Boolean, default=False, nullable=False)  # Activates Logic 4.1: System deducts requested quantity immediately upon issuance (Office Stationery, Paper Cups)
     
     created_at = Column(DateTime, default=datetime.utcnow)
+    is_active = Column(Boolean, default=True, nullable=False)
     
     items = relationship("InventoryItem", back_populates="category")
 
@@ -165,6 +166,7 @@ class PurchaseMaster(Base):
     gst_number = Column(String, nullable=True)  # Vendor GST number (can be from vendor or override)
     payment_terms = Column(String, nullable=True)
     payment_status = Column(String, default="pending", nullable=False)  # pending, partial, paid
+    payment_method = Column(String, nullable=True)  # Cash, Bank Transfer, UPI, Cheque, etc.
     sub_total = Column(Numeric(10, 2), default=0.0, nullable=False)
     cgst = Column(Numeric(10, 2), default=0.0, nullable=False)  # Central GST
     sgst = Column(Numeric(10, 2), default=0.0, nullable=False)  # State GST
