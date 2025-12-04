@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ReactDOM from "react-dom";
 import { X, Plus } from "lucide-react";
 import API from "../../../services/api";
 
@@ -16,16 +17,15 @@ const ItemFormModal = ({
 }) => {
     // Fetch locations if not provided
     const [fetchedLocations, setFetchedLocations] = useState([]);
+    const hasFetchedRef = React.useRef(false);
 
     useEffect(() => {
-        // Only fetch if locations prop is empty
-        console.log('[ItemFormModal] Locations prop:', locations);
-        if (locations.length === 0) {
+        // Only fetch once if locations prop is empty and we haven't fetched yet
+        if (locations.length === 0 && !hasFetchedRef.current) {
+            hasFetchedRef.current = true;
             const fetchLocations = async () => {
                 try {
-                    console.log('[ItemFormModal] Fetching locations from API...');
                     const response = await API.get('/inventory/locations');
-                    console.log('[ItemFormModal] Locations API response:', response.data);
                     setFetchedLocations(response.data || []);
                 } catch (error) {
                     console.error('[ItemFormModal] Error fetching locations:', error);
@@ -34,7 +34,7 @@ const ItemFormModal = ({
             };
             fetchLocations();
         }
-    }, [locations]);
+    }, []);
 
     // Use provided locations or fetched locations
     const availableLocations = locations.length > 0 ? locations : fetchedLocations;
@@ -95,8 +95,8 @@ const ItemFormModal = ({
 
     const subCategories = getSubCategories();
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
+    return ReactDOM.createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
             <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full mx-4 max-h-[95vh] overflow-y-auto">
                 <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10 shadow-sm">
                     <div>
@@ -593,8 +593,11 @@ const ItemFormModal = ({
                     </div>
                 </form>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
 export default ItemFormModal;
+
+

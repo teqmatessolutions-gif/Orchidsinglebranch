@@ -13,16 +13,16 @@ const SummaryCard = ({ label, value, icon, color, highlight }) => {
 
     return (
         <div
-            className={`bg-white rounded-xl shadow-sm border-2 p-4 ${highlight ? "border-red-300" : "border-gray-100"}`}
+            className={`bg-white rounded-xl shadow-sm border-2 p-3 sm:p-4 ${highlight ? "border-red-300" : "border-gray-100"}`}
         >
-            <div className="flex items-center justify-between">
-                <div>
-                    <p className="text-sm text-gray-600">{label}</p>
-                    <p className={`text-2xl font-bold mt-1 ${colorClasses[color]}`}>
+            <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                    <p className="text-xs sm:text-sm text-gray-600 truncate">{label}</p>
+                    <p className={`text-base sm:text-lg md:text-xl lg:text-2xl font-bold mt-1 break-words ${colorClasses[color]}`}>
                         {value}
                     </p>
                 </div>
-                <div className={colorClasses[color] + " p-3 rounded-lg"}>{icon}</div>
+                <div className={colorClasses[color] + " p-2 sm:p-3 rounded-lg flex-shrink-0"}>{icon}</div>
             </div>
         </div>
     );

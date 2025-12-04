@@ -90,29 +90,29 @@ const BookingDetailsModal = ({
   const roomInfo =
     booking.rooms && booking.rooms.length > 0
       ? booking.rooms
-          .map((room) => {
-            // Handle package bookings (nested room structure) vs regular bookings
-            if (booking.is_package) {
-              // Package bookings: room has nested room object or only room_id
-              if (room?.room?.number)
-                return `${room.room.number} (${room.room.type})`;
-              if (room?.room_id && roomIdToRoom && roomIdToRoom[room.room_id]) {
-                const r = roomIdToRoom[room.room_id];
-                return `${r.number} (${r.type})`;
-              }
-              return "-";
-            } else {
-              // Regular bookings: room has number and type directly
-              if (room?.number) return `${room.number} (${room.type})`;
-              if (room?.room_id && roomIdToRoom && roomIdToRoom[room.room_id]) {
-                const r = roomIdToRoom[room.room_id];
-                return `${r.number} (${r.type})`;
-              }
-              return "-";
+        .map((room) => {
+          // Handle package bookings (nested room structure) vs regular bookings
+          if (booking.is_package) {
+            // Package bookings: room has nested room object or only room_id
+            if (room?.room?.number)
+              return `${room.room.number} (${room.room.type})`;
+            if (room?.room_id && roomIdToRoom && roomIdToRoom[room.room_id]) {
+              const r = roomIdToRoom[room.room_id];
+              return `${r.number} (${r.type})`;
             }
-          })
-          .filter(Boolean)
-          .join(", ") || "-"
+            return "-";
+          } else {
+            // Regular bookings: room has number and type directly
+            if (room?.number) return `${room.number} (${room.type})`;
+            if (room?.room_id && roomIdToRoom && roomIdToRoom[room.room_id]) {
+              const r = roomIdToRoom[room.room_id];
+              return `${r.number} (${r.type})`;
+            }
+            return "-";
+          }
+        })
+        .filter(Boolean)
+        .join(", ") || "-"
       : "-";
 
   const isCheckedIn =
@@ -664,7 +664,7 @@ const AddExtraAllocationModal = ({
       console.error("Error adding extra allocation:", error);
       alert(
         "Failed to add allocation: " +
-          (error.response?.data?.detail || error.message),
+        (error.response?.data?.detail || error.message),
       );
     } finally {
       setIsSubmitting(false);
@@ -710,7 +710,7 @@ const AddExtraAllocationModal = ({
       console.error("Error updating payable status:", error);
       alert(
         "Failed to update payable status: " +
-          (error.response?.data?.detail || error.message),
+        (error.response?.data?.detail || error.message),
       );
     }
   };
@@ -755,7 +755,7 @@ const AddExtraAllocationModal = ({
       console.error("Error updating paid status:", error);
       alert(
         "Failed to update paid status: " +
-          (error.response?.data?.detail || error.message),
+        (error.response?.data?.detail || error.message),
       );
     }
   };
@@ -798,22 +798,20 @@ const AddExtraAllocationModal = ({
           <button
             type="button"
             onClick={() => setActiveTab("current")}
-            className={`px-4 py-2 font-medium ${
-              activeTab === "current"
-                ? "border-b-2 border-indigo-600 text-indigo-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={`px-4 py-2 font-medium ${activeTab === "current"
+              ? "border-b-2 border-indigo-600 text-indigo-600"
+              : "text-gray-500 hover:text-gray-700"
+              }`}
           >
             Current Items ({currentRoomItems.length})
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("add")}
-            className={`px-4 py-2 font-medium ${
-              activeTab === "add"
-                ? "border-b-2 border-indigo-600 text-indigo-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
+            className={`px-4 py-2 font-medium ${activeTab === "add"
+              ? "border-b-2 border-indigo-600 text-indigo-600"
+              : "text-gray-500 hover:text-gray-700"
+              }`}
           >
             Add New Items
           </button>
@@ -884,7 +882,7 @@ const AddExtraAllocationModal = ({
                     console.error("Error refreshing items:", error);
                     alert(
                       "Failed to refresh items: " +
-                        (error.response?.data?.detail || error.message),
+                      (error.response?.data?.detail || error.message),
                     );
                   } finally {
                     setLoadingCurrentItems(false);
@@ -1051,8 +1049,8 @@ const AddExtraAllocationModal = ({
                           <td className="px-3 py-2 text-sm font-semibold text-gray-900">
                             {calculatedPayableQty > 0
                               ? formatCurrency(
-                                  (item.unit_price || 0) * calculatedPayableQty,
-                                )
+                                (item.unit_price || 0) * calculatedPayableQty,
+                              )
                               : formatCurrency(0)}
                           </td>
                           <td className="px-3 py-2">
@@ -1328,8 +1326,8 @@ const AddExtraAllocationModal = ({
                                   @{" "}
                                   {formatCurrency(
                                     selectedItem.selling_price ||
-                                      selectedItem.unit_price ||
-                                      0,
+                                    selectedItem.unit_price ||
+                                    0,
                                   )}{" "}
                                   each
                                 </div>
@@ -1540,6 +1538,95 @@ const CheckInModal = ({
 
   // Amenity configuration is editable: items, complimentary limits and payable toggle.
   const [amenityConfig, setAmenityConfig] = useState(DEFAULT_AMENITIES);
+  const [packageInclusions, setPackageInclusions] = useState([]);
+
+  // Load package inclusions when booking changes
+  useEffect(() => {
+    if (booking && booking.is_package && booking.package) {
+      // Parse package inclusions if they exist
+      let inclusions = [];
+
+      if (booking.package.inclusions) {
+        try {
+          // Try to parse if it's a JSON string
+          inclusions = typeof booking.package.inclusions === 'string'
+            ? JSON.parse(booking.package.inclusions)
+            : booking.package.inclusions;
+        } catch (e) {
+          console.error('Error parsing package inclusions:', e);
+          inclusions = [];
+        }
+      }
+
+      setPackageInclusions(inclusions);
+
+      // Convert package inclusions to amenity config format
+      if (inclusions && inclusions.length > 0) {
+        const amenitiesFromPackage = inclusions
+          .filter(inc => inc.type === 'Amenity' || inc.type === 'Complimentary')
+          .map((inc, index) => {
+            // Try to find matching inventory item if ID is missing
+            let matchedItemId = inc.item_id || null;
+            if (!matchedItemId && inc.name && inventoryItems.length > 0) {
+              const normalize = (s) => String(s).trim().toLowerCase();
+              const target = normalize(inc.name);
+              const match = inventoryItems.find(inv =>
+                normalize(inv.name) === target ||
+                normalize(inv.name).includes(target) ||
+                target.includes(normalize(inv.name))
+              );
+              if (match) matchedItemId = match.id;
+            }
+
+            return {
+              id: inc.id || `pkg_${index}`,
+              item_id: matchedItemId,
+              name: inc.name,
+              frequency: inc.schedule_type === 'Daily' ? 'PER_NIGHT' : 'PER_STAY',
+              complimentaryPerNight: inc.schedule_type === 'Daily' ? 1 : 0,
+              complimentaryPerStay: inc.schedule_type === 'Daily' ? 0 : 1,
+              extraPrice: 0,
+              is_payable: false,
+            };
+          });
+
+        if (amenitiesFromPackage.length > 0) {
+          setAmenityConfig(amenitiesFromPackage);
+        }
+      }
+    }
+  }, [booking]);
+
+  // Retry matching when inventory items load (in case they loaded after booking)
+  useEffect(() => {
+    if (inventoryItems.length > 0) {
+      setAmenityConfig(prev => {
+        let hasChanges = false;
+        const next = prev.map(item => {
+          if (!item.item_id && item.name) {
+            const normalize = (s) => String(s).trim().toLowerCase();
+            const target = normalize(item.name);
+            const match = inventoryItems.find(inv =>
+              normalize(inv.name) === target ||
+              normalize(inv.name).includes(target) ||
+              target.includes(normalize(inv.name))
+            );
+
+            if (match) {
+              hasChanges = true;
+              return {
+                ...item,
+                item_id: match.id,
+                extraPrice: item.is_payable ? (Number(match.selling_price) || 0) : 0
+              };
+            }
+          }
+          return item;
+        });
+        return hasChanges ? next : prev;
+      });
+    }
+  }, [inventoryItems]);
 
   const amenitySummary = useMemo(() => {
     if (!booking) return null;
@@ -1640,16 +1727,16 @@ const CheckInModal = ({
     // Prepare amenity allocation payload so parent can create stock issues
     const amenityAllocation = amenitySummary
       ? {
-          nights: amenitySummary.nights,
-          items: amenityConfig.map((a) => ({
-            item_id: a.item_id || null,
-            name: a.name,
-            frequency: a.frequency,
-            complimentaryPerNight: a.complimentaryPerNight || 0,
-            complimentaryPerStay: a.complimentaryPerStay || 0,
-            is_payable: Boolean(a.is_payable),
-          })),
-        }
+        nights: amenitySummary.nights,
+        items: amenityConfig.map((a) => ({
+          item_id: a.item_id || null,
+          name: a.name,
+          frequency: a.frequency,
+          complimentaryPerNight: a.complimentaryPerNight || 0,
+          complimentaryPerStay: a.complimentaryPerStay || 0,
+          is_payable: Boolean(a.is_payable),
+        })),
+      }
       : null;
 
     onSave(booking.id, {
@@ -1659,264 +1746,376 @@ const CheckInModal = ({
     });
   };
 
+  // Get room information
+  const roomInfo = booking.rooms && booking.rooms.length > 0
+    ? booking.rooms.map((room) => {
+      if (booking.is_package) {
+        if (room?.room?.number) return `${room.room.number} (${room.room.type})`;
+        return room?.number ? `${room.number} (${room.type})` : "-";
+      } else {
+        return room?.number ? `${room.number} (${room.type})` : "-";
+      }
+    }).join(", ")
+    : "-";
+
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
       <motion.div
-        initial={{ opacity: 0, y: -50 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 50 }}
-        className="bg-white p-8 rounded-xl shadow-2xl w-full max-w-2xl"
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto"
       >
-        <h3 className="text-2xl font-bold text-gray-800 mb-4">
-          Check-in Guest: {booking.guest_name}
-        </h3>
+        <div className="p-8">
+          <h3 className="text-2xl font-bold text-gray-800 mb-6 text-center">
+            Check-in Guest: {booking.guest_name}
+          </h3>
 
-        {/* Basic guest / document capture */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="flex flex-col items-center">
-            <label className="font-medium text-gray-700 mb-2">
-              ID Card Image
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleFileChange(e, "id")}
-              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-              required
-            />
-            {idCardPreview && (
-              <img
-                src={idCardPreview}
-                alt="ID Preview"
-                className="mt-4 w-full h-40 object-contain rounded-lg border"
-              />
-            )}
-          </div>
-          <div className="flex flex-col items-center">
-            <label className="font-medium text-gray-700 mb-2">
-              Guest Photo
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => handleFileChange(e, "guest")}
-              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-              required
-            />
-            {guestPhotoPreview && (
-              <img
-                src={guestPhotoPreview}
-                alt="Guest Preview"
-                className="mt-4 w-full h-40 object-contain rounded-lg border"
-              />
-            )}
-          </div>
-        </div>
+          {/* Booking Information */}
+          {booking.is_package && booking.package && (
+            <div className="bg-indigo-50 p-4 rounded-lg mb-6 border border-indigo-100">
+              <h4 className="font-bold text-indigo-900 flex items-center gap-2 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                </svg>
+                Package: {booking.package.title}
+              </h4>
+              <div className="text-sm text-gray-700 space-y-1">
+                <p><strong>Rooms:</strong> {roomInfo}</p>
+                <p><strong>Duration:</strong> {amenitySummary?.nights} night(s)</p>
+                <p><strong>Guests:</strong> {booking.adults} Adults, {booking.children} Children</p>
+              </div>
+            </div>
+          )}
 
-        {/* Amenity allocation editor for this stay (complimentary vs payable) */}
-        {amenitySummary && (
-          <div className="mt-6 border-t border-gray-200 pt-4">
-            <h4 className="text-lg font-semibold text-gray-800 mb-2">
-              Amenity Allocation for this Stay
-            </h4>
-            <p className="text-xs text-gray-500 mb-3">
-              Based on room type{" "}
-              <span className="font-semibold">{amenitySummary.roomType}</span>{" "}
-              and {amenitySummary.nights} night(s). Complimentary quantities are
-              already included in the room tariff. You can adjust the
-              complimentary limits and whether extra usage is payable or not.
-            </p>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-xs md:text-sm border border-gray-200 rounded-lg overflow-hidden">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium text-gray-600">
-                      Item
-                    </th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-600">
-                      Frequency
-                    </th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-600">
-                      Complimentary / Night
-                    </th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-600">
-                      Complimentary / Stay
-                    </th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-600">
-                      Extra Price (Payable)
-                    </th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-600">
-                      Payable?
-                    </th>
-                    <th className="px-3 py-2 text-left font-medium text-gray-600">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
-                  {amenityConfig.map((item, index) => (
-                    <tr key={item.id}>
-                      <td className="px-3 py-2 text-gray-800 min-w-[180px]">
-                        <select
-                          value={item.item_id || ""}
-                          onChange={(e) => {
-                            const selectedId = e.target.value
-                              ? Number(e.target.value)
-                              : null;
-                            const selectedItem = inventoryItems.find(
-                              (inv) => inv.id === selectedId,
-                            );
-                            handleAmenityChange(index, "item_id", selectedId);
-                            if (selectedItem) {
-                              handleAmenityChange(
-                                index,
-                                "name",
-                                selectedItem.name || item.name,
-                              );
-                              handleAmenityChange(
-                                index,
-                                "extraPrice",
-                                Number(selectedItem.selling_price) || 0,
-                              );
-                            }
-                          }}
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs md:text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
-                        >
-                          <option value="">Select item from inventory</option>
-                          {inventoryItems.map((inv) => (
-                            <option key={inv.id} value={inv.id}>
-                              {inv.name}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-2 text-gray-600">
-                        <select
-                          value={item.frequency}
-                          onChange={(e) =>
-                            handleAmenityChange(
-                              index,
-                              "frequency",
-                              e.target.value,
-                            )
-                          }
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs md:text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                        >
-                          <option value="PER_NIGHT">Per Night</option>
-                          <option value="PER_STAY">Per Stay</option>
-                        </select>
-                      </td>
-                      <td className="px-3 py-2 text-gray-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.complimentaryPerNight}
-                          onChange={(e) =>
-                            handleAmenityChange(
-                              index,
-                              "complimentaryPerNight",
-                              Number(e.target.value) || 0,
-                            )
-                          }
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs md:text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-gray-800">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.complimentaryPerStay}
-                          onChange={(e) =>
-                            handleAmenityChange(
-                              index,
-                              "complimentaryPerStay",
-                              Number(e.target.value) || 0,
-                            )
-                          }
-                          className="w-full border border-gray-300 rounded px-2 py-1 text-xs md:text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                        />
-                      </td>
-                      <td className="px-3 py-2 text-gray-800">
-                        <div className="flex items-center gap-1">
-                          <span className="text-gray-500 text-xs">₹</span>
-                          <input
-                            type="number"
-                            min="0"
-                            value={item.extraPrice}
-                            onChange={(e) =>
-                              handleAmenityChange(
-                                index,
-                                "extraPrice",
-                                Number(e.target.value) || 0,
-                              )
-                            }
-                            className="w-full border border-gray-300 rounded px-2 py-1 text-xs md:text-sm focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                          />
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 text-gray-800 text-center">
-                        <label className="inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={item.is_payable}
-                            onChange={(e) =>
-                              handleAmenityChange(
-                                index,
-                                "is_payable",
-                                e.target.checked,
-                              )
-                            }
-                            className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                          />
-                          <span className="ml-1 text-xs text-gray-600">
-                            {item.is_payable ? "Payable" : "Not Payable"}
-                          </span>
-                        </label>
-                      </td>
-                      <td className="px-3 py-2 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAmenity(index)}
-                          className="text-red-500 text-xs hover:text-red-700"
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="flex justify-between items-center mt-3">
+          {!booking.is_package && (
+            <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-100">
+              <h4 className="font-bold text-blue-900 flex items-center gap-2 mb-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                Room Booking
+              </h4>
+              <div className="text-sm text-gray-700 space-y-1">
+                <p><strong>Rooms:</strong> {roomInfo}</p>
+                <p><strong>Duration:</strong> {amenitySummary?.nights} night(s)</p>
+                <p><strong>Guests:</strong> {booking.adults} Adults, {booking.children} Children</p>
+              </div>
+            </div>
+          )}
+
+          {/* Package Inclusions Display */}
+          {booking.is_package && packageInclusions && packageInclusions.length > 0 && (
+            <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg mb-6 border border-purple-200">
+              <h4 className="font-bold text-purple-900 flex items-center gap-2 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                </svg>
+                Package Inclusions ({packageInclusions.length} items)
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Services */}
+                {packageInclusions.filter(inc => inc.type === 'Service').length > 0 && (
+                  <div className="bg-white p-4 rounded-lg border border-purple-100">
+                    <h5 className="font-semibold text-sm text-purple-800 mb-2 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                      </svg>
+                      Services / Spa
+                    </h5>
+                    <ul className="space-y-1 text-sm">
+                      {packageInclusions.filter(inc => inc.type === 'Service').map((inc, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-purple-500 mt-1">•</span>
+                          <div>
+                            <span className="text-gray-700">{inc.name}</span>
+                            <span className="text-xs text-gray-500 ml-2">({inc.schedule_type})</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Food Items */}
+                {packageInclusions.filter(inc => inc.type === 'Food').length > 0 && (
+                  <div className="bg-white p-4 rounded-lg border border-orange-100">
+                    <h5 className="font-semibold text-sm text-orange-800 mb-2 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                      Food & Beverages
+                    </h5>
+                    <ul className="space-y-1 text-sm">
+                      {packageInclusions.filter(inc => inc.type === 'Food').map((inc, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-orange-500 mt-1">•</span>
+                          <div>
+                            <span className="text-gray-700">{inc.name}</span>
+                            <span className="text-xs text-gray-500 ml-2">({inc.schedule_type})</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Amenities */}
+                {packageInclusions.filter(inc => inc.type === 'Amenity').length > 0 && (
+                  <div className="bg-white p-4 rounded-lg border border-blue-100">
+                    <h5 className="font-semibold text-sm text-blue-800 mb-2 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                      </svg>
+                      Amenities
+                    </h5>
+                    <ul className="space-y-1 text-sm">
+                      {packageInclusions.filter(inc => inc.type === 'Amenity').map((inc, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-blue-500 mt-1">•</span>
+                          <div>
+                            <span className="text-gray-700">{inc.name}</span>
+                            <span className="text-xs text-gray-500 ml-2">({inc.schedule_type})</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Complimentary Items */}
+                {packageInclusions.filter(inc => inc.type === 'Complimentary').length > 0 && (
+                  <div className="bg-white p-4 rounded-lg border border-green-100">
+                    <h5 className="font-semibold text-sm text-green-800 mb-2 flex items-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
+                      </svg>
+                      Complimentary
+                    </h5>
+                    <ul className="space-y-1 text-sm">
+                      {packageInclusions.filter(inc => inc.type === 'Complimentary').map((inc, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-green-500 mt-1">•</span>
+                          <div>
+                            <span className="text-gray-700">{inc.name}</span>
+                            <span className="text-xs text-gray-500 ml-2">({inc.schedule_type})</span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              <p className="text-xs text-purple-600 mt-4 italic">
+                ✨ All these items are included in your package and will be provided as per the schedule
+              </p>
+            </div>
+          )}
+
+          {/* Top Section: File Uploads */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+            <div className="flex flex-col items-center">
+              <label className="font-medium text-gray-700 mb-2">ID Card Image</label>
+              <div className="flex items-center gap-4 w-full">
+                <label className="flex-shrink-0 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg cursor-pointer hover:bg-indigo-100 font-medium transition-colors">
+                  Choose File
+                  <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "id")} className="hidden" />
+                </label>
+                <span className="text-sm text-gray-500 truncate">{idCardImage ? idCardImage.name : "No file chosen"}</span>
+              </div>
+              {idCardPreview && <img src={idCardPreview} alt="ID Preview" className="mt-4 w-full h-48 object-contain rounded-lg border border-gray-200 bg-gray-50" />}
+            </div>
+            <div className="flex flex-col items-center">
+              <label className="font-medium text-gray-700 mb-2">Guest Photo</label>
+              <div className="flex items-center gap-4 w-full">
+                <label className="flex-shrink-0 px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg cursor-pointer hover:bg-indigo-100 font-medium transition-colors">
+                  Choose File
+                  <input type="file" accept="image/*" onChange={(e) => handleFileChange(e, "guest")} className="hidden" />
+                </label>
+                <span className="text-sm text-gray-500 truncate">{guestPhoto ? guestPhoto.name : "No file chosen"}</span>
+              </div>
+              {guestPhotoPreview && <img src={guestPhotoPreview} alt="Guest Preview" className="mt-4 w-full h-48 object-contain rounded-lg border border-gray-200 bg-gray-50" />}
+            </div>
+          </div>
+
+          <hr className="border-gray-200 mb-8" />
+
+          {/* Amenity allocation editor for this stay (complimentary vs payable) */}
+          {
+            amenitySummary && (
+              <div className="mb-8">
+                <h4 className="text-lg font-bold text-gray-800 mb-2">
+                  Amenity Allocation for this Stay
+                </h4>
+                <p className="text-sm text-gray-500 mb-6">
+                  Based on room type <span className="font-semibold text-gray-700">{amenitySummary.roomType}</span> and {amenitySummary.nights} night(s).
+                  Quantities are defined by the package. You can adjust limits and add extra amenities here.
+                </p>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm text-left">
+                    <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200">
+                      <tr>
+                        <th className="px-4 py-3 w-1/3">Item</th>
+                        <th className="px-4 py-3 w-32">Type</th>
+                        <th className="px-4 py-3">Frequency</th>
+                        <th className="px-4 py-3 w-24">Qty / Night</th>
+                        <th className="px-4 py-3 w-24">Qty / Stay</th>
+                        <th className="px-4 py-3 w-32">Price (if Payable)</th>
+                        <th className="px-4 py-3 w-10"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {amenityConfig.map((item, index) => (
+                        <tr key={item.id} className="group hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-2">
+                            <div className="flex flex-col">
+                              <select
+                                value={item.item_id || ""}
+                                onChange={(e) => {
+                                  const selectedId = e.target.value ? Number(e.target.value) : null;
+                                  const selectedItem = inventoryItems.find((inv) => inv.id === selectedId);
+                                  handleAmenityChange(index, "item_id", selectedId);
+                                  if (selectedItem) {
+                                    handleAmenityChange(index, "name", selectedItem.name || item.name);
+                                    // Only set price if it's payable
+                                    if (item.is_payable) {
+                                      handleAmenityChange(index, "extraPrice", Number(selectedItem.selling_price) || 0);
+                                    }
+                                  }
+                                }}
+                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none ${!item.item_id ? "border-orange-300 bg-orange-50" : ""}`}
+                              >
+                                <option value="">Select item from inventory</option>
+                                {inventoryItems.map((inv) => (
+                                  <option key={inv.id} value={inv.id}>{inv.name}</option>
+                                ))}
+                              </select>
+                              {!item.item_id && item.name && (
+                                <span className="text-xs text-orange-600 mt-1 font-medium flex items-center gap-1">
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                                  </svg>
+                                  Package Item: {item.name}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-2">
+                            <select
+                              value={item.is_payable ? "payable" : "complimentary"}
+                              onChange={(e) => {
+                                const isPayable = e.target.value === "payable";
+                                handleAmenityChange(index, "is_payable", isPayable);
+                                if (!isPayable) {
+                                  handleAmenityChange(index, "extraPrice", 0);
+                                } else {
+                                  // If switching to payable, try to find price from inventory item
+                                  const selectedItem = inventoryItems.find((inv) => inv.id === item.item_id);
+                                  if (selectedItem) {
+                                    handleAmenityChange(index, "extraPrice", Number(selectedItem.selling_price) || 0);
+                                  }
+                                }
+                              }}
+                              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 outline-none font-medium ${item.is_payable
+                                ? "border-blue-300 bg-blue-50 text-blue-700 focus:ring-blue-500"
+                                : "border-green-300 bg-green-50 text-green-700 focus:ring-green-500"
+                                }`}
+                            >
+                              <option value="complimentary">Complimentary</option>
+                              <option value="payable">Payable</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-2">
+                            <select
+                              value={item.frequency}
+                              onChange={(e) => handleAmenityChange(index, "frequency", e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                            >
+                              <option value="PER_NIGHT">Per Night</option>
+                              <option value="PER_STAY">Per Stay</option>
+                            </select>
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.complimentaryPerNight}
+                              onChange={(e) => handleAmenityChange(index, "complimentaryPerNight", Number(e.target.value) || 0)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                              disabled={item.frequency === "PER_STAY"}
+                            />
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.complimentaryPerStay}
+                              onChange={(e) => handleAmenityChange(index, "complimentaryPerStay", Number(e.target.value) || 0)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                            />
+                          </td>
+                          <td className="px-4 py-2 relative">
+                            <span className={`absolute left-7 top-1/2 -translate-y-1/2 ${!item.is_payable ? "text-gray-400" : "text-gray-500"}`}>₹</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={item.extraPrice}
+                              onChange={(e) => handleAmenityChange(index, "extraPrice", Number(e.target.value) || 0)}
+                              className={`w-full pl-6 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none ${!item.is_payable ? "bg-gray-100 text-gray-400 cursor-not-allowed" : ""
+                                }`}
+                              disabled={!item.is_payable}
+                            />
+                          </td>
+                          <td className="px-4 py-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveAmenity(index)}
+                              className="text-gray-400 hover:text-red-500 transition-colors"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
                 <button
                   type="button"
                   onClick={handleAddAmenity}
-                  className="px-3 py-1 rounded-md border border-dashed border-indigo-400 text-xs text-indigo-700 hover:bg-indigo-50"
+                  className="mt-4 px-4 py-2 border border-dashed border-indigo-300 text-indigo-600 rounded-lg hover:bg-indigo-50 font-medium flex items-center gap-2 transition-colors"
                 >
-                  + Add Amenity
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Amenity
                 </button>
-                <p className="text-[11px] text-gray-500">
-                  These settings control only the allocation logic; actual stock
-                  and charges are handled from the Inventory & Billing modules.
+
+                <p className="mt-4 text-xs text-gray-400 italic">
+                  These settings control only the allocation logic; actual stock and charges are handled from the Inventory & Billing modules.
                 </p>
               </div>
-            </div>
-          </div>
-        )}
+            )
+          }
 
-        <div className="flex gap-4 mt-6">
-          <button
-            onClick={onClose}
-            className="w-full bg-gray-200 text-gray-800 font-semibold py-2 rounded-md hover:bg-gray-300 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isSubmitting || !idCardImage || !guestPhoto}
-            className="w-full bg-indigo-600 text-white font-semibold py-2 rounded-md hover:bg-indigo-700 transition-colors disabled:bg-gray-400"
-          >
-            {isSubmitting ? "Checking in..." : "Confirm Check-in"}
-          </button>
+          {/* Bottom Actions */}
+          <div className="flex gap-4 pt-4 border-t border-gray-100">
+            <button
+              onClick={onClose}
+              className="flex-1 bg-gray-100 text-gray-700 font-semibold py-3 rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSubmitting || !idCardImage || !guestPhoto}
+              className="flex-1 bg-gray-800 text-white font-semibold py-3 rounded-xl hover:bg-gray-900 transition-colors disabled:bg-gray-400 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+            >
+              {isSubmitting ? "Processing..." : "Confirm Check-in"}
+            </button>
+          </div>
         </div>
       </motion.div>
     </div>
@@ -2670,12 +2869,77 @@ const Bookings = () => {
       }
       // -------------------------
 
+      // --- CONFLICT DETECTION FOR PACKAGE BOOKING ---
+      const requestedCheckIn = new Date(packageBookingForm.check_in);
+      const requestedCheckOut = new Date(packageBookingForm.check_out);
+
+      const conflicts = [];
+      finalRoomIds.forEach((roomId) => {
+        const room = allRooms.find((r) => r.id === roomId);
+        if (!room) return;
+
+        // Check all bookings for conflicts
+        const conflictingBookings = bookings.filter((booking) => {
+          // Only check active bookings (booked or checked-in)
+          const normalizedStatus = booking.status?.toLowerCase().replace(/[-_]/g, "");
+          if (normalizedStatus !== "booked" && normalizedStatus !== "checkedin") {
+            return false;
+          }
+
+          // Check if this booking includes the current room
+          const bookingHasRoom = booking.rooms?.some((r) => {
+            const bookingRoomId = r.room?.id || r.id || r.room_id;
+            return bookingRoomId === roomId;
+          });
+
+          if (!bookingHasRoom) return false;
+
+          // Check for date overlap
+          const bookingCheckIn = new Date(booking.check_in);
+          const bookingCheckOut = new Date(booking.check_out);
+
+          const hasOverlap = requestedCheckIn < bookingCheckOut && requestedCheckOut > bookingCheckIn;
+
+          return hasOverlap;
+        });
+
+        if (conflictingBookings.length > 0) {
+          conflicts.push({
+            room: room.number,
+            bookings: conflictingBookings.map((b) => ({
+              id: b.display_id || `${b.is_package ? 'PK' : 'BK'}-${String(b.id).padStart(6, '0')}`,
+              guest: b.guest_name,
+              checkIn: b.check_in,
+              checkOut: b.check_out,
+              status: b.status,
+            })),
+          });
+        }
+      });
+
+      if (conflicts.length > 0) {
+        const conflictMessages = conflicts.map((c) => {
+          const bookingDetails = c.bookings.map((b) =>
+            `${b.id} (${b.guest}, ${b.checkIn} to ${b.checkOut})`
+          ).join(", ");
+          return `Room ${c.room}: ${bookingDetails}`;
+        }).join("\n");
+
+        showBannerMessage(
+          "error",
+          `Cannot create package booking. The following rooms have conflicting bookings:\n${conflictMessages}`
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      // --- END CONFLICT DETECTION ---
+
       const bookingData = {
         ...packageBookingForm,
         package_id: parseInt(packageBookingForm.package_id),
         adults: parseInt(packageBookingForm.adults),
         children: parseInt(packageBookingForm.children),
-        room_ids: finalRoomIds.map((id) => parseInt(id)), // Use finalRoomIds (all available for whole_property, selected for room_type)
+        room_ids: finalRoomIds.map((id) => parseInt(id)),
       };
       const response = await API.post(
         "/packages/book",
@@ -2715,18 +2979,23 @@ const Bookings = () => {
   };
 
   const totalCapacity = useMemo(() => {
+    // Get selected room details from formData.roomNumbers
+    const selectedRoomDetails = formData.roomNumbers
+      .map((roomNumber) => rooms.find((r) => r.number === roomNumber))
+      .filter((room) => room !== undefined && room !== null);
+
     return {
-      adults: selectedRoomDetails.reduce((sum, room) => sum + room.adults, 0),
+      adults: selectedRoomDetails.reduce((sum, room) => sum + (room?.adults || 0), 0),
       children: selectedRoomDetails.reduce(
-        (sum, room) => sum + room.children,
+        (sum, room) => sum + (room?.children || 0),
         0,
       ),
       total: selectedRoomDetails.reduce(
-        (sum, room) => sum + (room.adults + room.children),
+        (sum, room) => sum + ((room?.adults || 0) + (room?.children || 0)),
         0,
       ),
     };
-  }, [selectedRoomDetails]);
+  }, [formData.roomNumbers, rooms]);
 
   // Generate unique booking ID for sharing - use display_id from API if available
   const generateBookingId = (booking) => {
@@ -2746,30 +3015,30 @@ const Bookings = () => {
     const rooms =
       booking.rooms && booking.rooms.length > 0
         ? booking.rooms
-            .map((r) => {
-              if (booking.is_package) {
-                return r.room ? `Room ${r.room.number} (${r.room.type})` : "-";
-              } else {
-                return `Room ${r.number} (${r.type})`;
-              }
-            })
-            .filter(Boolean)
-            .join(", ")
+          .map((r) => {
+            if (booking.is_package) {
+              return r.room ? `Room ${r.room.number} (${r.room.type})` : "-";
+            } else {
+              return `Room ${r.number} (${r.type})`;
+            }
+          })
+          .filter(Boolean)
+          .join(", ")
         : "N/A";
 
     const subject = encodeURIComponent(`Booking Confirmation - ${bookingId}`);
     const body = encodeURIComponent(
       `Dear ${booking.guest_name},\n\n` +
-        `Your booking has been confirmed!\n\n` +
-        `Booking ID: ${bookingId}\n` +
-        `Booking Type: ${booking.is_package ? "Package" : "Room"}\n` +
-        `Rooms: ${rooms}\n` +
-        `Check-in: ${booking.check_in}\n` +
-        `Check-out: ${booking.check_out}\n` +
-        `Guests: ${booking.adults} Adults, ${booking.children} Children\n` +
-        `Status: ${booking.status}\n\n` +
-        `Thank you for choosing our resort!\n\n` +
-        `Best regards,\nResort Team`,
+      `Your booking has been confirmed!\n\n` +
+      `Booking ID: ${bookingId}\n` +
+      `Booking Type: ${booking.is_package ? "Package" : "Room"}\n` +
+      `Rooms: ${rooms}\n` +
+      `Check-in: ${booking.check_in}\n` +
+      `Check-out: ${booking.check_out}\n` +
+      `Guests: ${booking.adults} Adults, ${booking.children} Children\n` +
+      `Status: ${booking.status}\n\n` +
+      `Thank you for choosing our resort!\n\n` +
+      `Best regards,\nResort Team`,
     );
     window.location.href = `mailto:${booking.guest_email}?subject=${subject}&body=${body}`;
   };
@@ -2790,28 +3059,28 @@ const Bookings = () => {
     const rooms =
       booking.rooms && booking.rooms.length > 0
         ? booking.rooms
-            .map((r) => {
-              if (booking.is_package) {
-                return r.room ? `Room ${r.room.number} (${r.room.type})` : "-";
-              } else {
-                return `Room ${r.number} (${r.type})`;
-              }
-            })
-            .filter(Boolean)
-            .join(", ")
+          .map((r) => {
+            if (booking.is_package) {
+              return r.room ? `Room ${r.room.number} (${r.room.type})` : "-";
+            } else {
+              return `Room ${r.number} (${r.type})`;
+            }
+          })
+          .filter(Boolean)
+          .join(", ")
         : "N/A";
 
     const message = encodeURIComponent(
       `Dear ${booking.guest_name},\n\n` +
-        `Your booking has been confirmed!\n\n` +
-        `Booking ID: ${bookingId}\n` +
-        `Booking Type: ${booking.is_package ? "Package" : "Room"}\n` +
-        `Rooms: ${rooms}\n` +
-        `Check-in: ${booking.check_in}\n` +
-        `Check-out: ${booking.check_out}\n` +
-        `Guests: ${booking.adults} Adults, ${booking.children} Children\n` +
-        `Status: ${booking.status}\n\n` +
-        `Thank you for choosing our resort!`,
+      `Your booking has been confirmed!\n\n` +
+      `Booking ID: ${bookingId}\n` +
+      `Booking Type: ${booking.is_package ? "Package" : "Room"}\n` +
+      `Rooms: ${rooms}\n` +
+      `Check-in: ${booking.check_in}\n` +
+      `Check-out: ${booking.check_out}\n` +
+      `Guests: ${booking.adults} Adults, ${booking.children} Children\n` +
+      `Status: ${booking.status}\n\n` +
+      `Thank you for choosing our resort!`,
     );
     window.open(`https://wa.me/${mobile}?text=${message}`, "_blank");
   };
@@ -3042,6 +3311,75 @@ const Bookings = () => {
         setIsSubmitting(false);
         return;
       }
+
+      // --- CONFLICT DETECTION ---
+      // Check if any of the selected rooms have conflicting bookings
+      const requestedCheckIn = new Date(formData.checkIn);
+      const requestedCheckOut = new Date(formData.checkOut);
+
+      const conflicts = [];
+      roomIds.forEach((roomId) => {
+        const room = allRooms.find((r) => r.id === roomId);
+        if (!room) return;
+
+        // Check all bookings for conflicts
+        const conflictingBookings = bookings.filter((booking) => {
+          // Only check active bookings (booked or checked-in)
+          const normalizedStatus = booking.status?.toLowerCase().replace(/[-_]/g, "");
+          if (normalizedStatus !== "booked" && normalizedStatus !== "checkedin") {
+            return false;
+          }
+
+          // Check if this booking includes the current room
+          const bookingHasRoom = booking.rooms?.some((r) => {
+            const bookingRoomId = r.room?.id || r.id || r.room_id;
+            return bookingRoomId === roomId;
+          });
+
+          if (!bookingHasRoom) return false;
+
+          // Check for date overlap
+          const bookingCheckIn = new Date(booking.check_in);
+          const bookingCheckOut = new Date(booking.check_out);
+
+          // Overlap occurs if:
+          // - New check-in is before existing check-out AND
+          // - New check-out is after existing check-in
+          const hasOverlap = requestedCheckIn < bookingCheckOut && requestedCheckOut > bookingCheckIn;
+
+          return hasOverlap;
+        });
+
+        if (conflictingBookings.length > 0) {
+          conflicts.push({
+            room: room.number,
+            bookings: conflictingBookings.map((b) => ({
+              id: b.display_id || `${b.is_package ? 'PK' : 'BK'}-${String(b.id).padStart(6, '0')}`,
+              guest: b.guest_name,
+              checkIn: b.check_in,
+              checkOut: b.check_out,
+              status: b.status,
+            })),
+          });
+        }
+      });
+
+      if (conflicts.length > 0) {
+        const conflictMessages = conflicts.map((c) => {
+          const bookingDetails = c.bookings.map((b) =>
+            `${b.id} (${b.guest}, ${b.checkIn} to ${b.checkOut})`
+          ).join(", ");
+          return `Room ${c.room}: ${bookingDetails}`;
+        }).join("\n");
+
+        showBannerMessage(
+          "error",
+          `Cannot create booking. The following rooms have conflicting bookings:\n${conflictMessages}`
+        );
+        setIsSubmitting(false);
+        return;
+      }
+      // --- END CONFLICT DETECTION ---
 
       const response = await API.post(
         "/bookings",
@@ -3322,7 +3660,7 @@ const Bookings = () => {
         prevBookings.map((b) =>
           b.id === bookingId && b.is_package === booking.is_package
             ? // Merge old booking data with new to preserve fields like `is_package`
-              { ...b, ...response.data }
+            { ...b, ...response.data }
             : b,
         ),
       );
@@ -3442,20 +3780,24 @@ const Bookings = () => {
                   }
                   if (!invItem) return null;
 
-                  const totalComplimentary =
+                  const totalQuantity =
                     a.frequency === "PER_NIGHT"
                       ? (a.complimentaryPerNight || 0) * nights
                       : a.complimentaryPerStay || 0;
-                  if (!totalComplimentary || totalComplimentary <= 0)
+
+                  if (!totalQuantity || totalQuantity <= 0)
                     return null;
 
                   return {
                     item_id: invItem.id,
-                    issued_quantity: totalComplimentary,
+                    issued_quantity: totalQuantity,
                     unit: invItem?.unit || "pcs",
                     batch_lot_number: null,
                     cost: null,
-                    notes: "Auto amenity allocation on check-in",
+                    is_payable: Boolean(a.is_payable),
+                    notes: a.is_payable
+                      ? `Payable amenity allocation on check-in (Price: ${a.extraPrice})`
+                      : "Complimentary amenity allocation on check-in",
                   };
                 })
                 .filter(Boolean);
@@ -3592,7 +3934,7 @@ const Bookings = () => {
           showBannerMessage("success", "Booking is already cancelled.");
           return;
         }
-      } catch (_) {}
+      } catch (_) { }
 
       const url = is_package
         ? `/packages/booking/${displayId}/cancel`
@@ -3640,7 +3982,7 @@ const Bookings = () => {
               return;
             }
           }
-        } catch (_) {}
+        } catch (_) { }
       }
       console.error("Failed to cancel booking:", err);
       showBannerMessage("error", "Failed to cancel booking.");
@@ -3658,11 +4000,10 @@ const Bookings = () => {
                 whileHover={{ scale: 1.05 }}
                 className={`
                 p-4 rounded-xl shadow-md cursor-pointer transition-all duration-200
-                ${
-                  selectedRoomNumbers.includes(room.number)
+                ${selectedRoomNumbers.includes(room.number)
                     ? "bg-indigo-600 text-white transform scale-105 ring-2 ring-indigo-500"
                     : "bg-white text-gray-800 hover:bg-gray-100"
-                }
+                  }
               `}
                 onClick={() => onRoomToggle(room.number)}
               >
@@ -3749,41 +4090,37 @@ const Bookings = () => {
           <div className="flex border-b border-gray-200">
             <button
               onClick={() => setMainTab("dashboard")}
-              className={`px-6 py-3 font-medium transition-colors ${
-                mainTab === "dashboard"
-                  ? "text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`px-6 py-3 font-medium transition-colors ${mainTab === "dashboard"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               Dashboard
             </button>
             <button
               onClick={() => setMainTab("booking")}
-              className={`px-6 py-3 font-medium transition-colors ${
-                mainTab === "booking"
-                  ? "text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`px-6 py-3 font-medium transition-colors ${mainTab === "booking"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               Booking Management
             </button>
             <button
               onClick={() => setMainTab("package")}
-              className={`px-6 py-3 font-medium transition-colors ${
-                mainTab === "package"
-                  ? "text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`px-6 py-3 font-medium transition-colors ${mainTab === "package"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               Package Management
             </button>
             <button
               onClick={() => setMainTab("room")}
-              className={`px-6 py-3 font-medium transition-colors ${
-                mainTab === "room"
-                  ? "text-indigo-600 border-b-2 border-indigo-600"
-                  : "text-gray-600 hover:text-gray-900"
-              }`}
+              className={`px-6 py-3 font-medium transition-colors ${mainTab === "room"
+                ? "text-indigo-600 border-b-2 border-indigo-600"
+                : "text-gray-600 hover:text-gray-900"
+                }`}
             >
               Room Management
             </button>
@@ -3920,11 +4257,10 @@ const Bookings = () => {
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                              pkg.booking_type === "whole_property"
-                                ? "bg-purple-100 text-purple-700"
-                                : "bg-blue-100 text-blue-700"
-                            }`}
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${pkg.booking_type === "whole_property"
+                              ? "bg-purple-100 text-purple-700"
+                              : "bg-blue-100 text-blue-700"
+                              }`}
                           >
                             {pkg.booking_type === "whole_property"
                               ? "Whole Property"
@@ -4002,15 +4338,14 @@ const Bookings = () => {
                               </p>
                             </div>
                             <span
-                              className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                room.status === "Available"
-                                  ? "bg-green-100 text-green-700"
-                                  : room.status === "Booked"
-                                    ? "bg-red-100 text-red-700"
-                                    : room.status === "Maintenance"
-                                      ? "bg-yellow-100 text-yellow-700"
-                                      : "bg-gray-100 text-gray-700"
-                              }`}
+                              className={`px-2 py-1 rounded-full text-xs font-semibold ${room.status === "Available"
+                                ? "bg-green-100 text-green-700"
+                                : room.status === "Booked"
+                                  ? "bg-red-100 text-red-700"
+                                  : room.status === "Maintenance"
+                                    ? "bg-yellow-100 text-yellow-700"
+                                    : "bg-gray-100 text-gray-700"
+                                }`}
                             >
                               {room.status}
                             </span>
@@ -4034,69 +4369,69 @@ const Bookings = () => {
                             room.garden ||
                             room.dining ||
                             room.breakfast) && (
-                            <div className="flex flex-wrap gap-1 mt-3">
-                              {room.air_conditioning && (
-                                <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
-                                  AC
-                                </span>
-                              )}
-                              {room.wifi && (
-                                <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
-                                  WiFi
-                                </span>
-                              )}
-                              {room.bathroom && (
-                                <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
-                                  Bathroom
-                                </span>
-                              )}
-                              {room.living_area && (
-                                <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">
-                                  Living
-                                </span>
-                              )}
-                              {room.terrace && (
-                                <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">
-                                  Terrace
-                                </span>
-                              )}
-                              {room.parking && (
-                                <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">
-                                  Parking
-                                </span>
-                              )}
-                              {room.kitchen && (
-                                <span className="px-2 py-1 text-xs bg-pink-100 text-pink-700 rounded-full">
-                                  Kitchen
-                                </span>
-                              )}
-                              {room.family_room && (
-                                <span className="px-2 py-1 text-xs bg-teal-100 text-teal-700 rounded-full">
-                                  Family
-                                </span>
-                              )}
-                              {room.bbq && (
-                                <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">
-                                  BBQ
-                                </span>
-                              )}
-                              {room.garden && (
-                                <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">
-                                  Garden
-                                </span>
-                              )}
-                              {room.dining && (
-                                <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-full">
-                                  Dining
-                                </span>
-                              )}
-                              {room.breakfast && (
-                                <span className="px-2 py-1 text-xs bg-cyan-100 text-cyan-700 rounded-full">
-                                  Breakfast
-                                </span>
-                              )}
-                            </div>
-                          )}
+                              <div className="flex flex-wrap gap-1 mt-3">
+                                {room.air_conditioning && (
+                                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                                    AC
+                                  </span>
+                                )}
+                                {room.wifi && (
+                                  <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                                    WiFi
+                                  </span>
+                                )}
+                                {room.bathroom && (
+                                  <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
+                                    Bathroom
+                                  </span>
+                                )}
+                                {room.living_area && (
+                                  <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">
+                                    Living
+                                  </span>
+                                )}
+                                {room.terrace && (
+                                  <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">
+                                    Terrace
+                                  </span>
+                                )}
+                                {room.parking && (
+                                  <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">
+                                    Parking
+                                  </span>
+                                )}
+                                {room.kitchen && (
+                                  <span className="px-2 py-1 text-xs bg-pink-100 text-pink-700 rounded-full">
+                                    Kitchen
+                                  </span>
+                                )}
+                                {room.family_room && (
+                                  <span className="px-2 py-1 text-xs bg-teal-100 text-teal-700 rounded-full">
+                                    Family
+                                  </span>
+                                )}
+                                {room.bbq && (
+                                  <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">
+                                    BBQ
+                                  </span>
+                                )}
+                                {room.garden && (
+                                  <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">
+                                    Garden
+                                  </span>
+                                )}
+                                {room.dining && (
+                                  <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-full">
+                                    Dining
+                                  </span>
+                                )}
+                                {room.breakfast && (
+                                  <span className="px-2 py-1 text-xs bg-cyan-100 text-cyan-700 rounded-full">
+                                    Breakfast
+                                  </span>
+                                )}
+                              </div>
+                            )}
                         </div>
                       </div>
                     );
@@ -4182,69 +4517,69 @@ const Bookings = () => {
                               room.garden ||
                               room.dining ||
                               room.breakfast) && (
-                              <div className="flex flex-wrap gap-1 mt-3">
-                                {room.air_conditioning && (
-                                  <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
-                                    AC
-                                  </span>
-                                )}
-                                {room.wifi && (
-                                  <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
-                                    WiFi
-                                  </span>
-                                )}
-                                {room.bathroom && (
-                                  <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
-                                    Bathroom
-                                  </span>
-                                )}
-                                {room.living_area && (
-                                  <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">
-                                    Living
-                                  </span>
-                                )}
-                                {room.terrace && (
-                                  <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">
-                                    Terrace
-                                  </span>
-                                )}
-                                {room.parking && (
-                                  <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">
-                                    Parking
-                                  </span>
-                                )}
-                                {room.kitchen && (
-                                  <span className="px-2 py-1 text-xs bg-pink-100 text-pink-700 rounded-full">
-                                    Kitchen
-                                  </span>
-                                )}
-                                {room.family_room && (
-                                  <span className="px-2 py-1 text-xs bg-teal-100 text-teal-700 rounded-full">
-                                    Family
-                                  </span>
-                                )}
-                                {room.bbq && (
-                                  <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">
-                                    BBQ
-                                  </span>
-                                )}
-                                {room.garden && (
-                                  <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">
-                                    Garden
-                                  </span>
-                                )}
-                                {room.dining && (
-                                  <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-full">
-                                    Dining
-                                  </span>
-                                )}
-                                {room.breakfast && (
-                                  <span className="px-2 py-1 text-xs bg-cyan-100 text-cyan-700 rounded-full">
-                                    Breakfast
-                                  </span>
-                                )}
-                              </div>
-                            )}
+                                <div className="flex flex-wrap gap-1 mt-3">
+                                  {room.air_conditioning && (
+                                    <span className="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded-full">
+                                      AC
+                                    </span>
+                                  )}
+                                  {room.wifi && (
+                                    <span className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded-full">
+                                      WiFi
+                                    </span>
+                                  )}
+                                  {room.bathroom && (
+                                    <span className="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded-full">
+                                      Bathroom
+                                    </span>
+                                  )}
+                                  {room.living_area && (
+                                    <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded-full">
+                                      Living
+                                    </span>
+                                  )}
+                                  {room.terrace && (
+                                    <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-full">
+                                      Terrace
+                                    </span>
+                                  )}
+                                  {room.parking && (
+                                    <span className="px-2 py-1 text-xs bg-indigo-100 text-indigo-700 rounded-full">
+                                      Parking
+                                    </span>
+                                  )}
+                                  {room.kitchen && (
+                                    <span className="px-2 py-1 text-xs bg-pink-100 text-pink-700 rounded-full">
+                                      Kitchen
+                                    </span>
+                                  )}
+                                  {room.family_room && (
+                                    <span className="px-2 py-1 text-xs bg-teal-100 text-teal-700 rounded-full">
+                                      Family
+                                    </span>
+                                  )}
+                                  {room.bbq && (
+                                    <span className="px-2 py-1 text-xs bg-red-100 text-red-700 rounded-full">
+                                      BBQ
+                                    </span>
+                                  )}
+                                  {room.garden && (
+                                    <span className="px-2 py-1 text-xs bg-emerald-100 text-emerald-700 rounded-full">
+                                      Garden
+                                    </span>
+                                  )}
+                                  {room.dining && (
+                                    <span className="px-2 py-1 text-xs bg-amber-100 text-amber-700 rounded-full">
+                                      Dining
+                                    </span>
+                                  )}
+                                  {room.breakfast && (
+                                    <span className="px-2 py-1 text-xs bg-cyan-100 text-cyan-700 rounded-full">
+                                      Breakfast
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                           </div>
                         </div>
                       );
@@ -4269,7 +4604,7 @@ const Bookings = () => {
                   All Bookings & Guest Details ({bookings.length})
                 </h3>
                 <button
-                  onClick={() => setBookingView("create")}
+                  onClick={() => setMainTab("booking")}
                   className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
                 >
                   Create New Booking
@@ -4310,32 +4645,32 @@ const Bookings = () => {
                       const roomInfo =
                         booking.rooms && booking.rooms.length > 0
                           ? booking.rooms
-                              .map((room) => {
-                                if (booking.is_package) {
-                                  if (room?.room?.number)
-                                    return room.room.number;
-                                  if (
-                                    room?.room_id &&
-                                    roomIdToRoom &&
-                                    roomIdToRoom[room.room_id]
-                                  ) {
-                                    return roomIdToRoom[room.room_id].number;
-                                  }
-                                  return "-";
-                                } else {
-                                  if (room?.number) return room.number;
-                                  if (
-                                    room?.room_id &&
-                                    roomIdToRoom &&
-                                    roomIdToRoom[room.room_id]
-                                  ) {
-                                    return roomIdToRoom[room.room_id].number;
-                                  }
-                                  return "-";
+                            .map((room) => {
+                              if (booking.is_package) {
+                                if (room?.room?.number)
+                                  return room.room.number;
+                                if (
+                                  room?.room_id &&
+                                  roomIdToRoom &&
+                                  roomIdToRoom[room.room_id]
+                                ) {
+                                  return roomIdToRoom[room.room_id].number;
                                 }
-                              })
-                              .filter(Boolean)
-                              .join(", ") || "-"
+                                return "-";
+                              } else {
+                                if (room?.number) return room.number;
+                                if (
+                                  room?.room_id &&
+                                  roomIdToRoom &&
+                                  roomIdToRoom[room.room_id]
+                                ) {
+                                  return roomIdToRoom[room.room_id].number;
+                                }
+                                return "-";
+                              }
+                            })
+                            .filter(Boolean)
+                            .join(", ") || "-"
                           : "-";
 
                       return (
@@ -4358,11 +4693,10 @@ const Bookings = () => {
                           </td>
                           <td className="px-4 py-3">
                             <span
-                              className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                booking.is_package
-                                  ? "bg-purple-100 text-purple-700"
-                                  : "bg-blue-100 text-blue-700"
-                              }`}
+                              className={`px-2 py-1 rounded-full text-xs font-semibold ${booking.is_package
+                                ? "bg-purple-100 text-purple-700"
+                                : "bg-blue-100 text-blue-700"
+                                }`}
                             >
                               {booking.is_package ? "Package" : "Room"}
                             </span>
@@ -4435,21 +4769,19 @@ const Bookings = () => {
                 <div className="flex border-b border-gray-200 mb-6">
                   <button
                     onClick={() => setBookingTab("room")}
-                    className={`px-6 py-3 font-medium transition-colors ${
-                      bookingTab === "room"
-                        ? "text-indigo-600 border-b-2 border-indigo-600"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
+                    className={`px-6 py-3 font-medium transition-colors ${bookingTab === "room"
+                      ? "text-indigo-600 border-b-2 border-indigo-600"
+                      : "text-gray-600 hover:text-gray-900"
+                      }`}
                   >
                     Room Booking
                   </button>
                   <button
                     onClick={() => setBookingTab("package")}
-                    className={`px-6 py-3 font-medium transition-colors ${
-                      bookingTab === "package"
-                        ? "text-indigo-600 border-b-2 border-indigo-600"
-                        : "text-gray-600 hover:text-gray-900"
-                    }`}
+                    className={`px-6 py-3 font-medium transition-colors ${bookingTab === "package"
+                      ? "text-indigo-600 border-b-2 border-indigo-600"
+                      : "text-gray-600 hover:text-gray-900"
+                      }`}
                   >
                     Package Booking
                   </button>
@@ -4466,11 +4798,10 @@ const Bookings = () => {
                       <motion.div
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className={`mb-4 p-4 rounded-lg text-sm font-semibold ${
-                          feedback.type === "success"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
+                        className={`mb-4 p-4 rounded-lg text-sm font-semibold ${feedback.type === "success"
+                          ? "bg-green-100 text-green-800"
+                          : "bg-red-100 text-red-800"
+                          }`}
                       >
                         {feedback.message}
                       </motion.div>
@@ -4818,7 +5149,7 @@ const Bookings = () => {
                                     )}
                                 </label>
                                 {!packageBookingForm.check_in ||
-                                !packageBookingForm.check_out ? (
+                                  !packageBookingForm.check_out ? (
                                   <div className="text-center py-8 text-gray-500 text-sm bg-gray-50 rounded-lg border">
                                     <p>
                                       Please select check-in and check-out dates
@@ -4896,7 +5227,7 @@ const Bookings = () => {
                                   )}
                               </label>
                               {!packageBookingForm.check_in ||
-                              !packageBookingForm.check_out ? (
+                                !packageBookingForm.check_out ? (
                                 <div className="text-center py-8 text-gray-500 text-sm bg-gray-50 rounded-lg border">
                                   <p>
                                     Please select check-in and check-out dates
@@ -4914,7 +5245,7 @@ const Bookings = () => {
                                     let roomsToShow = packageRooms;
                                     if (
                                       selectedPackage.booking_type ===
-                                        "room_type" &&
+                                      "room_type" &&
                                       selectedPackage.room_types
                                     ) {
                                       const allowedRoomTypes =
@@ -5082,19 +5413,19 @@ const Bookings = () => {
                     roomNumberFilter !== "All" ||
                     fromDate ||
                     toDate) && (
-                    <button
-                      onClick={() => {
-                        setStatusFilter("All");
-                        setRoomNumberFilter("All");
-                        setFromDate("");
-                        setToDate("");
-                      }}
-                      className="text-xs text-blue-600 hover:text-blue-700 font-medium px-3 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors self-end sm:self-center"
-                      title="Clear all filters"
-                    >
-                      Clear Filters
-                    </button>
-                  )}
+                      <button
+                        onClick={() => {
+                          setStatusFilter("All");
+                          setRoomNumberFilter("All");
+                          setFromDate("");
+                          setToDate("");
+                        }}
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium px-3 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 transition-colors self-end sm:self-center"
+                        title="Clear all filters"
+                      >
+                        Clear Filters
+                      </button>
+                    )}
                 </div>
               </div>
 
@@ -5163,20 +5494,20 @@ const Bookings = () => {
                           <td className="p-2 sm:p-4 text-xs sm:text-sm">
                             {b.rooms && b.rooms.length > 0
                               ? b.rooms
-                                  .map((room) => {
-                                    // Handle package bookings (nested room structure) vs regular bookings
-                                    if (b.is_package) {
-                                      // Package bookings: room has nested room object
-                                      return room.room
-                                        ? `${room.room.number}${room.room.type ? ` (${room.room.type})` : ""}`
-                                        : "-";
-                                    } else {
-                                      // Regular bookings: room has number and type directly
-                                      return `${room.number}${room.type ? ` (${room.type})` : ""}`;
-                                    }
-                                  })
-                                  .filter(Boolean)
-                                  .join(", ") || "-"
+                                .map((room) => {
+                                  // Handle package bookings (nested room structure) vs regular bookings
+                                  if (b.is_package) {
+                                    // Package bookings: room has nested room object
+                                    return room.room
+                                      ? `${room.room.number}${room.room.type ? ` (${room.room.type})` : ""}`
+                                      : "-";
+                                  } else {
+                                    // Regular bookings: room has number and type directly
+                                    return `${room.number}${room.type ? ` (${room.type})` : ""}`;
+                                  }
+                                })
+                                .filter(Boolean)
+                                .join(", ") || "-"
                               : "-"}
                           </td>
                           <td className="p-2 sm:p-4 text-gray-800 text-xs hidden lg:table-cell">
@@ -5203,7 +5534,7 @@ const Bookings = () => {
                               </button>
                               {b.status &&
                                 b.status.toLowerCase().replace(/[-_]/g, "") ===
-                                  "checkedin" && (
+                                "checkedin" && (
                                   <button
                                     onClick={async () => {
                                       try {

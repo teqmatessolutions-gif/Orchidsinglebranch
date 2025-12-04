@@ -214,6 +214,7 @@ export default function DashboardLayout({ children }) {
     { label: "Dashboard", icon: <Home size={18} />, to: "/dashboard" },
     { label: "Account", icon: <UserCircle size={18} />, to: "/account", roles: ["admin"] },
     { label: "Bookings", icon: <CalendarCheck2 size={18} />, to: "/bookings" },
+    { label: "Packages", icon: <Package size={18} />, to: "/packages" },
     { label: "Services", icon: <ConciergeBell size={18} />, to: "/services" },
     { label: "Role", icon: <ShieldCheck size={18} />, to: "/roles", roles: ["admin"] },
     { label: "Expenses", icon: <PiggyBank size={18} />, to: "/expenses" },
@@ -449,6 +450,18 @@ export default function DashboardLayout({ children }) {
             )}
           </div>
         </div>
+
+        {/* Mobile menu button - always visible on small screens */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="lg:hidden fixed top-4 left-4 z-[60] p-3 rounded-xl shadow-lg transition-all duration-200 hover:scale-110"
+          style={{
+            backgroundColor: 'var(--accent-bg)',
+            color: 'var(--accent-text)'
+          }}
+        >
+          <Menu size={24} />
+        </button>
 
         {/* Main content area */}
         <main className="flex-1 overflow-y-auto p-2 sm:p-4 md:p-6 lg:p-8 z-10 lg:ml-0 ml-0" style={{ backgroundColor: 'var(--bg-primary)', color: 'var(--text-primary)' }}>

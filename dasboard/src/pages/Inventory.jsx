@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import DashboardLayout from "../layout/DashboardLayout";
+import { useNotifications } from "../contexts/NotificationContext";
 import API from "../services/api";
-import { formatCurrency } from "../utils/currency";
+import { formatCurrency, formatIndianCurrencyCompact } from "../utils/currency";
 import { getApiBaseUrl } from "../utils/env";
 import {
   formatDateIST,
@@ -50,7 +51,7 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
   if (!locationData) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <div>
@@ -356,6 +357,7 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
 };
 
 const Inventory = () => {
+  const { addNotification } = useNotifications();
   const [activeTab, setActiveTab] = useState("items");
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -608,17 +610,13 @@ const Inventory = () => {
         const res = await API.get(`/inventory/items?limit=${limit}`);
         setItems(res.data || []);
       } else if (activeTab === "categories") {
-        // Already loaded in essential data, just set if needed
-        if (categories.length === 0) {
-          const res = await API.get(`/inventory/categories?limit=${limit}`);
-          setCategories(res.data || []);
-        }
+        // Always fetch categories to ensure fresh data after add/edit
+        const res = await API.get(`/inventory/categories?limit=${limit}`);
+        setCategories(res.data || []);
       } else if (activeTab === "vendors") {
-        // Already loaded in essential data
-        if (vendors.length === 0) {
-          const res = await API.get(`/inventory/vendors?limit=${limit}`);
-          setVendors(res.data || []);
-        }
+        // Always fetch vendors to ensure fresh data after add/edit
+        const res = await API.get(`/inventory/vendors?limit=${limit}`);
+        setVendors(res.data || []);
       } else if (activeTab === "purchases") {
         const res = await API.get(`/inventory/purchases?limit=${limit}`);
         setPurchases(res.data || []);
@@ -635,11 +633,9 @@ const Inventory = () => {
         const res = await API.get(`/inventory/waste-logs?limit=${limit}`);
         setWasteLogs(res.data || []);
       } else if (activeTab === "locations") {
-        // Already loaded in essential data
-        if (locations.length === 0) {
-          const res = await API.get("/inventory/locations?limit=10000");
-          setLocations(res.data || []);
-        }
+        // Always fetch locations to ensure fresh data after add/edit
+        const res = await API.get("/inventory/locations?limit=10000");
+        setLocations(res.data || []);
       } else if (activeTab === "assets") {
         const res = await API.get(`/inventory/asset-mappings?limit=${limit}`);
         setAssetMappings(res.data || []);
@@ -767,12 +763,12 @@ const Inventory = () => {
         await API.put(`/inventory/items/${editingItem.id}`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        alert("Item updated successfully!");
+        addNotification({ title: "Success", message: "Item updated successfully!", type: "success" });
       } else {
         await API.post("/inventory/items", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
-        alert("Item created successfully!");
+        addNotification({ title: "Success", message: "Item created successfully!", type: "success" });
       }
 
       // Reset form
@@ -807,13 +803,18 @@ const Inventory = () => {
         is_active: true,
       });
       setShowItemForm(false);
-      fetchData();
+      setEditingItem(null);
+
+      // Directly fetch items to ensure immediate refresh
+      const res = await API.get('/inventory/items?limit=1000');
+      setItems(res.data || []);
     } catch (error) {
       console.error("Error submitting item:", error);
-      alert(
-        "Failed to submit item: " +
-        (error.response?.data?.detail || error.message),
-      );
+      addNotification({
+        title: "Error",
+        message: "Failed to submit item: " + (error.response?.data?.detail || error.message),
+        type: "error"
+      });
     }
   };
 
@@ -821,11 +822,11 @@ const Inventory = () => {
     if (!window.confirm("Are you sure you want to delete this item?")) return;
     try {
       await API.delete(`/inventory/items/${id}`);
-      alert("Item deleted successfully");
+      addNotification({ title: "Success", message: "Item deleted successfully", type: "success" });
       fetchData();
     } catch (error) {
       console.error("Error deleting item:", error);
-      alert("Failed to delete item: " + (error.response?.data?.detail || error.message));
+      addNotification({ title: "Error", message: "Failed to delete item: " + (error.response?.data?.detail || error.message), type: "error" });
     }
   };
 
@@ -845,10 +846,10 @@ const Inventory = () => {
     try {
       if (editingCategory) {
         await API.put(`/inventory/categories/${editingCategory.id}`, categoryForm);
-        alert("Category updated successfully!");
+        addNotification({ title: "Success", message: "Category updated successfully!", type: "success" });
       } else {
         await API.post("/inventory/categories", categoryForm);
-        alert("Category created successfully!");
+        addNotification({ title: "Success", message: "Category created successfully!", type: "success" });
       }
 
       setCategoryForm({
@@ -871,10 +872,16 @@ const Inventory = () => {
       });
       setEditingCategory(null);
       setShowCategoryForm(false);
-      fetchData();
+
+      // Directly fetch categories to ensure immediate refresh
+      console.log('[Category Submit] Fetching categories...');
+      const res = await API.get('/inventory/categories?limit=1000');
+      console.log('[Category Submit] Received categories:', res.data?.length);
+      setCategories(res.data || []);
+      console.log('[Category Submit] Categories state updated');
     } catch (error) {
       console.error("Error submitting category:", error);
-      alert("Failed to submit category: " + (error.response?.data?.detail || error.message));
+      addNotification({ title: "Error", message: "Failed to submit category: " + (error.response?.data?.detail || error.message), type: "error" });
     }
   };
 
@@ -892,11 +899,11 @@ const Inventory = () => {
     if (!window.confirm("Are you sure you want to delete this category?")) return;
     try {
       await API.delete(`/inventory/categories/${id}`);
-      alert("Category deleted successfully");
+      addNotification({ title: "Success", message: "Category deleted successfully", type: "success" });
       fetchData();
     } catch (error) {
       console.error("Error deleting category:", error);
-      alert("Failed to delete category: " + (error.response?.data?.detail || error.message));
+      addNotification({ title: "Error", message: "Failed to delete category: " + (error.response?.data?.detail || error.message), type: "error" });
     }
   };
 
@@ -907,7 +914,7 @@ const Inventory = () => {
     // Validate account number match if bank transfer is selected
     if (vendorForm.preferred_payment_method === "Bank Transfer") {
       if (vendorForm.account_number !== vendorForm.account_number_confirm) {
-        alert("Account numbers do not match! Please verify.");
+        addNotification({ title: "Validation Error", message: "Account numbers do not match! Please verify.", type: "error" });
         return;
       }
       if (
@@ -915,11 +922,11 @@ const Inventory = () => {
         vendorForm.account_number.length < 9 ||
         vendorForm.account_number.length > 18
       ) {
-        alert("Account number must be 9-18 digits!");
+        addNotification({ title: "Validation Error", message: "Account number must be 9-18 digits!", type: "error" });
         return;
       }
       if (!vendorForm.ifsc_code || vendorForm.ifsc_code.length !== 11) {
-        alert("IFSC code must be exactly 11 characters!");
+        addNotification({ title: "Validation Error", message: "IFSC code must be exactly 11 characters!", type: "error" });
         return;
       }
     }
@@ -952,10 +959,10 @@ const Inventory = () => {
     try {
       if (editingVendor) {
         await API.put(`/inventory/vendors/${editingVendor.id}`, cleanedData);
-        alert("Vendor updated successfully!");
+        addNotification({ title: "Success", message: "Vendor updated successfully!", type: "success" });
       } else {
         await API.post("/inventory/vendors", cleanedData);
-        alert("Vendor created successfully!");
+        addNotification({ title: "Success", message: "Vendor created successfully!", type: "success" });
       }
 
       setVendorForm({
@@ -998,7 +1005,10 @@ const Inventory = () => {
       });
       setEditingVendor(null);
       setShowVendorForm(false);
-      fetchData();
+
+      // Directly fetch vendors to ensure immediate refresh
+      const res = await API.get('/inventory/vendors?limit=1000');
+      setVendors(res.data || []);
     } catch (error) {
       console.error("Error submitting vendor:", error);
       const errorMessage =
@@ -1006,7 +1016,7 @@ const Inventory = () => {
         error.response?.data?.message ||
         error.message ||
         "Failed to submit vendor";
-      alert(`Failed to submit vendor: ${errorMessage}`);
+      addNotification({ title: "Error", message: `Failed to submit vendor: ${errorMessage}`, type: "error" });
     }
   };
 
@@ -1054,7 +1064,7 @@ const Inventory = () => {
     try {
       // Validate required fields
       if (!purchaseForm.purchase_number || !purchaseForm.vendor_id) {
-        alert("Please fill in all required fields (PO Number and Vendor)");
+        addNotification({ title: "Validation Error", message: "Please fill in all required fields (PO Number and Vendor)", type: "error" });
         return;
       }
 
@@ -1096,7 +1106,7 @@ const Inventory = () => {
         });
 
       if (details.length === 0) {
-        alert("Please add at least one item to the purchase order");
+        addNotification({ title: "Validation Error", message: "Please add at least one item to the purchase order", type: "error" });
         return;
       }
 
@@ -1153,7 +1163,7 @@ const Inventory = () => {
         error.response?.data?.detail ||
         error.message ||
         "Failed to submit purchase";
-      alert(`Failed to submit purchase: ${errorMessage}`);
+      addNotification({ title: "Error", message: `Failed to submit purchase: ${errorMessage}`, type: "error" });
     }
   };
 
@@ -1254,7 +1264,7 @@ const Inventory = () => {
         }));
 
       if (details.length === 0) {
-        alert("Please add at least one item");
+        addNotification({ title: "Validation Error", message: "Please add at least one item", type: "error" });
         return;
       }
 
@@ -1266,7 +1276,7 @@ const Inventory = () => {
         details: details,
       });
 
-      alert("Requisition created successfully!");
+      addNotification({ title: "Success", message: "Requisition created successfully!", type: "success" });
       setShowRequisitionForm(false);
       setRequisitionForm({
         destination_department: "",
@@ -1286,10 +1296,11 @@ const Inventory = () => {
       fetchData();
     } catch (error) {
       console.error("Error creating requisition:", error);
-      alert(
-        "Failed to create requisition: " +
-        (error.response?.data?.detail || error.message),
-      );
+      addNotification({
+        title: "Error",
+        message: "Failed to create requisition: " + (error.response?.data?.detail || error.message),
+        type: "error"
+      });
     }
   };
 
@@ -1364,12 +1375,12 @@ const Inventory = () => {
         }));
 
       if (details.length === 0) {
-        alert("Please add at least one item");
+        addNotification({ title: "Validation Error", message: "Please add at least one item", type: "error" });
         return;
       }
 
       if (!issueForm.source_location_id || !issueForm.destination_location_id) {
-        alert("Please select source and destination locations");
+        addNotification({ title: "Validation Error", message: "Please select source and destination locations", type: "error" });
         return;
       }
 
@@ -1382,7 +1393,7 @@ const Inventory = () => {
         details: details,
       });
 
-      alert("Stock issue created successfully!");
+      addNotification({ title: "Success", message: "Stock issue created successfully!", type: "success" });
       setShowIssueForm(false);
       setIssueForm({
         requisition_id: "",
@@ -1404,10 +1415,11 @@ const Inventory = () => {
       fetchData();
     } catch (error) {
       console.error("Error creating issue:", error);
-      alert(
-        "Failed to create issue: " +
-        (error.response?.data?.detail || error.message),
-      );
+      addNotification({
+        title: "Error",
+        message: "Failed to create issue: " + (error.response?.data?.detail || error.message),
+        type: "error"
+      });
     }
   };
 
@@ -1422,7 +1434,7 @@ const Inventory = () => {
         (loc) => loc.is_inventory_point && loc.location_type === "warehouse",
       );
       if (!mainWarehouse) {
-        alert("Please create a main warehouse location first!");
+        addNotification({ title: "Validation Error", message: "Please create a main warehouse location first!", type: "error" });
         return;
       }
 
@@ -1468,14 +1480,15 @@ const Inventory = () => {
         details: issueDetails,
       });
 
-      alert("Requisition approved and stock issued successfully!");
+      addNotification({ title: "Success", message: "Requisition approved and stock issued successfully!", type: "success" });
       fetchData();
     } catch (error) {
       console.error("Error approving requisition:", error);
-      alert(
-        "Failed to approve requisition: " +
-        (error.response?.data?.detail || error.message),
-      );
+      addNotification({
+        title: "Error",
+        message: "Failed to approve requisition: " + (error.response?.data?.detail || error.message),
+        type: "error"
+      });
     }
   };
 
@@ -1519,7 +1532,7 @@ const Inventory = () => {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      alert("Waste log created successfully!");
+      addNotification({ title: "Success", message: "Waste log created successfully!", type: "success" });
       setShowWasteForm(false);
       setWasteForm({
         item_id: "",
@@ -1537,10 +1550,11 @@ const Inventory = () => {
       fetchData();
     } catch (error) {
       console.error("Error creating waste log:", error);
-      alert(
-        "Failed to create waste log: " +
-        (error.response?.data?.detail || error.message),
-      );
+      addNotification({
+        title: "Error",
+        message: "Failed to create waste log: " + (error.response?.data?.detail || error.message),
+        type: "error"
+      });
     }
   };
 
@@ -1561,7 +1575,7 @@ const Inventory = () => {
     e.preventDefault();
     try {
       await API.post("/inventory/locations", locationForm);
-      alert("Location created successfully!");
+      addNotification({ title: "Success", message: "Location created successfully!", type: "success" });
       setShowLocationForm(false);
       setLocationForm({
         name: "",
@@ -1577,10 +1591,11 @@ const Inventory = () => {
       fetchData();
     } catch (error) {
       console.error("Error creating location:", error);
-      alert(
-        "Failed to create location: " +
-        (error.response?.data?.detail || error.message),
-      );
+      addNotification({
+        title: "Error",
+        message: "Failed to create location: " + (error.response?.data?.detail || error.message),
+        type: "error"
+      });
     }
   };
 
@@ -1774,7 +1789,7 @@ const Inventory = () => {
           />
           <SummaryCard
             label="Total Value"
-            value={formatCurrency(summary.totalValue)}
+            value={formatIndianCurrencyCompact(summary.totalValue)}
             icon={<TrendingUp className="w-5 h-5" />}
             color="green"
           />
@@ -1806,7 +1821,7 @@ const Inventory = () => {
 
         {/* Tabs */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          <div className="flex border-b border-gray-200">
+          <div className="flex border-b border-gray-200 overflow-x-auto scrollbar-hide">
             {[
               "items",
               "categories",
@@ -1827,7 +1842,7 @@ const Inventory = () => {
                   setActiveTab(tab);
                   setSearchTerm("");
                 }}
-                className={`px-6 py-3 font-medium capitalize transition-colors ${activeTab === tab
+                className={`px-6 py-3 font-medium capitalize transition-colors whitespace-nowrap flex-shrink-0 ${activeTab === tab
                   ? "text-indigo-600 border-b-2 border-indigo-600"
                   : "text-gray-600 hover:text-gray-900"
                   }`}
@@ -7347,7 +7362,7 @@ const WasteLogFormModal = ({
   const wasteReasons = ["Expired", "Damaged", "Spilled", "Theft", "Taste Test"];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">
@@ -7581,7 +7596,7 @@ const LocationFormModal = ({ form, setForm, locations, onSubmit, onClose }) => {
   ];
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">Add Location</h2>
@@ -7788,7 +7803,7 @@ const AssetMappingFormModal = ({
   });
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">
@@ -7894,7 +7909,7 @@ const AssetMappingFormModal = ({
 // Requisition Details Modal
 const RequisitionDetailsModal = ({ requisition, items, onClose }) => {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -8055,7 +8070,7 @@ const RequisitionDetailsModal = ({ requisition, items, onClose }) => {
 // Issue Details Modal
 const IssueDetailsModal = ({ issue, items, locations, onClose }) => {
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -8203,7 +8218,7 @@ const WasteLogDetailsModal = ({ wasteLog, items, locations, onClose }) => {
   const location = locations.find((l) => l.id === wasteLog.location_id);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -8354,7 +8369,7 @@ const LocationDetailsModal = ({ location, locations, onClose }) => {
   );
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -8489,7 +8504,7 @@ const AssetDetailsModal = ({ asset, items, locations, onClose }) => {
   const location = locations.find((l) => l.id === asset.current_location_id);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-4 sm:p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
@@ -8673,7 +8688,7 @@ const RecipeFormModal = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-2 sm:p-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-2xl font-bold text-gray-800">
@@ -8922,3 +8937,5 @@ const RecipeFormModal = ({
 };
 
 export default Inventory;
+
+

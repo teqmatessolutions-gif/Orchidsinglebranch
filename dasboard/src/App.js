@@ -146,7 +146,7 @@ function App() {
             }
           />
           <Route
-            path="/package"
+            path="/packages"
             element={
               <ProtectedRoute requiredPermission="/package">
                 <Package />
