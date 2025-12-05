@@ -2591,7 +2591,7 @@ export default function ReportsDashboard() {
                             </div>
                           ) : (
                             <div className="text-center py-8 text-gray-500 bg-gray-50 rounded">
-                              No B2C Large invoices found (Inter-state invoices > ₹2.5L)
+                              No B2C Large invoices found (Inter-state invoices &gt; ₹2.5L)
                             </div>
                           )}
                         </div>
