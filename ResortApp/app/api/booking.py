@@ -752,7 +752,10 @@ def check_in_booking(
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
         raise HTTPException(status_code=404, detail="Booking not found")
-    if booking.status != "booked":
+    
+    # Normalize status to handle case variations and different separators (underscore vs hyphen)
+    normalized_status = (booking.status or "").strip().lower().replace("_", "-").replace(" ", "-")
+    if normalized_status != "booked":
         raise HTTPException(status_code=400, detail=f"Booking is not in 'booked' state. Current status: {booking.status}")
 
     # Save ID card image

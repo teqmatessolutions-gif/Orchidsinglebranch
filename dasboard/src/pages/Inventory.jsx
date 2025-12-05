@@ -632,6 +632,14 @@ const Inventory = () => {
       } else if (activeTab === "waste") {
         const res = await API.get(`/inventory/waste-logs?limit=${limit}`);
         setWasteLogs(res.data || []);
+        // Also fetch food items for waste form
+        try {
+          const foodRes = await API.get("/food-items");
+          setFoodItems(foodRes.data || []);
+        } catch (err) {
+          console.error("Failed to fetch food items:", err);
+        }
+
       } else if (activeTab === "locations") {
         // Always fetch locations to ensure fresh data after add/edit
         const res = await API.get("/inventory/locations?limit=10000");
@@ -1121,6 +1129,7 @@ const Inventory = () => {
         gst_number: purchaseForm.gst_number || null,
         payment_terms: purchaseForm.payment_terms || null,
         payment_status: purchaseForm.payment_status || "pending",
+        destination_location_id: purchaseForm.destination_location_id ? parseInt(purchaseForm.destination_location_id) : null,
         notes: purchaseForm.notes || null,
         status: purchaseForm.status || "draft",
         details: details,
@@ -1294,6 +1303,7 @@ const Inventory = () => {
         ],
       });
       fetchData();
+      fetchData();
     } catch (error) {
       console.error("Error creating requisition:", error);
       addNotification({
@@ -1423,6 +1433,16 @@ const Inventory = () => {
     }
   };
 
+  const handleRequisitionStatusChange = async (reqId, newStatus) => {
+    try {
+      await API.patch(`/inventory/requisitions/${reqId}`, { status: newStatus });
+      addNotification({ title: "Success", message: `Requisition status updated to ${newStatus}`, type: "success" });
+      fetchData();
+    } catch (error) {
+      addNotification({ title: "Error", message: "Failed to update status", type: "error" });
+    }
+  };
+
   const handleApproveRequisition = async (requisitionId) => {
     try {
       // Get requisition details first
@@ -1511,7 +1531,22 @@ const Inventory = () => {
     e.preventDefault();
     try {
       const formData = new FormData();
-      formData.append("item_id", wasteForm.item_id);
+
+      // Determine if this is a food item or inventory item
+      const isFoodItem = wasteForm.item_id && wasteForm.item_id.toString().startsWith('food_');
+
+      if (isFoodItem) {
+        // Extract food item ID (remove 'food_' prefix)
+        const foodItemId = wasteForm.item_id.replace('food_', '');
+        formData.append("food_item_id", foodItemId);
+        formData.append("is_food_item", "1");
+      } else {
+        if (wasteForm.item_id) {
+          formData.append("item_id", wasteForm.item_id);
+        }
+        formData.append("is_food_item", "0");
+      }
+
       if (wasteForm.batch_number)
         formData.append("batch_number", wasteForm.batch_number);
       if (wasteForm.expiry_date)
@@ -1523,8 +1558,7 @@ const Inventory = () => {
         formData.append("action_taken", wasteForm.action_taken);
       if (wasteForm.location_id)
         formData.append("location_id", wasteForm.location_id);
-      if (wasteForm.waste_date)
-        formData.append("waste_date", wasteForm.waste_date);
+      formData.append("waste_date", wasteForm.waste_date || getCurrentDateIST());
       if (wasteForm.notes) formData.append("notes", wasteForm.notes);
       if (wasteForm.photo) formData.append("photo", wasteForm.photo);
 
@@ -2005,6 +2039,7 @@ const Inventory = () => {
                       transactions={transactions}
                       purchases={purchases}
                       items={items}
+                      foodItems={foodItems}
                       categories={categories}
                       filters={transactionFilters}
                       setFilters={setTransactionFilters}
@@ -2018,6 +2053,7 @@ const Inventory = () => {
                       <TransactionDetailsModal
                         transaction={selectedTransaction}
                         items={items}
+                        foodItems={foodItems}
                         categories={categories}
                         purchases={purchases}
                         onClose={() => {
@@ -2093,17 +2129,22 @@ const Inventory = () => {
                                 </p>
                               )}
                             </div>
-                            {req.status === "pending" && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleApproveRequisition(req.id);
-                                }}
-                                className="mt-3 w-full px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+                            <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+                              <select
+                                value={req.status}
+                                onChange={(e) => handleRequisitionStatusChange(req.id, e.target.value)}
+                                className={`w-full px-3 py-2 text-sm border rounded-lg ${req.status === 'approved' ? 'bg-green-50 text-green-700 border-green-200' :
+                                  req.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                                    req.status === 'completed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                      'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                  }`}
                               >
-                                Approve & Issue
-                              </button>
-                            )}
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="completed">Completed</option>
+                              </select>
+                            </div>
                           </div>
                         ))
                       )}
@@ -2199,16 +2240,23 @@ const Inventory = () => {
                                   className="px-2 sm:px-4 py-3"
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  {req.status === "pending" && (
-                                    <button
-                                      onClick={() =>
-                                        handleApproveRequisition(req.id)
-                                      }
-                                      className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
-                                    >
-                                      Approve & Issue
-                                    </button>
-                                  )}
+                                  <select
+                                    value={req.status}
+                                    onChange={(e) => handleRequisitionStatusChange(req.id, e.target.value)}
+                                    className={`px-3 py-1 text-sm rounded border ${req.status === "approved"
+                                      ? "bg-green-100 text-green-800 border-green-300"
+                                      : req.status === "rejected"
+                                        ? "bg-red-100 text-red-800 border-red-300"
+                                        : req.status === "completed"
+                                          ? "bg-blue-100 text-blue-800 border-blue-300"
+                                          : "bg-yellow-100 text-yellow-800 border-yellow-300"
+                                      }`}
+                                  >
+                                    <option value="pending">Pending</option>
+                                    <option value="approved">Approved</option>
+                                    <option value="rejected">Rejected</option>
+                                    <option value="completed">Completed</option>
+                                  </select>
                                 </td>
                               </tr>
                             ))
@@ -2898,6 +2946,7 @@ const Inventory = () => {
           form={requisitionForm}
           setForm={setRequisitionForm}
           items={items}
+          foodItems={foodItems}
           onSubmit={handleRequisitionSubmit}
           onAddDetail={() => {
             setRequisitionForm({
@@ -2947,6 +2996,7 @@ const Inventory = () => {
           form={wasteForm}
           setForm={setWasteForm}
           items={items}
+          foodItems={foodItems}
           locations={locations || []}
           onSubmit={handleWasteSubmit}
           onClose={() => {
@@ -2994,6 +3044,7 @@ const Inventory = () => {
           form={assetMappingForm}
           setForm={setAssetMappingForm}
           items={items}
+          foodItems={foodItems}
           locations={locations}
           categories={categories}
           onSubmit={handleAssetMappingSubmit}
@@ -3196,8 +3247,10 @@ const Inventory = () => {
           form={purchaseForm}
           setForm={setPurchaseForm}
           items={items}
+          foodItems={foodItems}
           categories={categories}
           vendors={vendors}
+          locations={locations}
           purchases={purchases}
           onSubmit={handlePurchaseSubmit}
           onAddDetail={addPurchaseDetail}
@@ -3242,6 +3295,7 @@ const Inventory = () => {
           form={requisitionForm}
           setForm={setRequisitionForm}
           items={items}
+          foodItems={foodItems}
           onSubmit={handleRequisitionSubmit}
           onAddDetail={addRequisitionDetail}
           onRemoveDetail={removeRequisitionDetail}
@@ -3272,6 +3326,7 @@ const Inventory = () => {
           form={issueForm}
           setForm={setIssueForm}
           items={items}
+          foodItems={foodItems}
           locations={locations}
           requisitions={requisitions}
           onSubmit={handleIssueSubmit}
@@ -3306,6 +3361,7 @@ const Inventory = () => {
           form={wasteForm}
           setForm={setWasteForm}
           items={items}
+          foodItems={foodItems}
           locations={locations}
           onSubmit={handleWasteSubmit}
           onClose={() => {
@@ -3357,6 +3413,7 @@ const Inventory = () => {
           form={assetMappingForm}
           setForm={setAssetMappingForm}
           items={items}
+          foodItems={foodItems}
           locations={locations}
           categories={categories}
           onSubmit={handleAssetMappingSubmit}
@@ -3382,6 +3439,7 @@ const Inventory = () => {
         <RequisitionDetailsModal
           requisition={selectedRequisition}
           items={items}
+          foodItems={foodItems}
           onClose={() => {
             setShowRequisitionDetails(false);
             setSelectedRequisition(null);
@@ -3394,6 +3452,7 @@ const Inventory = () => {
         <IssueDetailsModal
           issue={selectedIssue}
           items={items}
+          foodItems={foodItems}
           locations={locations}
           onClose={() => {
             setShowIssueDetails(false);
@@ -3407,6 +3466,7 @@ const Inventory = () => {
         <WasteLogDetailsModal
           wasteLog={selectedWasteLog}
           items={items}
+          foodItems={foodItems}
           locations={locations}
           onClose={() => {
             setShowWasteLogDetails(false);
@@ -3432,6 +3492,7 @@ const Inventory = () => {
         <AssetDetailsModal
           asset={selectedAsset}
           items={items}
+          foodItems={foodItems}
           locations={locations}
           onClose={() => {
             setShowAssetDetails(false);
@@ -3458,6 +3519,7 @@ const Inventory = () => {
           setForm={setRecipeForm}
           foodItems={foodItems}
           items={items}
+          foodItems={foodItems}
           editingRecipe={editingRecipe}
           onSubmit={async (formData) => {
             try {
@@ -3509,9 +3571,11 @@ const SmartTransactionsTab = ({
   // Calculate dashboard metrics (all-time totals)
   const calculateMetrics = () => {
     // Total Purchases (from purchase masters - all time)
-    const totalPurchases = purchases.reduce((sum, p) => {
-      return sum + (parseFloat(p.total_amount) || 0);
-    }, 0);
+    const totalPurchases = purchases
+      .filter(p => p.status !== 'cancelled')
+      .reduce((sum, p) => {
+        return sum + (parseFloat(p.total_amount) || 0);
+      }, 0);
 
     // Kitchen Consumption (Usage transactions - all time)
     const kitchenUsage = transactions
@@ -5476,6 +5540,7 @@ const PurchaseFormModal = ({
   items,
   categories,
   vendors,
+  locations,
   purchases,
   onSubmit,
   onAddDetail,
@@ -5615,7 +5680,7 @@ const PurchaseFormModal = ({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">
             New Purchase Order
@@ -5746,6 +5811,29 @@ const PurchaseFormModal = ({
                 <option value="partial">Partial</option>
                 <option value="paid">Paid</option>
               </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Destination Location *
+              </label>
+              <select
+                value={form.destination_location_id || ""}
+                onChange={(e) => setForm({ ...form, destination_location_id: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                required
+              >
+                <option value="">Select Destination</option>
+                {locations
+                  .filter((loc) => loc.is_inventory_point)
+                  .map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name || `${loc.building} - ${loc.room_area}`}
+                    </option>
+                  ))}
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                Where items will be stored when received
+              </p>
             </div>
           </div>
 
@@ -6412,6 +6500,14 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
             </div>
             <div>
               <label className="text-xs font-medium text-gray-500">
+                Destination Location
+              </label>
+              <p className="text-sm font-semibold text-indigo-600 mt-1">
+                {purchase.destination_location_name || "Not specified"}
+              </p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500">
                 Purchase Date
               </label>
               <p className="text-sm text-gray-900 mt-1">
@@ -6459,6 +6555,16 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
 
           {/* Additional Information */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+            {purchase.destination_location_name && (
+              <div>
+                <label className="text-xs font-medium text-gray-500">
+                  Destination Location
+                </label>
+                <p className="text-sm text-gray-900 mt-1 font-medium text-indigo-600">
+                  {purchase.destination_location_name}
+                </p>
+              </div>
+            )}
             {purchase.expected_delivery_date && (
               <div>
                 <label className="text-xs font-medium text-gray-500">
@@ -6798,9 +6904,30 @@ const IssueFormModal = ({
               </label>
               <select
                 value={form.requisition_id}
-                onChange={(e) =>
-                  setForm({ ...form, requisition_id: e.target.value })
-                }
+                onChange={(e) => {
+                  const reqId = e.target.value;
+                  let newDetails = form.details;
+
+                  if (reqId) {
+                    const selectedReq = requisitions.find(r => r.id === parseInt(reqId));
+                    if (selectedReq?.details) {
+                      newDetails = selectedReq.details.map(detail => ({
+                        item_id: detail.item_id,
+                        issued_quantity: detail.requested_quantity || detail.approved_quantity,
+                        unit: detail.unit,
+                        cost: items.find(i => i.id === detail.item_id)?.unit_price || 0,
+                        notes: `From ${selectedReq.requisition_number}`,
+                        batch_lot_number: "",
+                      }));
+                    }
+                  }
+
+                  setForm({
+                    ...form,
+                    requisition_id: reqId,
+                    details: newDetails.length > 0 ? newDetails : form.details
+                  });
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               >
                 <option value="">None - Direct Issue</option>
@@ -7355,6 +7482,7 @@ const WasteLogFormModal = ({
   form,
   setForm,
   items = [],
+  foodItems = [],
   locations = [],
   onSubmit,
   onClose,
@@ -7381,26 +7509,49 @@ const WasteLogFormModal = ({
               Item *
             </label>
             <select
-              value={form.item_id}
+              value={form.item_id || form.food_item_id || ""}
               onChange={(e) => {
-                const item = items.find(
-                  (i) => i.id === parseInt(e.target.value),
-                );
-                setForm({
-                  ...form,
-                  item_id: e.target.value,
-                  unit: item?.unit || "pcs",
-                });
+                const value = e.target.value;
+                const type = e.target.selectedOptions[0]?.dataset.type;
+
+                if (type === 'food') {
+                  const foodItem = foodItems.find(i => i.id === parseInt(value));
+                  setForm({
+                    ...form,
+                    food_item_id: value,
+                    item_id: "",
+                    is_food_item: true,
+                    unit: foodItem?.unit || "pcs",
+                  });
+                } else {
+                  const item = items.find(i => i.id === parseInt(value));
+                  setForm({
+                    ...form,
+                    item_id: value,
+                    food_item_id: "",
+                    is_food_item: false,
+                    unit: item?.unit || "pcs",
+                  });
+                }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               required
             >
               <option value="">Select Item</option>
-              {items.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
+              <optgroup label="Inventory Items (Raw Materials)">
+                {items.map((item) => (
+                  <option key={`inv-${item.id}`} value={item.id} data-type="inventory">
+                    {item.name}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Food Items (Prepared Dishes)">
+                {foodItems.map((item) => (
+                  <option key={`food-${item.id}`} value={item.id} data-type="food">
+                    {item.name}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </div>
 

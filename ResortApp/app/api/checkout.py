@@ -1169,15 +1169,29 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
         # For regular bookings: calculate room charges as days * room price
         charges.room_charges = (room.price or 0) * stay_days
     
-    # Use actual check-in timestamp if available, otherwise fall back to check-in date at 00:00:00
-    # This provides strict bill scoping by check-in date AND time
-    if booking.checked_in_at:
-        check_in_datetime = booking.checked_in_at
-        print(f"[DEBUG] Using actual check-in timestamp: {check_in_datetime}")
+    # Determine start time for billing to include orders created before formal check-in
+    # 1. Start with booking check-in date at 00:00:00
+    check_in_datetime = datetime.combine(booking.check_in, datetime.min.time())
+    
+    # 2. Find the most recent checkout for this room to ensure we don't overlap with previous guest
+    # Exclude checkouts for the current booking
+    last_checkout_query = db.query(Checkout).filter(Checkout.room_number == room.number)
+    
+    if is_package:
+        last_checkout_query = last_checkout_query.filter(Checkout.package_booking_id != booking.id)
     else:
-        # Fallback for legacy bookings without checked_in_at timestamp
-        check_in_datetime = datetime.combine(booking.check_in, datetime.min.time())
-        print(f"[DEBUG] Using check-in date (legacy): {check_in_datetime}")
+        last_checkout_query = last_checkout_query.filter(Checkout.booking_id != booking.id)
+        
+    last_checkout = last_checkout_query.order_by(Checkout.checkout_date.desc()).first()
+    
+    if last_checkout and last_checkout.checkout_date:
+        # If last checkout was after the calculated start time, use it as the new start time
+        # This handles cases where previous guest checked out on the same day as new guest check-in
+        if last_checkout.checkout_date > check_in_datetime:
+            check_in_datetime = last_checkout.checkout_date
+            print(f"[DEBUG] Adjusted check-in datetime based on previous checkout: {check_in_datetime}")
+            
+    print(f"[DEBUG] Using billing start time: {check_in_datetime}")
 
     # Get food and service charges for THIS ROOM ONLY, filtered by check-in datetime
     # Include ALL food orders (both billed and unbilled) - show paid ones with zero amount
@@ -1191,11 +1205,11 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
                            .all())
     
     # Separate food orders by billing status:
-    # - Unbilled: billing_status is None, "unbilled" (add to bill)
+    # - Unbilled: billing_status is None, "unbilled", or "unpaid" (add to bill)
     # - Paid: billing_status is "paid" (show as paid, don't add to bill)
     # - Billed: billing_status is "billed" (already billed, show as paid)
     unbilled_food_order_items = [item for item in all_food_order_items 
-                                 if not item.order or item.order.billing_status == "unbilled" or item.order.billing_status is None]
+                                 if not item.order or item.order.billing_status in ["unbilled", "unpaid"] or item.order.billing_status is None]
     paid_food_order_items = [item for item in all_food_order_items 
                             if item.order and item.order.billing_status == "paid"]
     billed_food_order_items = [item for item in all_food_order_items 
@@ -1482,16 +1496,46 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
         # For regular bookings: calculate room charges as number of rooms * days * room price
         charges.room_charges = sum((room.price or 0) * stay_days for room in all_rooms)
     
+    # Determine start time for billing to include orders created before formal check-in
+    # 1. Start with booking check-in date at 00:00:00
+    check_in_datetime = datetime.combine(booking.check_in, datetime.min.time())
+    
+    # 2. Find the most recent checkout for ANY of the rooms to ensure we don't overlap with previous guest
+    # This is a bit complex for multiple rooms, but we can take the latest checkout timestamp across all rooms
+    # excluding the current booking.
+    
+    # Get room numbers
+    room_numbers = [r.number for r in all_rooms]
+    
+    last_checkout_query = db.query(Checkout).filter(Checkout.room_number.in_(room_numbers))
+    
+    if is_package:
+        last_checkout_query = last_checkout_query.filter(Checkout.package_booking_id != booking.id)
+    else:
+        last_checkout_query = last_checkout_query.filter(Checkout.booking_id != booking.id)
+        
+    last_checkout = last_checkout_query.order_by(Checkout.checkout_date.desc()).first()
+    
+    if last_checkout and last_checkout.checkout_date:
+        if last_checkout.checkout_date > check_in_datetime:
+            check_in_datetime = last_checkout.checkout_date
+            print(f"[DEBUG] Adjusted check-in datetime based on previous checkout: {check_in_datetime}")
+            
+    print(f"[DEBUG] Using billing start time: {check_in_datetime}")
+
     # Sum up additional food and service charges from all rooms
     # Include ALL food orders (both billed and unbilled) - show paid ones with zero amount
     all_food_order_items = (db.query(FoodOrderItem)
                            .join(FoodOrder)
                            .options(joinedload(FoodOrderItem.food_item), joinedload(FoodOrderItem.order))
-                           .filter(FoodOrder.room_id.in_(room_ids))
+                           .filter(
+                               FoodOrder.room_id.in_(room_ids),
+                               FoodOrder.created_at >= check_in_datetime
+                           )
                            .all())
 
     # Separate billed and unbilled items
-    # Unbilled: billing_status is None, "unbilled", or anything other than "billed"
+    # Unbilled: billing_status is None, "unbilled", "unpaid", or anything other than "billed"
     # Billed: billing_status is explicitly "billed"
     unbilled_food_order_items = [item for item in all_food_order_items 
                                  if not item.order or item.order.billing_status != "billed"]

@@ -294,6 +294,7 @@ class PurchaseMasterBase(BaseModel):
     gst_number: Optional[str] = None
     payment_terms: Optional[str] = None
     payment_status: str = "pending"
+    destination_location_id: Optional[int] = None
     notes: Optional[str] = None
     status: str = "draft"
 
@@ -329,6 +330,7 @@ class PurchaseMasterOut(PurchaseMasterBase):
     created_by_name: Optional[str] = None
     vendor_name: Optional[str] = None
     vendor_gst: Optional[str] = None
+    destination_location_name: Optional[str] = None
     created_at: datetime
     updated_at: datetime
     details: List[PurchaseDetailOut] = []

@@ -163,9 +163,18 @@ def delete_food_order(db: Session, order_id: int):
 def update_food_order_status(db: Session, order_id: int, status: str):
     order = db.query(FoodOrder).filter(FoodOrder.id == order_id).first()
     if order:
+        old_status = order.status
         order.status = status
         db.commit()
         db.refresh(order)
+        
+        # Process inventory usage if completed
+        if old_status != "completed" and status == "completed":
+            try:
+                from app.curd.inventory import process_food_order_usage
+                process_food_order_usage(db, order.id)
+            except Exception as e:
+                print(f"Failed to process inventory usage: {e}")
         
         # Send notification
         try:
@@ -188,7 +197,17 @@ def update_food_order(db: Session, order_id: int, update_data: FoodOrderUpdate):
     if update_data.assigned_employee_id is not None:
         order.assigned_employee_id = update_data.assigned_employee_id
     if update_data.status is not None:
+        old_status = order.status
         order.status = update_data.status
+        
+        # Process inventory usage if completed
+        if old_status != "completed" and update_data.status == "completed":
+            try:
+                from app.curd.inventory import process_food_order_usage
+                process_food_order_usage(db, order.id)
+            except Exception as e:
+                print(f"Failed to process inventory usage: {e}")
+
         # If completing a room service order, create a service request
         if update_data.status == "completed" and order.order_type == "room_service":
             # Check if service request already exists
@@ -215,6 +234,8 @@ def update_food_order(db: Session, order_id: int, update_data: FoodOrderUpdate):
 
     if update_data.billing_status is not None:
         order.billing_status = update_data.billing_status
+    if update_data.payment_method is not None:
+        order.payment_method = update_data.payment_method
     if update_data.order_type is not None:
         order.order_type = update_data.order_type
     if update_data.delivery_request is not None:

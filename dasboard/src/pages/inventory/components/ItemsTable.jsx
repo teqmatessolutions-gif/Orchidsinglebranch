@@ -75,10 +75,10 @@ const ItemsTable = ({ items, categories, onDelete, onEdit }) => {
                                     {item.min_stock_level}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600">
-                                    {formatCurrency(item.unit_price)}
+                                    {item.unit_price != null ? formatCurrency(item.unit_price) : "-"}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600">
-                                    {formatCurrency(item.current_stock * item.unit_price)}
+                                    {item.unit_price != null ? formatCurrency(item.current_stock * item.unit_price) : "-"}
                                 </td>
                                 <td className="px-4 py-3 text-sm">
                                     {item.is_low_stock ? (

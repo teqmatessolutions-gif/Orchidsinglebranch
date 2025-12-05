@@ -413,6 +413,20 @@ def create_purchase(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Debug logging to file
+    import datetime
+    with open("purchase_debug.log", "a") as f:
+        f.write(f"\n=== {datetime.datetime.now()} ===\n")
+        f.write(f"[DEBUG CREATE_PURCHASE] Received purchase data:\n")
+        f.write(f"  Status: {purchase.status}\n")
+        f.write(f"  Destination Location ID: {purchase.destination_location_id}\n")
+        f.write(f"  Details count: {len(purchase.details)}\n")
+    
+    print(f"[DEBUG CREATE_PURCHASE] Received purchase data:")
+    print(f"  Status: {purchase.status}")
+    print(f"  Destination Location ID: {purchase.destination_location_id}")
+    print(f"  Details count: {len(purchase.details)}")
+    
     created = inventory_crud.create_purchase_master(db, purchase, created_by=current_user.id)
     
     # Auto-update item prices from purchase details if purchase is confirmed/received
@@ -431,6 +445,93 @@ def create_purchase(
             import traceback
             print(f"Warning: Could not auto-update item prices: {str(e)}\\n{traceback.format_exc()}")
             # Don't fail the purchase creation
+    
+    # Update stock and location stock if purchase is received
+    with open("purchase_debug.log", "a") as f:
+        f.write(f"Checking if status is 'received': purchase.status = '{purchase.status}'\n")
+    
+    if purchase.status == "received":
+        with open("purchase_debug.log", "a") as f:
+            f.write(f"ENTERING stock update block for received purchase\n")
+        
+        try:
+            from app.models.inventory import InventoryItem, InventoryTransaction, LocationStock
+            
+            with open("purchase_debug.log", "a") as f:
+                f.write(f"Details count in created object: {len(created.details)}\n")
+            
+            for detail in created.details:
+                with open("purchase_debug.log", "a") as f:
+                    f.write(f"Processing detail: item_id={detail.item_id}, qty={detail.quantity}\n")
+                
+                if not detail.item_id:
+                    with open("purchase_debug.log", "a") as f:
+                        f.write(f"  Skipping - no item_id\n")
+                    continue
+                
+                item = db.query(InventoryItem).filter(InventoryItem.id == detail.item_id).first()
+                if not item:
+                    continue
+                
+                # Weighted average cost
+                old_stock = item.current_stock or 0
+                old_price = item.unit_price or 0
+                old_value = old_stock * old_price
+                
+                new_stock = detail.quantity
+                new_price = detail.unit_price
+                new_value = new_stock * new_price
+                
+                total_stock = old_stock + new_stock
+                total_value = old_value + new_value
+                
+                item.current_stock = total_stock
+                if total_stock > 0:
+                    item.unit_price = round(total_value / total_stock, 2)
+                
+                print(f"[CREATE-RECEIVED] {item.name}: Stock {old_stock}→{total_stock}, Cost ₹{old_price}→₹{item.unit_price}")
+                
+                # Location stock
+                print(f"[DEBUG] purchase.destination_location_id = {purchase.destination_location_id}")
+                if purchase.destination_location_id:
+                    print(f"[DEBUG] Creating/updating location stock for location {purchase.destination_location_id}, item {detail.item_id}")
+                    location_stock = db.query(LocationStock).filter(
+                        LocationStock.location_id == purchase.destination_location_id,
+                        LocationStock.item_id == detail.item_id
+                    ).first()
+                    
+                    if location_stock:
+                        print(f"[DEBUG] Updating existing location stock, old qty: {location_stock.quantity}")
+                        location_stock.quantity += detail.quantity
+                    else:
+                        print(f"[DEBUG] Creating new location stock with qty: {detail.quantity}")
+                        location_stock = LocationStock(
+                            location_id=purchase.destination_location_id,
+                            item_id=detail.item_id,
+                            quantity=detail.quantity
+                        )
+                        db.add(location_stock)
+                else:
+                    print(f"[DEBUG] No destination location specified, skipping location stock")
+                
+                # Transaction
+                transaction = InventoryTransaction(
+                    item_id=detail.item_id,
+                    transaction_type="in",
+                    quantity=detail.quantity,
+                    unit_price=detail.unit_price,
+                    total_amount=detail.unit_price * detail.quantity,
+                    reference_number=created.purchase_number,
+                    notes=f"Purchase received: {created.purchase_number}",
+                    created_by=current_user.id
+                )
+                db.add(transaction)
+            
+            db.commit()
+        except Exception as e:
+            import traceback
+            print(f"Warning: Could not update stock for received purchase: {str(e)}\\n{traceback.format_exc()}")
+            db.rollback()
     
     # Automatically create journal entry for purchase (Scenario 1)
     # Only create if purchase is confirmed/received (not draft)
@@ -527,11 +628,19 @@ def get_purchases(
             })
         # Get user separately (not in relationship, but only once per purchase)
         user = db.query(User).filter(User.id == purchase.created_by).first()
+        # Get destination location if set
+        location_name = None
+        if purchase.destination_location_id:
+            from app.models.inventory import Location
+            location = db.query(Location).filter(Location.id == purchase.destination_location_id).first()
+            if location:
+                location_name = location.name or f"{location.building} - {location.room_area}"
         result.append({
             **purchase.__dict__,
             "vendor_name": vendor.name if vendor else None,
             "vendor_gst": vendor.gst_number if vendor else None,
             "created_by_name": user.name if user else None,
+            "destination_location_name": location_name,
             "details": details
         })
     return result
@@ -563,11 +672,20 @@ def get_purchase(purchase_id: int, db: Session = Depends(get_db), current_user: 
             "item_name": item.name if item else None
         })
     
+    # Get destination location name
+    location_name = None
+    if purchase.destination_location_id:
+        from app.models.inventory import Location
+        location = db.query(Location).filter(Location.id == purchase.destination_location_id).first()
+        if location:
+            location_name = location.name or f"{location.building} - {location.room_area}"
+    
     return {
         **purchase.__dict__,
         "vendor_name": vendor.name if vendor else None,
         "vendor_gst": vendor.gst_number if vendor else None,
         "created_by_name": user.name if user else None,
+        "destination_location_name": location_name,
         "details": details
     }
 
@@ -579,30 +697,124 @@ def update_purchase(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    from app.models.inventory import InventoryItem, InventoryTransaction, LocationStock
+    
+    purchase = inventory_crud.get_purchase_by_id(db, purchase_id)
+    if not purchase:
+        raise HTTPException(status_code=404, detail="Purchase not found")
+    
+    old_status = purchase.status
+    new_status = purchase_update.status if hasattr(purchase_update, 'status') else old_status
+    
     updated = inventory_crud.update_purchase_master(db, purchase_id, purchase_update)
     if not updated:
-        # Check if it exists first
-        exists = inventory_crud.get_purchase_by_id(db, purchase_id)
-        if not exists:
-            raise HTTPException(status_code=404, detail="Purchase not found")
-        else:
-            raise HTTPException(status_code=400, detail="Cannot update purchase in current status (only draft or confirmed allowed for full update)")
+        raise HTTPException(status_code=400, detail="Cannot update purchase")
+    
+    # CASE 1: Purchase RECEIVED
+    if new_status == "received" and old_status != "received":
+        for detail in updated.details:
+            if not detail.item_id:
+                continue
             
-    # Auto-update item prices if status is confirmed/received
-    if updated.status in ["confirmed", "received"]:
-        try:
-            from app.models.inventory import InventoryItem
-            for detail in updated.details:
-                if detail.item_id and detail.unit_price:
-                    item = db.query(InventoryItem).filter(InventoryItem.id == detail.item_id).first()
-                    if item:
-                        item.unit_price = detail.unit_price
-                        print(f"[AUTO-UPDATE] Updated item {item.name} (ID: {item.id}) unit_price to {detail.unit_price}")
-            db.commit()
-        except Exception as e:
-            print(f"Warning: Could not auto-update item prices: {str(e)}")
-
-    # Return full response with details
+            item = db.query(InventoryItem).filter(InventoryItem.id == detail.item_id).first()
+            if not item:
+                continue
+            
+            # Weighted average cost
+            old_stock = item.current_stock or 0
+            old_price = item.unit_price or 0
+            old_value = old_stock * old_price
+            
+            new_stock = detail.quantity
+            new_price = detail.unit_price
+            new_value = new_stock * new_price
+            
+            total_stock = old_stock + new_stock
+            total_value = old_value + new_value
+            
+            item.current_stock = total_stock
+            if total_stock > 0:
+                item.unit_price = round(total_value / total_stock, 2)
+            
+            print(f"[RECEIVED] {item.name}: Stock {old_stock}→{total_stock}, Cost ₹{old_price}→₹{item.unit_price}")
+            
+            # Location stock
+            if updated.destination_location_id:
+                location_stock = db.query(LocationStock).filter(
+                    LocationStock.location_id == updated.destination_location_id,
+                    LocationStock.item_id == detail.item_id
+                ).first()
+                
+                if location_stock:
+                    location_stock.quantity += detail.quantity
+                else:
+                    location_stock = LocationStock(
+                        location_id=updated.destination_location_id,
+                        item_id=detail.item_id,
+                        quantity=detail.quantity
+                    )
+                    db.add(location_stock)
+            
+            # Transaction
+            transaction = InventoryTransaction(
+                item_id=detail.item_id,
+                transaction_type="in",
+                quantity=detail.quantity,
+                unit_price=detail.unit_price,
+                total_amount=detail.unit_price * detail.quantity,
+                reference_number=updated.purchase_number,
+                notes=f"Purchase received: {updated.purchase_number}",
+                created_by=current_user.id
+            )
+            db.add(transaction)
+    
+    # CASE 2: Purchase CANCELLED
+    elif new_status == "cancelled" and old_status == "received":
+        for detail in updated.details:
+            if not detail.item_id:
+                continue
+            
+            item = db.query(InventoryItem).filter(InventoryItem.id == detail.item_id).first()
+            if not item:
+                continue
+            
+            old_stock = item.current_stock
+            new_stock = max(0, old_stock - detail.quantity)
+            
+            old_value = old_stock * item.unit_price
+            cancelled_value = detail.quantity * detail.unit_price
+            remaining_value = old_value - cancelled_value
+            
+            item.current_stock = new_stock
+            if new_stock > 0:
+                item.unit_price = round(remaining_value / new_stock, 2)
+            
+            print(f"[CANCELLED] {item.name}: Stock {old_stock}→{new_stock}")
+            
+            if updated.destination_location_id:
+                location_stock = db.query(LocationStock).filter(
+                    LocationStock.location_id == updated.destination_location_id,
+                    LocationStock.item_id == detail.item_id
+                ).first()
+                
+                if location_stock:
+                    location_stock.quantity -= detail.quantity
+                    if location_stock.quantity <= 0:
+                        db.delete(location_stock)
+            
+            transaction = InventoryTransaction(
+                item_id=detail.item_id,
+                transaction_type="out",
+                quantity=detail.quantity,
+                unit_price=detail.unit_price,
+                total_amount=detail.unit_price * detail.quantity,
+                reference_number=updated.purchase_number,
+                notes=f"Purchase cancelled: {updated.purchase_number}",
+                created_by=current_user.id
+            )
+            db.add(transaction)
+    
+    db.commit()
     return get_purchase(purchase_id, db, current_user)
 
 
@@ -1065,14 +1277,17 @@ def update_issue_detail(
 # Waste Log Endpoints
 @router.post("/waste-logs", response_model=WasteLogOut)
 def create_waste_log(
-    item_id: int = Form(...),
-    location_id: Optional[int] = Form(None),
+    item_id: Optional[str] = Form(None),
+    food_item_id: Optional[str] = Form(None),
+    is_food_item: Optional[str] = Form(None),
+    location_id: Optional[str] = Form(None),
     batch_number: Optional[str] = Form(None),
     expiry_date: Optional[str] = Form(None),
-    quantity: float = Form(...),
+    quantity: str = Form(...),
     unit: str = Form(...),
     reason_code: str = Form(...),
     action_taken: Optional[str] = Form(None),
+    waste_date: Optional[str] = Form(None),
     notes: Optional[str] = Form(None),
     photo: Optional[UploadFile] = File(None),
     db: Session = Depends(get_db),
@@ -1080,15 +1295,26 @@ def create_waste_log(
 ):
     try:
         from datetime import datetime as dt
+        
+        # Manual conversion
+        parsed_item_id = int(item_id) if item_id and item_id.strip() else None
+        parsed_food_item_id = int(food_item_id) if food_item_id and food_item_id.strip() else None
+        parsed_location_id = int(location_id) if location_id and location_id.strip() else None
+        parsed_quantity = float(quantity)
+        parsed_is_food = is_food_item in ["true", "True", "1", "on"] if is_food_item else False
+
         waste_data = {
-            "item_id": item_id,
-            "location_id": int(location_id) if location_id else None,
+            "item_id": parsed_item_id,
+            "food_item_id": parsed_food_item_id,
+            "is_food_item": parsed_is_food,
+            "location_id": parsed_location_id,
             "batch_number": batch_number,
             "expiry_date": dt.strptime(expiry_date, "%Y-%m-%d").date() if expiry_date else None,
-            "quantity": quantity,
+            "quantity": parsed_quantity,
             "unit": unit,
             "reason_code": reason_code,
             "action_taken": action_taken if action_taken else None,
+            "waste_date": dt.strptime(waste_date, "%Y-%m-%d") if waste_date else dt.now(),
             "notes": notes,
         }
         
@@ -1252,32 +1478,53 @@ def get_location_items(
     current_user: User = Depends(get_current_user)
 ):
     """Get all inventory items and their stock levels for a specific location"""
-    from app.models.inventory import InventoryItem, AssetMapping, AssetRegistry, StockIssueDetail, StockIssue
+    from app.models.inventory import InventoryItem, AssetMapping, AssetRegistry, StockIssueDetail, StockIssue, LocationStock
     from sqlalchemy import func
     
     location = inventory_crud.get_location_by_id(db, location_id)
     if not location:
         raise HTTPException(status_code=404, detail="Location not found")
     
-    # Get items assigned to this location via asset mappings
+    # 1. Get items from LocationStock (Primary Source for bulk items)
+    location_stocks = db.query(LocationStock).filter(
+        LocationStock.location_id == location_id
+    ).all()
+    
+    # 2. Get items assigned to this location via asset mappings
     asset_mappings = db.query(AssetMapping).filter(
         AssetMapping.location_id == location_id,
         AssetMapping.is_active == True
     ).all()
     
-    # Get items from asset registry
+    # 3. Get items from asset registry
     asset_registry = db.query(AssetRegistry).filter(
         AssetRegistry.current_location_id == location_id
-    ).all()
-    
-    # Get items issued to this location (stock transfers)
-    issues_to_location = db.query(StockIssueDetail).join(StockIssue).filter(
-        StockIssue.destination_location_id == location_id
     ).all()
     
     # Combine all items
     items_dict = {}
     
+    # Add items from LocationStock
+    for stock in location_stocks:
+        item = stock.item
+        if item:
+            key = f"stock_{item.id}"
+            category = inventory_crud.get_category_by_id(db, item.category_id)
+            items_dict[key] = {
+                "item_id": item.id,
+                "item_name": item.name,
+                "item_code": item.item_code,
+                "category_name": category.name if category else None,
+                "unit": item.unit,
+                "current_stock": stock.quantity, # Location specific stock
+                "location_stock": stock.quantity, # Alias for frontend
+                "min_stock_level": item.min_stock_level,
+                "unit_price": item.unit_price,
+                "total_value": stock.quantity * (item.unit_price or 0),
+                "source": "Stock",
+                "last_updated": stock.last_updated
+            }
+
     # Add items from asset mappings
     for mapping in asset_mappings:
         item = inventory_crud.get_item_by_id(db, mapping.item_id)
@@ -1291,22 +1538,24 @@ def get_location_items(
                     "item_code": item.item_code,
                     "category_name": category.name if category else None,
                     "unit": item.unit,
-                    "current_stock": item.current_stock,
+                    "current_stock": 1, # Assets are usually 1 per mapping
                     "min_stock_level": item.min_stock_level,
                     "unit_price": item.unit_price,
-                    "location_stock": 0,  # For fixed assets, count is 1
-                    "stock_value": item.unit_price if item.unit_price else 0,
-                    "type": "asset",
+                    "total_value": item.unit_price or 0,
+                    "source": "Asset Mapping",
                     "serial_number": mapping.serial_number,
-                    "is_low_stock": item.current_stock <= item.min_stock_level if item.min_stock_level else False
+                    "assigned_date": mapping.assigned_date
                 }
-            items_dict[key]["location_stock"] += 1
-    
+            else:
+                # If already exists (e.g. multiple assets of same type), increment count
+                items_dict[key]["current_stock"] += 1
+                items_dict[key]["total_value"] += (item.unit_price or 0)
+
     # Add items from asset registry
     for asset in asset_registry:
-        item = inventory_crud.get_item_by_id(db, asset.item_id)
+        item = asset.item
         if item:
-            key = f"registry_{item.id}_{asset.id}"
+            key = f"registry_{asset.id}" # Unique per asset instance
             category = inventory_crud.get_category_by_id(db, item.category_id)
             items_dict[key] = {
                 "item_id": item.id,
@@ -1314,188 +1563,36 @@ def get_location_items(
                 "item_code": item.item_code,
                 "category_name": category.name if category else None,
                 "unit": item.unit,
-                "current_stock": item.current_stock,
+                "current_stock": 1,
                 "min_stock_level": item.min_stock_level,
                 "unit_price": item.unit_price,
-                "location_stock": 1,
-                "stock_value": item.unit_price if item.unit_price else 0,
-                "type": "asset",
-                "asset_tag_id": asset.asset_tag_id,
+                "total_value": item.unit_price or 0,
+                "source": "Asset Registry",
                 "serial_number": asset.serial_number,
-                "status": asset.status,
-                "is_low_stock": item.current_stock <= item.min_stock_level if item.min_stock_level else False
+                "asset_tag": asset.asset_tag_id,
+                "status": asset.status
             }
     
-    # Add items from stock issues (consumables/stock transfers)
-    # Track complimentary and payable quantities separately
-    for issue_detail in issues_to_location:
-        item = inventory_crud.get_item_by_id(db, issue_detail.item_id)
-        if item:
-            key = f"stock_{item.id}"
-            # Check if this issue detail is payable and paid (from notes)
-            is_payable = issue_detail.notes and "payable" in issue_detail.notes.lower()
-            is_paid = issue_detail.notes and "PAID" in issue_detail.notes.upper()
-            issue_detail_id = issue_detail.id
-            issue_id = issue_detail.issue_id
-            quantity = issue_detail.issued_quantity or 0
-            
-            if key not in items_dict:
-                category = inventory_crud.get_category_by_id(db, item.category_id)
-                items_dict[key] = {
-                    "item_id": item.id,
-                    "item_name": item.name,
-                    "item_code": item.item_code,
-                    "category_name": category.name if category else None,
-                    "unit": item.unit,
-                    "current_stock": item.current_stock,
-                    "min_stock_level": item.min_stock_level,
-                    "unit_price": item.unit_price,
-                    "location_stock": 0,
-                    "complimentary_qty": 0,
-                    "payable_qty": 0,
-                    "stock_value": 0,
-                    "type": "consumable",
-                    "is_low_stock": item.current_stock <= item.min_stock_level if item.min_stock_level else False,
-                    "is_payable": is_payable,
-                    "is_paid": is_paid,
-                    "issue_detail_id": issue_detail_id,
-                    "issue_id": issue_id,
-                    "notes": issue_detail.notes or "",
-                    "issue_details": []  # Store all issue details for this item
-                }
-            
-            # Track quantities separately
-            if is_payable:
-                items_dict[key]["payable_qty"] = (items_dict[key].get("payable_qty", 0) or 0) + quantity
-            else:
-                items_dict[key]["complimentary_qty"] = (items_dict[key].get("complimentary_qty", 0) or 0) + quantity
-            
-            # Update total location stock
-            items_dict[key]["location_stock"] = (items_dict[key].get("location_stock", 0) or 0) + quantity
-            
-            # Store issue detail info
-            if "issue_details" not in items_dict[key]:
-                items_dict[key]["issue_details"] = []
-            items_dict[key]["issue_details"].append({
-                "issue_detail_id": issue_detail_id,
-                "issue_id": issue_id,
-                "quantity": quantity,
-                "is_payable": is_payable,
-                "is_paid": is_paid,
-                "notes": issue_detail.notes or ""
-            })
-            
-            # Update stock value (only for payable items)
-            if is_payable:
-                unit_price = item.unit_price or 0
-                items_dict[key]["stock_value"] = (items_dict[key].get("stock_value", 0) or 0) + (quantity * unit_price)
-    
-    # Get room usage information (services used, guest info) if this is a guest room
-    room_usage = None
-    if location.location_type == "GUEST_ROOM":
-        try:
-            from app.models.room import Room
-            from app.models.service import AssignedService
-            from app.models.booking import Booking, BookingRoom
-            from app.models.Package import PackageBooking, PackageBookingRoom
-            
-            # Find room by location
-            room = db.query(Room).filter(Room.inventory_location_id == location_id).first()
-            
-            if room:
-                # Get assigned services for this room
-                assigned_services = db.query(AssignedService).options(
-                    joinedload(AssignedService.service),
-                    joinedload(AssignedService.employee)
-                ).filter(AssignedService.room_id == room.id).order_by(AssignedService.assigned_at.desc()).limit(10).all()
-                
-                # Get current guest information
-                current_guest = None
-                booking_info = None
-                
-                # Check regular bookings
-                booking_room = db.query(BookingRoom).join(Booking).filter(
-                    BookingRoom.room_id == room.id,
-                    Booking.status.in_(['checked-in', 'checked_in', 'booked'])
-                ).first()
-                
-                if booking_room and booking_room.booking:
-                    current_guest = booking_room.booking.guest_name
-                    booking_info = {
-                        "guest_name": booking_room.booking.guest_name,
-                        "guest_mobile": booking_room.booking.guest_mobile,
-                        "guest_email": booking_room.booking.guest_email,
-                        "check_in": booking_room.booking.check_in.isoformat() if booking_room.booking.check_in else None,
-                        "check_out": booking_room.booking.check_out.isoformat() if booking_room.booking.check_out else None,
-                        "booking_type": "booking",
-                        "booking_id": booking_room.booking.id
-                    }
-                else:
-                    # Check package bookings
-                    pkg_booking_room = db.query(PackageBookingRoom).join(PackageBooking).filter(
-                        PackageBookingRoom.room_id == room.id,
-                        PackageBooking.status.in_(['checked-in', 'checked_in', 'booked'])
-                    ).first()
-                    
-                    if pkg_booking_room and pkg_booking_room.package_booking:
-                        current_guest = pkg_booking_room.package_booking.guest_name
-                        booking_info = {
-                            "guest_name": pkg_booking_room.package_booking.guest_name,
-                            "guest_mobile": pkg_booking_room.package_booking.guest_mobile,
-                            "guest_email": pkg_booking_room.package_booking.guest_email,
-                            "check_in": pkg_booking_room.package_booking.check_in.isoformat() if pkg_booking_room.package_booking.check_in else None,
-                            "check_out": pkg_booking_room.package_booking.check_out.isoformat() if pkg_booking_room.package_booking.check_out else None,
-                            "booking_type": "package",
-                            "booking_id": pkg_booking_room.package_booking.id
-                        }
-                
-                # Format services
-                services_list = []
-                total_service_charges = 0.0
-                for ass in assigned_services:
-                    if ass.service:
-                        services_list.append({
-                            "service_id": ass.service.id,
-                            "service_name": ass.service.name,
-                            "charges": ass.service.charges,
-                            "status": ass.status.value if hasattr(ass.status, 'value') else str(ass.status),
-                            "billing_status": ass.billing_status,
-                            "assigned_at": ass.assigned_at.isoformat() if ass.assigned_at else None,
-                            "last_used_at": ass.last_used_at.isoformat() if ass.last_used_at else None,
-                            "employee_name": ass.employee.name if ass.employee else None
-                        })
-                        total_service_charges += ass.service.charges or 0
-                
-                room_usage = {
-                    "room_number": room.number,
-                    "room_id": room.id,
-                    "current_guest": current_guest,
-                    "booking_info": booking_info,
-                    "services_used": services_list,
-                    "total_services": len(services_list),
-                    "total_service_charges": total_service_charges
-                }
-        except Exception as e:
-            import traceback
-            print(f"[WARNING] Could not fetch room usage for location {location_id}: {str(e)}")
-            print(traceback.format_exc())
-            room_usage = None
+        
+    # Calculate totals
+    items_list = list(items_dict.values())
+    total_items = sum(item["current_stock"] for item in items_list)
+    total_value = sum(item["total_value"] for item in items_list)
     
     return {
         "location": {
             "id": location.id,
             "name": location.name,
-            "location_code": location.location_code,
             "building": location.building,
             "floor": location.floor,
             "room_area": location.room_area,
             "location_type": location.location_type
         },
-        "items": list(items_dict.values()),
-        "total_items": len(items_dict),
-        "total_stock_value": sum(item["stock_value"] for item in items_dict.values()),
-        "room_usage": room_usage  # Added room usage information
+        "total_items": total_items,
+        "total_stock_value": total_value,
+        "items": items_list
     }
+
 
 
 @router.get("/stock-by-location")
@@ -1504,7 +1601,7 @@ def get_stock_by_location(
     current_user: User = Depends(get_current_user)
 ):
     """Get inventory stock summary grouped by location"""
-    from app.models.inventory import Location, AssetMapping, AssetRegistry, StockIssueDetail, StockIssue
+    from app.models.inventory import Location, AssetMapping, AssetRegistry, StockIssueDetail, StockIssue, LocationStock
     from sqlalchemy import func
     
     try:
@@ -1513,7 +1610,7 @@ def get_stock_by_location(
         
         for location in locations:
             try:
-                # Count assets in this location
+                # 1. Count assets in this location
                 asset_count = db.query(AssetMapping).filter(
                     AssetMapping.location_id == location.id,
                     AssetMapping.is_active == True
@@ -1523,27 +1620,44 @@ def get_stock_by_location(
                     AssetRegistry.current_location_id == location.id
                 ).count()
                 
-                # Get stock issues to this location
+                # 2. Get items from LocationStock (PRIMARY source for bulk items)
+                location_stocks = db.query(LocationStock).filter(
+                    LocationStock.location_id == location.id
+                ).all()
+                
+                total_stock_value = 0
+                items_count = 0
+                
+                # Calculate from LocationStock
+                for stock in location_stocks:
+                    item = stock.item
+                    if item and stock.quantity > 0:
+                        items_count += 1
+                        total_stock_value += stock.quantity * (item.unit_price or 0)
+                
+                # 3. Get stock issues to this location (legacy/fallback)
                 issues = db.query(StockIssueDetail).join(StockIssue).filter(
                     StockIssue.destination_location_id == location.id
                 ).all()
                 
-                total_stock_value = 0
-                items_dict = {}  # Track unique items and their total quantities
+                items_dict = {}  # Track unique items from issues
                 
                 for issue_detail in issues:
                     item = inventory_crud.get_item_by_id(db, issue_detail.item_id)
                     if item:
-                        # StockIssueDetail has 'issued_quantity' field
                         qty = getattr(issue_detail, 'issued_quantity', 0) or 0
                         if qty > 0:
-                            # Sum quantities for the same item
                             if issue_detail.item_id not in items_dict:
                                 items_dict[issue_detail.item_id] = 0
                             items_dict[issue_detail.item_id] += qty
-                            total_stock_value += qty * (item.unit_price or 0)
+                            # Only add to value if not already in LocationStock
+                            if not any(s.item_id == issue_detail.item_id for s in location_stocks):
+                                total_stock_value += qty * (item.unit_price or 0)
                 
-                items_count = len(items_dict)  # Count unique items
+                # Add unique items from issues that aren't in LocationStock
+                for item_id in items_dict:
+                    if not any(s.item_id == item_id for s in location_stocks):
+                        items_count += 1
                 
                 result.append({
                     **location.__dict__,
@@ -1785,3 +1899,86 @@ def update_asset_registry(
         "current_location_name": f"{location.building} - {location.room_area}" if location else None
     }
 
+
+# Stock Requisition Endpoints
+@router.post("/requisitions", response_model=StockRequisitionOut)
+def create_stock_requisition(
+    requisition: StockRequisitionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return inventory_crud.create_stock_requisition(db, requisition, requested_by_id=current_user.id)
+
+
+@router.get("/requisitions", response_model=List[StockRequisitionOut])
+def get_stock_requisitions(
+    skip: int = 0,
+    limit: int = 100,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return inventory_crud.get_all_stock_requisitions(db, skip=skip, limit=limit, status=status)
+
+
+@router.get("/requisitions/{requisition_id}", response_model=StockRequisitionOut)
+def get_stock_requisition(
+    requisition_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    requisition = inventory_crud.get_stock_requisition_by_id(db, requisition_id)
+    if not requisition:
+        raise HTTPException(status_code=404, detail="Requisition not found")
+    return requisition
+
+
+@router.patch("/requisitions/{requisition_id}", response_model=StockRequisitionOut)
+def update_stock_requisition(
+    requisition_id: int,
+    update_data: StockRequisitionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # For now, we only support status update via this endpoint or specific fields
+    # If status is in update_data, use the status update logic
+    if update_data.status:
+        return inventory_crud.update_stock_requisition_status(
+            db, requisition_id, update_data.status, approved_by_id=current_user.id if update_data.status == "approved" else None
+        )
+    return inventory_crud.get_stock_requisition_by_id(db, requisition_id)
+
+
+@router.patch("/requisitions/{requisition_id}/status", response_model=StockRequisitionOut)
+def update_stock_requisition_status(
+    requisition_id: int,
+    status: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    updated = inventory_crud.update_stock_requisition_status(
+        db, requisition_id, status, approved_by_id=current_user.id if status == "approved" else None
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Requisition not found")
+    return updated
+
+
+# Stock Issue Endpoints
+@router.post("/issues", response_model=StockIssueOut)
+def create_stock_issue(
+    issue: StockIssueCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return inventory_crud.create_stock_issue(db, issue, issued_by_id=current_user.id)
+
+
+@router.get("/issues", response_model=List[StockIssueOut])
+def get_stock_issues(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    return inventory_crud.get_all_stock_issues(db, skip=skip, limit=limit)

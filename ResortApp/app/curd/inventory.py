@@ -8,7 +8,8 @@ from app.models.inventory import (
     StockRequisition, StockRequisitionDetail, StockIssue, StockIssueDetail, WasteLog, Location, AssetMapping
 )
 from app.schemas.inventory import (
-    InventoryCategoryCreate, InventoryCategoryUpdate, InventoryItemCreate, InventoryItemUpdate, VendorCreate, PurchaseMasterCreate, PurchaseMasterUpdate
+    InventoryCategoryCreate, InventoryCategoryUpdate, InventoryItemCreate, InventoryItemUpdate, VendorCreate, PurchaseMasterCreate, PurchaseMasterUpdate,
+    StockRequisitionCreate, StockRequisitionUpdate, StockIssueCreate
 )
 
 
@@ -600,49 +601,81 @@ def generate_waste_log_number(db: Session):
 
 def create_waste_log(db: Session, data: dict, reported_by: int):
     from app.models.inventory import WasteLog, InventoryTransaction, InventoryItem
+    from app.models.food import FoodItem
     from datetime import datetime
     
-    item = get_item_by_id(db, data["item_id"])
-    if not item:
-        raise ValueError("Item not found")
+    is_food = data.get("is_food_item", False)
     
-    # Check stock availability
-    if item.current_stock < data["quantity"]:
-        raise ValueError(f"Insufficient stock for {item.name}. Available: {item.current_stock}, Reported: {data['quantity']}")
-    
-    log_number = generate_waste_log_number(db)
-    waste_log = WasteLog(
-        log_number=log_number,
-        item_id=data["item_id"],
-        location_id=data.get("location_id"),
-        batch_number=data.get("batch_number"),
-        expiry_date=data.get("expiry_date"),
-        quantity=data["quantity"],
-        unit=data["unit"],
-        reason_code=data["reason_code"],
-        action_taken=data.get("action_taken"),
-        photo_path=data.get("photo_path"),
-        notes=data.get("notes"),
-        reported_by=reported_by,
-        waste_date=data.get("waste_date", datetime.utcnow()),
-    )
-    db.add(waste_log)
-    
-    # Deduct stock
-    item.current_stock -= data["quantity"]
-    
-    # Create transaction record
-    transaction = InventoryTransaction(
-        item_id=data["item_id"],
-        transaction_type="out",
-        quantity=data["quantity"],
-        unit_price=item.unit_price,
-        total_amount=item.unit_price * data["quantity"] if item.unit_price else None,
-        reference_number=log_number,
-        notes=f"Waste/Spoilage: {data['reason_code']} - {data.get('notes', '')}",
-        created_by=reported_by
-    )
-    db.add(transaction)
+    if is_food:
+        food_item_id = data.get("food_item_id")
+        if not food_item_id:
+            raise ValueError("Food item ID is required for food waste")
+        
+        food_item = db.query(FoodItem).filter(FoodItem.id == food_item_id).first()
+        if not food_item:
+            raise ValueError("Food item not found")
+        
+        log_number = generate_waste_log_number(db)
+        waste_log = WasteLog(
+            log_number=log_number,
+            food_item_id=food_item_id,
+            is_food_item=True,
+            location_id=data.get("location_id"),
+            quantity=data["quantity"],
+            unit=data["unit"],
+            reason_code=data["reason_code"],
+            action_taken=data.get("action_taken"),
+            photo_path=data.get("photo_path"),
+            notes=data.get("notes"),
+            reported_by=reported_by,
+            waste_date=data.get("waste_date", datetime.utcnow()),
+        )
+        db.add(waste_log)
+        
+    else:
+        item_id = data.get("item_id")
+        if not item_id:
+            raise ValueError("Item ID is required for inventory waste")
+        
+        item = get_item_by_id(db, item_id)
+        if not item:
+            raise ValueError("Item not found")
+        
+        if item.current_stock < data["quantity"]:
+            raise ValueError(f"Insufficient stock for {item.name}. Available: {item.current_stock}, Reported: {data['quantity']}")
+        
+        log_number = generate_waste_log_number(db)
+        waste_log = WasteLog(
+            log_number=log_number,
+            item_id=item_id,
+            is_food_item=False,
+            location_id=data.get("location_id"),
+            batch_number=data.get("batch_number"),
+            expiry_date=data.get("expiry_date"),
+            quantity=data["quantity"],
+            unit=data["unit"],
+            reason_code=data["reason_code"],
+            action_taken=data.get("action_taken"),
+            photo_path=data.get("photo_path"),
+            notes=data.get("notes"),
+            reported_by=reported_by,
+            waste_date=data.get("waste_date", datetime.utcnow()),
+        )
+        db.add(waste_log)
+        
+        item.current_stock -= data["quantity"]
+        
+        transaction = InventoryTransaction(
+            item_id=item_id,
+            transaction_type="out",
+            quantity=data["quantity"],
+            unit_price=item.unit_price,
+            total_amount=item.unit_price * data["quantity"] if item.unit_price else None,
+            reference_number=log_number,
+            notes=f"Waste/Spoilage: {data['reason_code']} - {data.get('notes', '')}",
+            created_by=reported_by
+        )
+        db.add(transaction)
     
     db.commit()
     db.refresh(waste_log)
@@ -828,3 +861,153 @@ def delete_asset_registry(db: Session, asset_id: int):
     db.commit()
     return asset
 
+
+# Stock Requisition CRUD
+def create_stock_requisition(db: Session, data: StockRequisitionCreate, requested_by_id: int):
+    # Create master
+    requisition_data = data.dict(exclude={"details"})
+    requisition = StockRequisition(**requisition_data, requested_by=requested_by_id)
+    
+    # Generate requisition number (REQ-YYYYMMDD-XXX)
+    today_str = datetime.now().strftime("%Y%m%d")
+    count = db.query(StockRequisition).filter(StockRequisition.requisition_number.like(f"REQ-{today_str}-%")).count()
+    requisition.requisition_number = f"REQ-{today_str}-{count + 1:03d}"
+    
+    db.add(requisition)
+    db.flush()  # Get ID
+    
+    # Create details
+    for detail_data in data.details:
+        detail = StockRequisitionDetail(**detail_data.dict(), requisition_id=requisition.id)
+        db.add(detail)
+    
+    db.commit()
+    db.refresh(requisition)
+    return requisition
+
+
+def get_all_stock_requisitions(db: Session, skip: int = 0, limit: int = 100, status: Optional[str] = None):
+    query = db.query(StockRequisition).options(
+        joinedload(StockRequisition.details).joinedload(StockRequisitionDetail.item),
+        joinedload(StockRequisition.requester)
+    )
+    if status:
+        query = query.filter(StockRequisition.status == status)
+    return query.order_by(StockRequisition.created_at.desc()).offset(skip).limit(limit).all()
+
+
+def get_stock_requisition_by_id(db: Session, requisition_id: int):
+    return db.query(StockRequisition).options(
+        joinedload(StockRequisition.details).joinedload(StockRequisitionDetail.item),
+        joinedload(StockRequisition.requester)
+    ).filter(StockRequisition.id == requisition_id).first()
+
+
+def update_stock_requisition_status(db: Session, requisition_id: int, status: str, approved_by_id: Optional[int] = None):
+    requisition = get_stock_requisition_by_id(db, requisition_id)
+    if not requisition:
+        return None
+    
+    requisition.status = status
+    if status == "approved" and approved_by_id:
+        requisition.approved_by = approved_by_id
+        requisition.approved_at = datetime.utcnow()
+    
+    db.commit()
+    db.refresh(requisition)
+    return requisition
+
+
+# Stock Issue CRUD
+def create_stock_issue(db: Session, data: StockIssueCreate, issued_by_id: int):
+    # Create master
+    issue_data = data.dict(exclude={"details"})
+    issue = StockIssue(**issue_data, issued_by=issued_by_id)
+    
+    # Generate issue number (ISS-YYYYMMDD-XXX)
+    today_str = datetime.now().strftime("%Y%m%d")
+    count = db.query(StockIssue).filter(StockIssue.issue_number.like(f"ISS-{today_str}-%")).count()
+    issue.issue_number = f"ISS-{today_str}-{count + 1:03d}"
+    
+    db.add(issue)
+    db.flush()
+    
+    # Create details and update stock
+    for detail_data in data.details:
+        detail = StockIssueDetail(**detail_data.dict(), issue_id=issue.id)
+        db.add(detail)
+        
+        # Update stock (deduct from source)
+        # Note: This logic assumes simple item stock. For location-based stock, we need more complex logic.
+        # For now, we'll update the global item stock as a fallback, 
+        # but ideally we should update LocationStock if implemented.
+        update_item_stock(db, detail.item_id, detail.issued_quantity, "out")
+    
+    db.commit()
+    db.refresh(issue)
+    return issue
+
+
+def get_all_stock_issues(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(StockIssue).options(
+        joinedload(StockIssue.details).joinedload(StockIssueDetail.item),
+        joinedload(StockIssue.source_location),
+        joinedload(StockIssue.destination_location),
+        joinedload(StockIssue.issuer)
+    ).order_by(StockIssue.created_at.desc()).offset(skip).limit(limit).all()
+
+
+def process_food_order_usage(db: Session, order_id: int):
+    """
+    Deduct inventory stock based on food order items and their recipes.
+    Should be called when order status changes to 'completed'.
+    """
+    from app.models.foodorder import FoodOrder
+    from app.models.recipe import Recipe
+    
+    order = db.query(FoodOrder).filter(FoodOrder.id == order_id).first()
+    if not order or not order.items:
+        return
+    
+    # Group total ingredient usage across all items in the order
+    ingredient_usage = {} # item_id -> quantity
+    
+    for order_item in order.items:
+        # Find recipe for this food item
+        recipe = db.query(Recipe).filter(Recipe.food_item_id == order_item.food_item_id).first()
+        
+        if recipe and recipe.ingredients:
+            servings = recipe.servings or 1
+            multiplier = order_item.quantity / servings
+            
+            for ingredient in recipe.ingredients:
+                qty_needed = ingredient.quantity * multiplier
+                
+                if ingredient.inventory_item_id in ingredient_usage:
+                    ingredient_usage[ingredient.inventory_item_id] += qty_needed
+                else:
+                    ingredient_usage[ingredient.inventory_item_id] = qty_needed
+    
+    # Deduct stock and create transactions
+    for item_id, quantity in ingredient_usage.items():
+        item = get_item_by_id(db, item_id)
+        if not item:
+            continue
+            
+        # Deduct stock
+        item.current_stock -= quantity
+        
+        # Create transaction
+        transaction = InventoryTransaction(
+            item_id=item_id,
+            transaction_type="out", # Using 'out' as it is standard in this system
+            quantity=quantity,
+            unit_price=item.unit_price,
+            total_amount=item.unit_price * quantity if item.unit_price else None,
+            reference_number=f"ORD-{order_id}",
+            notes=f"Food Order #{order_id} Consumption",
+            created_by=order.assigned_employee_id
+        )
+        db.add(transaction)
+    
+    db.commit()

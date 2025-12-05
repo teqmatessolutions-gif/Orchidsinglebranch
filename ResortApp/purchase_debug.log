@@ -1,0 +1,10 @@
+
+=== 2025-12-05 02:55:17.950531 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 1
+  Details count: 1
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 1
+Processing detail: item_id=3, qty=123.0

@@ -175,12 +175,14 @@ class PurchaseMaster(Base):
     total_amount = Column(Numeric(10, 2), default=0.0, nullable=False)
     notes = Column(Text, nullable=True)
     status = Column(String, default="draft", nullable=False)  # draft, confirmed, received, cancelled
+    destination_location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)  # Where items will be stored
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     vendor = relationship("Vendor", back_populates="purchases")
     details = relationship("PurchaseDetail", back_populates="purchase_master", cascade="all, delete-orphan")
+    destination_location = relationship("Location", foreign_keys=[destination_location_id])
     user = relationship("User", foreign_keys=[created_by])
 
 
@@ -307,7 +309,9 @@ class WasteLog(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     log_number = Column(String, unique=True, nullable=True, index=True)  # Unique ID
-    item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=False)
+    item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=True)  # Made nullable
+    food_item_id = Column(Integer, ForeignKey("food_items.id"), nullable=True)  # NEW
+    is_food_item = Column(Boolean, default=False, nullable=False)  # NEW
     location_id = Column(Integer, ForeignKey("locations.id"), nullable=True)  # Where did it spoil?
     batch_number = Column(String, nullable=True)  # Links to specific Purchase Batch
     expiry_date = Column(Date, nullable=True)
@@ -321,7 +325,8 @@ class WasteLog(Base):
     waste_date = Column(DateTime, default=datetime.utcnow, nullable=False)  # When the waste occurred
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
-    item = relationship("InventoryItem")
+    item = relationship("InventoryItem", foreign_keys=[item_id])
+    food_item = relationship("FoodItem", foreign_keys=[food_item_id])  # NEW
     location = relationship("Location")
     reporter = relationship("User", foreign_keys=[reported_by])
 
@@ -388,4 +393,17 @@ class AssetMapping(Base):
     item = relationship("InventoryItem")
     location = relationship("Location", back_populates="asset_mappings")
     assigner = relationship("User", foreign_keys=[assigned_by])
+
+
+class LocationStock(Base):
+    __tablename__ = "location_stocks"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    location_id = Column(Integer, ForeignKey("locations.id"), nullable=False)
+    item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=False)
+    quantity = Column(Float, default=0, nullable=False)
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    location = relationship("Location")
+    item = relationship("InventoryItem")
 

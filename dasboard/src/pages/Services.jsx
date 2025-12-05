@@ -355,15 +355,47 @@ const Services = () => {
   };
 
   const handleDeleteService = async (serviceId) => {
-    if (!window.confirm("Are you sure you want to delete this service? This action cannot be undone.")) {
+    if (!window.confirm("Are you sure you want to delete this service? It will be marked as inactive.")) {
       return;
     }
     try {
-      await api.delete(`/services/${serviceId}`);
+      // Soft delete: Mark service as inactive instead of deleting
+      // First, get the current service data
+      const service = services.find(s => s.id === serviceId);
+      if (!service) {
+        alert("Service not found");
+        return;
+      }
+
+      // Use PUT to update the service with is_active = false
+      const formData = new FormData();
+      formData.append('name', service.name);
+      formData.append('description', service.description);
+      formData.append('charges', service.charges);
+      formData.append('is_visible_to_guest', service.is_visible_to_guest ? 'true' : 'false');
+      formData.append('is_active', 'false'); // Mark as inactive
+      if (service.average_completion_time) {
+        formData.append('average_completion_time', service.average_completion_time);
+      }
+
+      // Include existing inventory items
+      if (service.inventory_items && service.inventory_items.length > 0) {
+        const inventoryItems = service.inventory_items.map(item => ({
+          inventory_item_id: item.id,
+          quantity: item.quantity || 1
+        }));
+        formData.append('inventory_items', JSON.stringify(inventoryItems));
+      }
+
+      await api.put(`/services/${serviceId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
       if (editingServiceId === serviceId) {
         resetServiceForm();
       }
       fetchAll();
+      alert("Service has been marked as inactive.");
     } catch (err) {
       console.error("Failed to delete service", err);
       const errorMsg = err.response?.data?.detail || err.message || "Unknown error";

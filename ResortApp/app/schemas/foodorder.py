@@ -29,6 +29,7 @@ class FoodOrderOut(BaseModel):
     status: str
     assigned_employee_id: int
     billing_status: str 
+    payment_method: Optional[str] = None
     order_type: Optional[str] = "dine_in"
     delivery_request: Optional[str] = None
     items: List[FoodOrderItemOut]
@@ -44,6 +45,7 @@ class FoodOrderUpdate(BaseModel):
     assigned_employee_id: Optional[int] = None
     status: Optional[str] = None
     billing_status: Optional[str] = None
+    payment_method: Optional[str] = None
     order_type: Optional[str] = None
     delivery_request: Optional[str] = None
     items: Optional[List[FoodOrderItemCreate]] = None

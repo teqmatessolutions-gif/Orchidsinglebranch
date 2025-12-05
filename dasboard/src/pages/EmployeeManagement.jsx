@@ -1196,7 +1196,6 @@ const EmployeeListAndForm = () => {
         await api.post("/employees", data, authHeader());
       }
       fetchEmployees();
-      fetchUsers(); // Refresh users list
       resetForm();
     } catch (err) {
       const errorMessage = err.response?.data?.detail || "An error occurred while saving the employee.";
@@ -1242,7 +1241,6 @@ const EmployeeListAndForm = () => {
       data.append("is_active", String(!emp.is_active)); // Convert to string for FormData
       await api.put(`/employees/${emp.id}`, data, authHeader());
       fetchEmployees();
-      fetchUsers(); // Refresh users list
     } catch (err) {
       const errorMessage = err.response?.data?.detail || "An error occurred while updating employee status.";
       console.error("Error updating employee:", err.response || err);
