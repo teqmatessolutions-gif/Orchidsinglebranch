@@ -472,6 +472,7 @@ def create_assigned_service(db: Session, assigned: AssignedServiceCreate):
                             unit_price=item.unit_price,
                             total_amount=item.unit_price * quantity if item.unit_price else None,
                             reference_number=f"SVC-ASSIGN-{db_assigned.id}",
+                            department=item.category.parent_department if item.category else "Housekeeping",
                             notes=f"Service Assignment: {service.name} - Employee: {employee.name} - Room: {room.number}",
                             created_by=None
                         )
@@ -680,6 +681,7 @@ def update_assigned_service_status(db: Session, assigned_id: int, update_data: A
                             unit_price=item.unit_price,
                             total_amount=item.unit_price * quantity_returned if item.unit_price else None,
                             reference_number=f"SVC-RETURN-{assigned_id}",
+                            department=item.category.parent_department if item.category else "Housekeeping",
                             notes=f"Return from Service Completion: {assigned.service.name if assigned.service else 'Unknown'} - {return_item.notes or 'Service completed'}",
                             created_by=None
                         )

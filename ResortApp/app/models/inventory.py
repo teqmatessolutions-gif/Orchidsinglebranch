@@ -219,6 +219,7 @@ class InventoryTransaction(Base):
     total_amount = Column(Float, nullable=True)
     reference_number = Column(String, nullable=True)  # PO number, invoice, etc.
     purchase_master_id = Column(Integer, ForeignKey("purchase_masters.id"), nullable=True)
+    department = Column(String, nullable=True)  # Department that consumed/used the inventory (Restaurant, Housekeeping, etc.)
     notes = Column(Text, nullable=True)
     created_by = Column(Integer, ForeignKey("users.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

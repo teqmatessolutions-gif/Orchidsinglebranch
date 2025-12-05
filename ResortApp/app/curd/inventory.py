@@ -1005,6 +1005,7 @@ def process_food_order_usage(db: Session, order_id: int):
             unit_price=item.unit_price,
             total_amount=item.unit_price * quantity if item.unit_price else None,
             reference_number=f"ORD-{order_id}",
+            department=item.category.parent_department if item.category else "Restaurant",
             notes=f"Food Order #{order_id} Consumption",
             created_by=order.assigned_employee_id
         )
