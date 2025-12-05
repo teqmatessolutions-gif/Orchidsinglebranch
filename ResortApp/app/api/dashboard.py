@@ -626,8 +626,12 @@ def get_summary(period: str = "all", db: Session = Depends(get_db), current_user
                         InventoryTransaction.department == dept
                     ).with_entities(func.sum(InventoryTransaction.total_amount)).scalar() or 0
                     
+                    # Store regular expenses separately (before adding inventory)
+                    regular_expenses = expense_value
+                    
                     # Add inventory consumption to operational expenses
-                    operational_expenses = expense_value + (float(inventory_consumption) if inventory_consumption else 0)
+                    inventory_consumption_cost = float(inventory_consumption) if inventory_consumption else 0
+                    operational_expenses = expense_value + inventory_consumption_cost
                     
                     # Calculate capital investment (inventory purchases for this department)
                     capital_investment = 0
@@ -658,15 +662,19 @@ def get_summary(period: str = "all", db: Session = Depends(get_db), current_user
                     print(f"Error calculating expenses for {dept}: {e}")
                     expense_value = 0
                     operational_expenses = 0
+                    regular_expenses = 0
+                    inventory_consumption_cost = 0
                     capital_investment = 0
                 
-                # Store department KPIs with separate capital and operational tracking
+                # Store department KPIs with detailed breakdown
                 department_kpis[dept] = {
                     "assets": float(assets_value),
                     "income": income_value,
-                    "expenses": expense_value,  # Operational expenses only
-                    "operational_expenses": operational_expenses,
-                    "capital_investment": capital_investment
+                    "expenses": expense_value,  # Total operational expenses
+                    "regular_expenses": regular_expenses,  # From Expense table
+                    "inventory_consumption": inventory_consumption_cost,  # From consumed inventory
+                    "operational_expenses": operational_expenses,  # regular + inventory
+                    "capital_investment": capital_investment  # Inventory purchases
                 }
             except Exception as e:
                 # Skip this department if there's an error
