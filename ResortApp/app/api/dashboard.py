@@ -613,6 +613,22 @@ def get_summary(period: str = "all", db: Session = Depends(get_db), current_user
                         float(category_based_expenses) if category_based_expenses else 0,
                         float(direct_category_expenses) if direct_category_expenses else 0
                     )
+                    
+                    # ADD INVENTORY CONSUMPTION COSTS
+                    # Get inventory consumption for this department
+                    from app.models.inventory import InventoryTransaction
+                    inventory_consumption_query = apply_date_filter(
+                        db.query(InventoryTransaction), 
+                        InventoryTransaction.created_at
+                    )
+                    inventory_consumption = inventory_consumption_query.filter(
+                        InventoryTransaction.transaction_type == "out",
+                        InventoryTransaction.department == dept
+                    ).with_entities(func.sum(InventoryTransaction.total_amount)).scalar() or 0
+                    
+                    # Add inventory consumption to expenses
+                    expense_value += float(inventory_consumption) if inventory_consumption else 0
+                    
                 except Exception as e:
                     print(f"Error calculating expenses for {dept}: {e}")
                     expense_value = 0
