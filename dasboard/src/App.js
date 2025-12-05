@@ -50,8 +50,8 @@ const getRouterBasename = () => {
 function App() {
   const basename = getRouterBasename();
   return (
-    <NotificationProvider>
-      <Router basename={basename}>
+    <Router basename={basename}>
+      <NotificationProvider>
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/dashboard" element={
@@ -210,9 +210,9 @@ function App() {
             }
           />
         </Routes>
-      </Router>
-      <Toaster position="top-right" />
-    </NotificationProvider>
+        <Toaster position="top-right" />
+      </NotificationProvider>
+    </Router>
   );
 }
 
