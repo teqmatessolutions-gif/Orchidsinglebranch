@@ -626,18 +626,47 @@ def get_summary(period: str = "all", db: Session = Depends(get_db), current_user
                         InventoryTransaction.department == dept
                     ).with_entities(func.sum(InventoryTransaction.total_amount)).scalar() or 0
                     
-                    # Add inventory consumption to expenses
-                    expense_value += float(inventory_consumption) if inventory_consumption else 0
+                    # Add inventory consumption to operational expenses
+                    operational_expenses = expense_value + (float(inventory_consumption) if inventory_consumption else 0)
+                    
+                    # Calculate capital investment (inventory purchases for this department)
+                    capital_investment = 0
+                    try:
+                        from app.models.inventory import PurchaseMaster, PurchaseDetail
+                        purchase_query = apply_date_filter(
+                            db.query(PurchaseDetail).join(PurchaseMaster),
+                            PurchaseMaster.purchase_date
+                        )
+                        # Join with InventoryItem and InventoryCategory to filter by department
+                        dept_purchases = purchase_query.join(
+                            InventoryItem, PurchaseDetail.item_id == InventoryItem.id
+                        ).join(
+                            InventoryCategory, InventoryItem.category_id == InventoryCategory.id
+                        ).filter(
+                            InventoryCategory.parent_department == dept
+                        ).with_entities(func.sum(PurchaseDetail.total_amount)).scalar() or 0
+                        
+                        capital_investment = float(dept_purchases) if dept_purchases else 0
+                    except Exception as e:
+                        print(f"Error calculating capital investment for {dept}: {e}")
+                        capital_investment = 0
+                    
+                    # For backward compatibility, expenses = operational expenses only
+                    expense_value = operational_expenses
                     
                 except Exception as e:
                     print(f"Error calculating expenses for {dept}: {e}")
                     expense_value = 0
+                    operational_expenses = 0
+                    capital_investment = 0
                 
-                # Store department KPIs
+                # Store department KPIs with separate capital and operational tracking
                 department_kpis[dept] = {
                     "assets": float(assets_value),
                     "income": income_value,
-                    "expenses": expense_value
+                    "expenses": expense_value,  # Operational expenses only
+                    "operational_expenses": operational_expenses,
+                    "capital_investment": capital_investment
                 }
             except Exception as e:
                 # Skip this department if there's an error
