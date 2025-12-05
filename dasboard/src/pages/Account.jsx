@@ -863,8 +863,8 @@ export default function ReportsDashboard() {
             <button
               onClick={() => setActiveMainTab("reports")}
               className={`px-4 py-2 font-medium ${activeMainTab === "reports"
-                  ? "border-b-2 border-indigo-600 text-indigo-600"
-                  : "text-gray-600 hover:text-gray-800"
+                ? "border-b-2 border-indigo-600 text-indigo-600"
+                : "text-gray-600 hover:text-gray-800"
                 }`}
             >
               <TrendingUp className="inline mr-2" size={18} />
@@ -873,8 +873,8 @@ export default function ReportsDashboard() {
             <button
               onClick={() => setActiveMainTab("accounting")}
               className={`px-4 py-2 font-medium ${activeMainTab === "accounting"
-                  ? "border-b-2 border-indigo-600 text-indigo-600"
-                  : "text-gray-600 hover:text-gray-800"
+                ? "border-b-2 border-indigo-600 text-indigo-600"
+                : "text-gray-600 hover:text-gray-800"
                 }`}
             >
               <BookOpen className="inline mr-2" size={18} />
@@ -966,14 +966,37 @@ export default function ReportsDashboard() {
                             ₹<CountUp end={data.income || 0} duration={1.5} decimals={2} separator="," />
                           </span>
                         </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-600 flex items-center gap-2">
-                            <TrendingDown className="text-red-500 w-4 h-4" />
-                            Expenses
-                          </span>
-                          <span className="text-lg font-bold text-red-600">
-                            ₹<CountUp end={data.expenses || 0} duration={1.5} decimals={2} separator="," />
-                          </span>
+                        <div className="pt-2 border-t border-gray-100">
+                          <p className="text-xs font-semibold text-gray-500 mb-2 uppercase">Expenses</p>
+                          <div className="space-y-1 pl-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-600 flex items-center gap-1">
+                                <FileText className="text-orange-400 w-3 h-3" />
+                                Regular Expenses
+                              </span>
+                              <span className="text-sm font-semibold text-orange-600">
+                                ₹<CountUp end={data.regular_expenses || 0} duration={1.5} decimals={2} separator="," />
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-600 flex items-center gap-1">
+                                <Package className="text-red-400 w-3 h-3" />
+                                Inventory Consumed
+                              </span>
+                              <span className="text-sm font-semibold text-red-600">
+                                ₹<CountUp end={data.inventory_consumption || 0} duration={1.5} decimals={2} separator="," />
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-600 flex items-center gap-1">
+                                <ShoppingCart className="text-purple-400 w-3 h-3" />
+                                Capital Investment
+                              </span>
+                              <span className="text-sm font-semibold text-purple-600">
+                                ₹<CountUp end={data.capital_investment || 0} duration={1.5} decimals={2} separator="," />
+                              </span>
+                            </div>
+                          </div>
                         </div>
                         <div className="mt-3 pt-3 border-t border-gray-200">
                           <div className="flex items-center justify-between">
@@ -1150,8 +1173,8 @@ export default function ReportsDashboard() {
               <button
                 onClick={() => setActiveAccountingTab("chart-of-accounts")}
                 className={`px-4 py-2 font-medium ${activeAccountingTab === "chart-of-accounts"
-                    ? "border-b-2 border-indigo-600 text-indigo-600"
-                    : "text-gray-600 hover:text-gray-800"
+                  ? "border-b-2 border-indigo-600 text-indigo-600"
+                  : "text-gray-600 hover:text-gray-800"
                   }`}
               >
                 <BookOpen className="inline mr-2" size={18} />
@@ -1160,8 +1183,8 @@ export default function ReportsDashboard() {
               <button
                 onClick={() => setActiveAccountingTab("journal-entries")}
                 className={`px-4 py-2 font-medium ${activeAccountingTab === "journal-entries"
-                    ? "border-b-2 border-indigo-600 text-indigo-600"
-                    : "text-gray-600 hover:text-gray-800"
+                  ? "border-b-2 border-indigo-600 text-indigo-600"
+                  : "text-gray-600 hover:text-gray-800"
                   }`}
               >
                 <FileText className="inline mr-2" size={18} />
@@ -1170,8 +1193,8 @@ export default function ReportsDashboard() {
               <button
                 onClick={() => setActiveAccountingTab("trial-balance")}
                 className={`px-4 py-2 font-medium ${activeAccountingTab === "trial-balance"
-                    ? "border-b-2 border-indigo-600 text-indigo-600"
-                    : "text-gray-600 hover:text-gray-800"
+                  ? "border-b-2 border-indigo-600 text-indigo-600"
+                  : "text-gray-600 hover:text-gray-800"
                   }`}
               >
                 <Calculator className="inline mr-2" size={18} />
@@ -1180,8 +1203,8 @@ export default function ReportsDashboard() {
               <button
                 onClick={() => setActiveAccountingTab("auto-report")}
                 className={`px-4 py-2 font-medium ${activeAccountingTab === "auto-report"
-                    ? "border-b-2 border-indigo-600 text-indigo-600"
-                    : "text-gray-600 hover:text-gray-800"
+                  ? "border-b-2 border-indigo-600 text-indigo-600"
+                  : "text-gray-600 hover:text-gray-800"
                   }`}
               >
                 <TrendingUp className="inline mr-2" size={18} />
@@ -1190,8 +1213,8 @@ export default function ReportsDashboard() {
               <button
                 onClick={() => setActiveAccountingTab("comprehensive-report")}
                 className={`px-4 py-2 font-medium ${activeAccountingTab === "comprehensive-report"
-                    ? "border-b-2 border-indigo-600 text-indigo-600"
-                    : "text-gray-600 hover:text-gray-800"
+                  ? "border-b-2 border-indigo-600 text-indigo-600"
+                  : "text-gray-600 hover:text-gray-800"
                   }`}
               >
                 <FileText className="inline mr-2" size={18} />
@@ -1200,8 +1223,8 @@ export default function ReportsDashboard() {
               <button
                 onClick={() => setActiveAccountingTab("gst-reports")}
                 className={`px-4 py-2 font-medium ${activeAccountingTab === "gst-reports"
-                    ? "border-b-2 border-indigo-600 text-indigo-600"
-                    : "text-gray-600 hover:text-gray-800"
+                  ? "border-b-2 border-indigo-600 text-indigo-600"
+                  : "text-gray-600 hover:text-gray-800"
                   }`}
               >
                 <Calculator className="inline mr-2" size={18} />
@@ -1234,8 +1257,8 @@ export default function ReportsDashboard() {
                         key={group.id}
                         onClick={() => setSelectedGroup(group)}
                         className={`p-3 rounded cursor-pointer ${selectedGroup?.id === group.id
-                            ? "bg-indigo-100 border-2 border-indigo-600"
-                            : "bg-gray-50 hover:bg-gray-100"
+                          ? "bg-indigo-100 border-2 border-indigo-600"
+                          : "bg-gray-50 hover:bg-gray-100"
                           }`}
                       >
                         <div className="flex items-center justify-between">
@@ -1644,8 +1667,8 @@ export default function ReportsDashboard() {
                         </p>
                       </div>
                       <div className={`rounded-lg p-4 border ${(autoReport.summary?.net_profit || 0) >= 0
-                          ? "bg-blue-50 border-blue-200"
-                          : "bg-orange-50 border-orange-200"
+                        ? "bg-blue-50 border-blue-200"
+                        : "bg-orange-50 border-orange-200"
                         }`}>
                         <h3 className={`text-sm font-medium mb-1 ${(autoReport.summary?.net_profit || 0) >= 0 ? "text-blue-800" : "text-orange-800"
                           }`}>
@@ -2304,8 +2327,8 @@ export default function ReportsDashboard() {
                   <button
                     onClick={() => setGstReportType("master-summary")}
                     className={`px-4 py-2 rounded ${gstReportType === "master-summary"
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                       }`}
                   >
                     Master Summary
@@ -2313,8 +2336,8 @@ export default function ReportsDashboard() {
                   <button
                     onClick={() => setGstReportType("b2b-sales")}
                     className={`px-4 py-2 rounded ${gstReportType === "b2b-sales"
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                       }`}
                   >
                     B2B Sales
@@ -2322,8 +2345,8 @@ export default function ReportsDashboard() {
                   <button
                     onClick={() => setGstReportType("b2c-sales")}
                     className={`px-4 py-2 rounded ${gstReportType === "b2c-sales"
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                       }`}
                   >
                     B2C Sales
@@ -2331,8 +2354,8 @@ export default function ReportsDashboard() {
                   <button
                     onClick={() => setGstReportType("hsn-sac-summary")}
                     className={`px-4 py-2 rounded ${gstReportType === "hsn-sac-summary"
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                       }`}
                   >
                     HSN/SAC Summary
@@ -2340,8 +2363,8 @@ export default function ReportsDashboard() {
                   <button
                     onClick={() => setGstReportType("itc-register")}
                     className={`px-4 py-2 rounded ${gstReportType === "itc-register"
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                       }`}
                   >
                     ITC Register
@@ -2349,8 +2372,8 @@ export default function ReportsDashboard() {
                   <button
                     onClick={() => setGstReportType("rcm-register")}
                     className={`px-4 py-2 rounded ${gstReportType === "rcm-register"
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                       }`}
                   >
                     RCM Register
@@ -2358,8 +2381,8 @@ export default function ReportsDashboard() {
                   <button
                     onClick={() => setGstReportType("advance-receipt")}
                     className={`px-4 py-2 rounded ${gstReportType === "advance-receipt"
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                       }`}
                   >
                     Advance Receipt
@@ -2367,8 +2390,8 @@ export default function ReportsDashboard() {
                   <button
                     onClick={() => setGstReportType("room-tariff-slab")}
                     className={`px-4 py-2 rounded ${gstReportType === "room-tariff-slab"
-                        ? "bg-indigo-600 text-white"
-                        : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      ? "bg-indigo-600 text-white"
+                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
                       }`}
                   >
                     Room Tariff Slab
@@ -2827,8 +2850,8 @@ export default function ReportsDashboard() {
                                     <td className="p-2 border text-xs">{item.category_name}</td>
                                     <td className="p-2 border">
                                       <span className={`px-2 py-1 rounded text-xs ${item.itc_type === "Capital Goods" ? "bg-purple-100 text-purple-800" :
-                                          item.itc_type === "Input Services" ? "bg-blue-100 text-blue-800" :
-                                            "bg-green-100 text-green-800"
+                                        item.itc_type === "Input Services" ? "bg-blue-100 text-blue-800" :
+                                          "bg-green-100 text-green-800"
                                         }`}>
                                         {item.itc_type}
                                       </span>
@@ -3760,16 +3783,16 @@ export default function ReportsDashboard() {
                       return Math.abs(totalDebits - totalCredits) >= 0.01;
                     })()}
                     className={`flex-1 px-4 py-2 rounded ${(() => {
-                        const totalDebits = journalForm.lines
-                          .filter(line => line.debit_ledger_id)
-                          .reduce((sum, line) => sum + (parseFloat(line.amount) || 0), 0);
-                        const totalCredits = journalForm.lines
-                          .filter(line => line.credit_ledger_id)
-                          .reduce((sum, line) => sum + (parseFloat(line.amount) || 0), 0);
-                        return Math.abs(totalDebits - totalCredits) >= 0.01
-                          ? "bg-gray-400 text-gray-600 cursor-not-allowed"
-                          : "bg-indigo-600 text-white hover:bg-indigo-700";
-                      })()
+                      const totalDebits = journalForm.lines
+                        .filter(line => line.debit_ledger_id)
+                        .reduce((sum, line) => sum + (parseFloat(line.amount) || 0), 0);
+                      const totalCredits = journalForm.lines
+                        .filter(line => line.credit_ledger_id)
+                        .reduce((sum, line) => sum + (parseFloat(line.amount) || 0), 0);
+                      return Math.abs(totalDebits - totalCredits) >= 0.01
+                        ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                        : "bg-indigo-600 text-white hover:bg-indigo-700";
+                    })()
                       }`}
                   >
                     Create Entry
