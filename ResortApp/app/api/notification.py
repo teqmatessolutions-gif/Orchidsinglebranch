@@ -67,6 +67,12 @@ def mark_all_as_read(db: Session = Depends(get_db), current_user: dict = Depends
     count = notification_crud.mark_all_as_read(db)
     return {"message": f"Marked {count} notifications as read"}
 
+@router.delete("/clear-all")
+def clear_all_notifications(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    """Delete all notifications"""
+    count = notification_crud.clear_all_notifications(db)
+    return {"message": f"Deleted {count} notifications"}
+
 @router.delete("/{notification_id}")
 def delete_notification(notification_id: int, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
     """Delete a specific notification"""
@@ -74,9 +80,3 @@ def delete_notification(notification_id: int, db: Session = Depends(get_db), cur
     if not success:
         raise HTTPException(status_code=404, detail="Notification not found")
     return {"message": "Notification deleted successfully"}
-
-@router.delete("/clear-all")
-def clear_all_notifications(db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
-    """Delete all notifications"""
-    count = notification_crud.clear_all_notifications(db)
-    return {"message": f"Deleted {count} notifications"}
