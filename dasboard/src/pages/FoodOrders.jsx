@@ -1162,6 +1162,18 @@ export default function FoodOrders() {
       setAmount(0);
       setOrderType("dine_in");
       setDeliveryRequest("");
+
+      // Clear filters to ensure visibility
+      setStatusFilter("");
+      setDateFilter("");
+
+      // Auto-scroll to the orders list to show the new order
+      setTimeout(() => {
+        const ordersSection = document.getElementById("orders-list-section");
+        if (ordersSection) {
+          ordersSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+      }, 100);
     } catch (err) {
       console.error(err);
       toast.error("Failed to submit order.");
@@ -1177,6 +1189,10 @@ export default function FoodOrders() {
       return;
     }
 
+
+    // Optimistically update UI immediately
+    setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+
     // For other status changes, update directly
     try {
       await api.put(`/food-orders/${id}`, { status: newStatus });
@@ -1189,19 +1205,26 @@ export default function FoodOrders() {
     } catch (error) {
       console.error("Failed to update status:", error);
       toast.error("Failed to update order status.");
+      // Revert optimistic update on error
+      fetchOrders();
     }
   };
 
   const handleCompleteOrder = async () => {
     if (!showCompleteModal) return;
 
+    const orderId = showCompleteModal.id;
+    // Optimistic update
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: "completed", billing_status: paymentStatus } : o));
+    setShowCompleteModal(null);
+    setPaymentStatus("unpaid");
+
     try {
-      await api.put(`/food-orders/${showCompleteModal.id}`, {
+      await api.put(`/food-orders/${orderId}`, {
         status: "completed",
         billing_status: paymentStatus
       });
-      setShowCompleteModal(null);
-      setPaymentStatus("unpaid");
+
       toast.success("Order completed successfully!");
       fetchOrders();
       // Also refresh dashboard data if on dashboard tab
@@ -1211,6 +1234,7 @@ export default function FoodOrders() {
     } catch (error) {
       console.error("Failed to complete order:", error);
       toast.error("Failed to complete order.");
+      fetchOrders(); // Revert optimistic update
     }
   };
 
@@ -1374,7 +1398,7 @@ export default function FoodOrders() {
     const matchStatus = statusFilter ? order.status === statusFilter : true;
     const matchDate = dateFilter ? order.created_at?.startsWith(dateFilter) : true;
     return matchStatus && matchDate;
-  });
+  }).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
   // Food Management calculations
   const totalItems = foodItems.length;
@@ -2178,7 +2202,7 @@ export default function FoodOrders() {
             </div>
 
             {/* Orders List */}
-            <div>
+            <div id="orders-list-section">
               <div className="mb-4">
                 <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
                   <span className="w-1 h-6 bg-indigo-600 rounded"></span>
@@ -2194,6 +2218,8 @@ export default function FoodOrders() {
                 ) : (
                   filteredOrders.map((order) => {
                     const roomData = rooms.find((r) => r.id === order.room_id);
+                    // Normalize 'active' status to 'pending' for UI display
+                    const normalizedStatus = order.status === 'active' ? 'pending' : order.status;
                     return (
                       <div
                         key={order.id}
@@ -2203,7 +2229,7 @@ export default function FoodOrders() {
                         <div className="flex justify-between items-start mb-3">
                           <div>
                             <h4 className="font-bold text-lg text-gray-800">
-                              Room {roomData?.number || roomData?.room_number || order.room_id}
+                              Room {roomData?.number || roomData?.room_number || order.room_number || order.room_id}
                             </h4>
                             <p className="text-xs text-gray-500 mt-1">
                               {order.created_at ? formatDateTimeIST(order.created_at) : 'N/A'}
@@ -2219,10 +2245,10 @@ export default function FoodOrders() {
                               {order.order_type === "room_service" ? "Room Service" : "Dine In"}
                             </span>
                             <span
-                              className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[order.status] || "bg-gray-100 text-gray-800"
+                              className={`px-2.5 py-1 rounded-full text-xs font-semibold ${statusColors[normalizedStatus] || "bg-gray-100 text-gray-800"
                                 }`}
                             >
-                              {order.status.replace("_", " ")}
+                              {normalizedStatus.replace("_", " ")}
                             </span>
                           </div>
                         </div>
@@ -2236,7 +2262,7 @@ export default function FoodOrders() {
                           <div className="flex justify-between">
                             <span className="text-gray-500">Employee:</span>
                             <span className="font-medium text-gray-800">
-                              {employees.find((e) => e.id === order.assigned_employee_id)?.name || "N/A"}
+                              {order.employee_name || employees.find((e) => e.id === order.assigned_employee_id)?.name || "N/A"}
                             </span>
                           </div>
                         </div>
@@ -2337,7 +2363,7 @@ export default function FoodOrders() {
                             View Ingredients
                           </button>
                           <select
-                            value={order.status}
+                            value={normalizedStatus}
                             onChange={(e) => handleStatusChange(order.id, e.target.value)}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm text-black focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white"
                           >

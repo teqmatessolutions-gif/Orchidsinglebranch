@@ -10,10 +10,18 @@ const API = axios.create({
   timeout: 60000, // 60 second timeout (increased for large queries)
 });
 
-// Automatically add token to headers
+// Automatically add token to headers and prevent caching
 API.interceptors.request.use((req) => {
   const token = localStorage.getItem("token");
   if (token) req.headers.Authorization = `Bearer ${token}`;
+
+  // Add cache-busting headers for GET requests to prevent browser caching
+  if (req.method === 'get') {
+    req.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+    req.headers['Pragma'] = 'no-cache';
+    req.headers['Expires'] = '0';
+  }
+
   console.log("API Request:", req.method, req.url, "Base URL:", req.baseURL);
   return req;
 });
@@ -31,7 +39,7 @@ API.interceptors.response.use(
         isTimeout: true,
       });
     }
-    
+
     // Handle network errors
     if (!error.response) {
       console.error("Network error:", error.message);
@@ -44,7 +52,7 @@ API.interceptors.response.use(
         isNetworkError: true,
       });
     }
-    
+
     // Handle 503 (Service Unavailable) - database connection issues
     if (error.response?.status === 503) {
       console.error("Service unavailable:", error.response?.data);
@@ -54,11 +62,10 @@ API.interceptors.response.use(
         isServiceUnavailable: true,
       });
     }
-    
+
     // For other errors, return as-is
     return Promise.reject(error);
   }
 );
 
 export default API;
-

@@ -91,6 +91,9 @@ class AssignedServiceUpdate(BaseModel):
 
 class AssignedServiceOut(BaseModel):
     id: int
+    service_id: int  # Add for filtering
+    employee_id: int  # Add for filtering
+    room_id: int  # Add for filtering
     service: ServiceOut
     employee: EmployeeOut
     room: RoomOut
@@ -100,3 +103,4 @@ class AssignedServiceOut(BaseModel):
 
     class Config:
         from_attributes = True
+

@@ -30,6 +30,12 @@ async def create_package_api(
     price: float = Form(...),
     booking_type: str = Form("room_type"),  # "whole_property" or "room_type"
     room_types: str = Form(None),  # Comma-separated list of room types
+    theme: str = Form(None),
+    default_adults: int = Form(2),
+    default_children: int = Form(0),
+    max_stay_days: int = Form(None),
+    food_included: str = Form(None),
+    food_timing: str = Form(None),
     images: List[UploadFile] = File([]),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -79,7 +85,7 @@ async def create_package_api(
             raise HTTPException(status_code=500, detail=f"Failed to upload images: {str(img_error)}")
 
         try:
-            return crud_package.create_package(db, title, description, price, image_urls, booking_type, room_types)
+            return crud_package.create_package(db, title, description, price, image_urls, booking_type, room_types, theme, default_adults, default_children, max_stay_days, food_included, food_timing)
         except Exception as db_error:
             import traceback
             error_detail = f"Failed to create package in database: {str(db_error)}\n{traceback.format_exc()}"
@@ -165,7 +171,7 @@ async def create_package_api_slash(
             raise HTTPException(status_code=500, detail=f"Failed to upload images: {str(img_error)}")
 
         try:
-            return crud_package.create_package(db, title, description, price, image_urls, booking_type, room_types)
+            return crud_package.create_package(db, title, description, price, image_urls, booking_type, room_types, theme, default_adults, default_children, max_stay_days, food_included, food_timing)
         except Exception as db_error:
             import traceback
             error_detail = f"Failed to create package in database: {str(db_error)}\n{traceback.format_exc()}"
@@ -202,6 +208,12 @@ async def update_package_api(
     price: float = Form(...),
     booking_type: str = Form("room_type"),  # "whole_property" or "room_type"
     room_types: str = Form(None),  # Comma-separated list of room types
+    theme: str = Form(None),
+    default_adults: int = Form(2),
+    default_children: int = Form(0),
+    max_stay_days: int = Form(None),
+    food_included: str = Form(None),
+    food_timing: str = Form(None),
     images: List[UploadFile] = File([]),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -229,6 +241,12 @@ async def update_package_api(
     package.price = price
     package.booking_type = booking_type
     package.room_types = room_types
+    package.theme = theme
+    package.default_adults = default_adults
+    package.default_children = default_children
+    package.max_stay_days = max_stay_days
+    package.food_included = food_included
+    package.food_timing = food_timing
     
     # Add new images if provided
     if images:

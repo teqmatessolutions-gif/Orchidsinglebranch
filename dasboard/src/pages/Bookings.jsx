@@ -278,6 +278,15 @@ const AddExtraAllocationModal = ({
     return `${prefix}-${paddedId}`;
   };
 
+  // Debug logging
+  React.useEffect(() => {
+    console.log("[AddExtraAllocationModal] Props received:");
+    console.log("- booking:", booking);
+    console.log("- inventoryItems:", inventoryItems?.length || 0, "items");
+    console.log("- inventoryLocations:", inventoryLocations?.length || 0, "locations");
+    console.log("- authHeader:", typeof authHeader);
+  }, [booking, inventoryItems, inventoryLocations, authHeader]);
+
   if (!booking) return null;
 
   // Fetch current room items
@@ -794,26 +803,46 @@ const AddExtraAllocationModal = ({
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b">
+        <div className="flex gap-2 mb-6 border-b overflow-x-auto">
           <button
             type="button"
             onClick={() => setActiveTab("current")}
-            className={`px-4 py-2 font-medium ${activeTab === "current"
+            className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === "current"
               ? "border-b-2 border-indigo-600 text-indigo-600"
               : "text-gray-500 hover:text-gray-700"
               }`}
           >
-            Current Items ({currentRoomItems.length})
+            Inventory ({currentRoomItems.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("food")}
+            className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === "food"
+              ? "border-b-2 border-indigo-600 text-indigo-600"
+              : "text-gray-500 hover:text-gray-700"
+              }`}
+          >
+            Food Orders
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("services")}
+            className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === "services"
+              ? "border-b-2 border-indigo-600 text-indigo-600"
+              : "text-gray-500 hover:text-gray-700"
+              }`}
+          >
+            Services
           </button>
           <button
             type="button"
             onClick={() => setActiveTab("add")}
-            className={`px-4 py-2 font-medium ${activeTab === "add"
+            className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === "add"
               ? "border-b-2 border-indigo-600 text-indigo-600"
               : "text-gray-500 hover:text-gray-700"
               }`}
           >
-            Add New Items
+            Add items
           </button>
         </div>
 
@@ -827,42 +856,26 @@ const AddExtraAllocationModal = ({
               <button
                 type="button"
                 onClick={async () => {
-                  // Force refresh
-                  const roomForFetch =
-                    (booking.rooms && booking.rooms[0]) || null;
-                  const roomNumber =
-                    roomForFetch?.number || roomForFetch?.room?.number || null;
+                  // Force refresh logic (same as original)
+                  const roomForFetch = (booking.rooms && booking.rooms[0]) || null;
+                  const roomNumber = roomForFetch?.number || roomForFetch?.room?.number || null;
                   if (!roomNumber) {
                     alert("Room number not found");
                     return;
                   }
 
-                  // Normalize room number
-                  const roomNumStr = String(roomNumber).trim();
-                  const roomNumNoZeros =
-                    roomNumStr.replace(/^0+/, "") || roomNumStr;
+                  // Helper to normalize strings for comparison
+                  const normalize = (str) => String(str || "").trim().toLowerCase().replace(/^0+/, "");
+                  const targetNum = normalize(roomNumber);
 
                   const destinationLocation = inventoryLocations.find((loc) => {
                     const type = String(loc.location_type || "").toUpperCase();
                     if (type !== "GUEST_ROOM") return false;
-                    const roomArea = String(loc.room_area || "")
-                      .trim()
-                      .toLowerCase();
-                    const roomName = String(loc.name || "")
-                      .trim()
-                      .toLowerCase();
-                    const roomAreaNoZeros =
-                      roomArea.replace(/^0+/, "") || roomArea;
-                    const searchStr = roomNumStr.toLowerCase();
-                    const searchStrNoZeros = roomNumNoZeros.toLowerCase();
-                    return (
-                      roomArea === searchStr ||
-                      roomAreaNoZeros === searchStrNoZeros ||
-                      roomName === searchStr ||
-                      roomName.includes(searchStr) ||
-                      roomArea.includes(searchStr) ||
-                      roomAreaNoZeros.includes(searchStrNoZeros)
-                    );
+
+                    const roomArea = normalize(loc.room_area);
+                    const roomName = normalize(loc.name);
+
+                    return roomArea === targetNum || roomName === targetNum || roomName.includes(targetNum) || roomArea.includes(targetNum);
                   });
 
                   if (!destinationLocation) {
@@ -872,18 +885,11 @@ const AddExtraAllocationModal = ({
 
                   setLoadingCurrentItems(true);
                   try {
-                    const res = await API.get(
-                      `/inventory/locations/${destinationLocation.id}/items`,
-                      authHeader(),
-                    );
+                    const res = await API.get(`/inventory/locations/${destinationLocation.id}/items`, authHeader());
                     setCurrentRoomItems(res.data?.items || []);
-                    console.log("✅ Refreshed items:", res.data?.items);
                   } catch (error) {
                     console.error("Error refreshing items:", error);
-                    alert(
-                      "Failed to refresh items: " +
-                      (error.response?.data?.detail || error.message),
-                    );
+                    alert("Failed to refresh items");
                   } finally {
                     setLoadingCurrentItems(false);
                   }
@@ -891,33 +897,17 @@ const AddExtraAllocationModal = ({
                 className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded-lg hover:bg-gray-300 flex items-center gap-1"
                 disabled={loadingCurrentItems}
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                  />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
                 {loadingCurrentItems ? "Refreshing..." : "Refresh"}
               </button>
             </div>
             {loadingCurrentItems ? (
-              <div className="text-center py-8 text-gray-500">
-                Loading current items...
-              </div>
+              <div className="text-center py-8 text-gray-500">Loading current items...</div>
             ) : currentRoomItems.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <p>No items currently allocated to this room.</p>
-                <p className="text-xs text-gray-400 mt-2">
-                  Items added during check-in or manually will appear here.
-                </p>
                 <button
                   type="button"
                   onClick={() => setActiveTab("add")}
@@ -931,173 +921,68 @@ const AddExtraAllocationModal = ({
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Item
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Total Qty
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Complimentary
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Payable
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Unit Price
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Total Value
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Paid
-                      </th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">
-                        Actions
-                      </th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total Qty</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Complimentary</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Payable</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Paid</th>
+                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {currentRoomItems.map((item, index) => {
-                      const paidStatus =
-                        item.is_paid || paidStatusMap[item.item_id] || false;
+                      const paidStatus = item.is_paid || paidStatusMap[item.item_id] || false;
                       const totalQty = parseFloat(item.location_stock || 0);
-
-                      // Find the inventory item to get complimentary limit (always needed for display)
-                      const inventoryItem = inventoryItems.find(
-                        (it) => it.id === item.item_id,
-                      );
-                      const complimentaryLimit =
-                        inventoryItem?.complimentary_limit || 0;
-
-                      // Use actual stored quantities if available, otherwise calculate
-                      const complimentaryQty = parseFloat(
-                        item.complimentary_qty || 0,
-                      );
+                      const inventoryItem = inventoryItems.find((it) => it.id === item.item_id);
+                      const complimentaryLimit = inventoryItem?.complimentary_limit || 0;
+                      const complimentaryQty = parseFloat(item.complimentary_qty || 0);
                       const payableQty = parseFloat(item.payable_qty || 0);
 
-                      // Fallback: If quantities not stored, calculate based on complimentary limit
                       let calculatedComplimentaryQty = complimentaryQty;
                       let calculatedPayableQty = payableQty;
 
-                      if (
-                        complimentaryQty === 0 &&
-                        payableQty === 0 &&
-                        totalQty > 0
-                      ) {
-                        // Calculate based on limit
-                        calculatedComplimentaryQty = Math.min(
-                          totalQty,
-                          complimentaryLimit,
-                        );
-                        calculatedPayableQty = Math.max(
-                          0,
-                          totalQty - complimentaryLimit,
-                        );
-                      } else {
-                        calculatedComplimentaryQty = complimentaryQty;
-                        calculatedPayableQty = payableQty;
+                      if (complimentaryQty === 0 && payableQty === 0 && totalQty > 0) {
+                        calculatedComplimentaryQty = Math.min(totalQty, complimentaryLimit);
+                        calculatedPayableQty = Math.max(0, totalQty - complimentaryLimit);
                       }
 
                       return (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-3 py-2 text-sm">
-                            <div className="font-medium text-gray-900">
-                              {item.item_name}
-                            </div>
-                            {item.item_code && (
-                              <div className="text-xs text-gray-500">
-                                {item.item_code}
-                              </div>
-                            )}
+                            <div className="font-medium text-gray-900">{item.item_name}</div>
                             {complimentaryLimit > 0 && (
-                              <div className="text-xs text-blue-600 mt-1">
-                                Limit: {complimentaryLimit} free
-                              </div>
+                              <div className="text-xs text-blue-600 mt-1">Limit: {complimentaryLimit} free</div>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-sm text-gray-600 font-medium">
-                            {totalQty} {item.unit}
-                          </td>
-                          <td className="px-3 py-2 text-sm">
-                            <span className="text-green-700 font-medium">
-                              {calculatedComplimentaryQty} {item.unit}
-                            </span>
-                            {calculatedComplimentaryQty > 0 && (
-                              <div className="text-xs text-gray-500">
-                                (Free)
-                              </div>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-sm">
-                            {calculatedPayableQty > 0 ? (
-                              <>
-                                <span className="text-orange-700 font-medium">
-                                  {calculatedPayableQty} {item.unit}
-                                </span>
-                                <div className="text-xs text-gray-500">
-                                  (Payable)
-                                </div>
-                              </>
-                            ) : (
-                              <span className="text-gray-400 text-xs">-</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-sm text-gray-600">
-                            {formatCurrency(item.unit_price || 0)}
-                          </td>
+                          <td className="px-3 py-2 text-sm text-gray-600 font-medium">{totalQty} {item.unit}</td>
+                          <td className="px-3 py-2 text-sm text-green-700 font-medium">{calculatedComplimentaryQty} {item.unit}</td>
+                          <td className="px-3 py-2 text-sm text-orange-700 font-medium">{calculatedPayableQty} {item.unit}</td>
+                          <td className="px-3 py-2 text-sm text-gray-600">{formatCurrency(item.unit_price || 0)}</td>
                           <td className="px-3 py-2 text-sm font-semibold text-gray-900">
-                            {calculatedPayableQty > 0
-                              ? formatCurrency(
-                                (item.unit_price || 0) * calculatedPayableQty,
-                              )
-                              : formatCurrency(0)}
+                            {formatCurrency((item.unit_price || 0) * calculatedPayableQty)}
                           </td>
                           <td className="px-3 py-2">
-                            {calculatedPayableQty > 0 && (
+                            {calculatedPayableQty > 0 ? (
                               <label className="flex items-center gap-2 cursor-pointer">
                                 <input
                                   type="checkbox"
                                   checked={paidStatus}
                                   onChange={(e) => {
-                                    setPaidStatusMap({
-                                      ...paidStatusMap,
-                                      [item.item_id]: e.target.checked,
-                                    });
-                                    updateItemPaidStatus(
-                                      item,
-                                      e.target.checked,
-                                    );
+                                    setPaidStatusMap({ ...paidStatusMap, [item.item_id]: e.target.checked });
+                                    updateItemPaidStatus(item, e.target.checked);
                                   }}
                                   className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
                                 />
-                                <span
-                                  className={`text-xs ${paidStatus ? "text-green-600 font-medium" : "text-gray-500"}`}
-                                >
-                                  {paidStatus ? "Paid" : "Unpaid"}
-                                </span>
+                                <span className={`text-xs ${paidStatus ? "text-green-600 font-medium" : "text-gray-500"}`}>{paidStatus ? "Paid" : "Unpaid"}</span>
                               </label>
-                            )}
-                            {calculatedPayableQty === 0 && (
-                              <span className="text-xs text-gray-400">N/A</span>
-                            )}
+                            ) : <span className="text-gray-400 text-xs">-</span>}
                           </td>
                           <td className="px-3 py-2">
-                            {calculatedPayableQty > 0 && !paidStatus && (
-                              <span className="text-xs text-orange-600 font-medium">
-                                Payment Pending
-                              </span>
-                            )}
-                            {calculatedPayableQty > 0 && paidStatus && (
-                              <span className="text-xs text-green-600 font-medium">
-                                ✓ Paid
-                              </span>
-                            )}
-                            {calculatedPayableQty === 0 && (
-                              <span className="text-xs text-gray-400">
-                                Complimentary
-                              </span>
-                            )}
+                            {calculatedPayableQty > 0 ? (
+                              paidStatus ? <span className="text-xs text-green-600 font-medium">✓ Paid</span> : <span className="text-xs text-orange-600 font-medium">Payment Pending</span>
+                            ) : <span className="text-xs text-gray-400">Complimentary</span>}
                           </td>
                         </tr>
                       );
@@ -1107,6 +992,26 @@ const AddExtraAllocationModal = ({
               </div>
             )}
           </div>
+        )}
+
+        {/* Food Orders Tab */}
+        {activeTab === "food" && (
+          <RoomFoodOrders
+            booking={booking}
+            authHeader={authHeader}
+            API={API}
+            formatCurrency={formatCurrency}
+          />
+        )}
+
+        {/* Services Tab */}
+        {activeTab === "services" && (
+          <RoomServiceAssignments
+            booking={booking}
+            authHeader={authHeader}
+            API={API}
+            formatCurrency={formatCurrency}
+          />
         )}
 
         {/* Add New Items Tab */}
@@ -2284,14 +2189,19 @@ const Bookings = () => {
       const allLocations = locationsRes.data || [];
       const todaysDate = getCurrentDateIST();
 
-      // Only allow items that are marked sellable to guests (used as rentable / chargeable items)
-      const sellableItems = (rawItems || []).filter(
-        (item) =>
-          item &&
-          (item.is_sellable_to_guest === true || item.is_sellable === true),
-      );
-      setInventoryItems(sellableItems);
+      console.log("[Bookings fetchData] Inventory items fetched:", rawItems?.length || 0);
+      console.log("[Bookings fetchData] Inventory locations fetched:", allLocations?.length || 0);
+
+      // Show all inventory items as per user request to "Suggest all inventory items"
+      // const sellableItems = (rawItems || []).filter(
+      //   (item) =>
+      //     item &&
+      //     (item.is_sellable_to_guest === true || item.is_sellable === true),
+      // );
+      setInventoryItems(rawItems);
       setInventoryLocations(allLocations);
+
+      console.log("[Bookings fetchData] State updated - items:", rawItems?.length, "locations:", allLocations?.length);
 
       // Reduced limit for better performance - KPI calculation uses sample data
       const allBookingsRes = await API.get(
@@ -2728,6 +2638,14 @@ const Bookings = () => {
       if (name === "package_id" && value) {
         const selectedPackage = packages.find((p) => p.id === parseInt(value));
         if (selectedPackage) {
+          // Apply package defaults for adults and children
+          if (selectedPackage.default_adults) {
+            updated.adults = selectedPackage.default_adults;
+          }
+          if (selectedPackage.default_children !== undefined && selectedPackage.default_children !== null) {
+            updated.children = selectedPackage.default_children;
+          }
+
           // If whole_property, automatically select all available rooms (will be handled in useEffect)
           if (selectedPackage.booking_type === "whole_property") {
             updated.room_ids = [];
@@ -2827,41 +2745,26 @@ const Bookings = () => {
       }
 
       // --- CAPACITY VALIDATION ---
-      // Skip capacity validation for whole_property packages (they book entire property regardless of guest count)
+      // Enforce package limits instead of room capacity
       if (!isWholeProperty) {
-        const selectedPackageRooms = finalRoomIds
-          .map((id) => rooms.find((r) => r.id === id))
-          .filter((room) => room !== null);
+        const requestedAdults = parseInt(packageBookingForm.adults) || 0;
+        const requestedChildren = parseInt(packageBookingForm.children) || 0;
+        const limitAdults = parseInt(selectedPackage.default_adults) || 0;
+        const limitChildren = parseInt(selectedPackage.default_children) || 0;
 
-        const packageCapacity = {
-          adults: selectedPackageRooms.reduce(
-            (sum, room) => sum + (room.adults || 0),
-            0,
-          ),
-          children: selectedPackageRooms.reduce(
-            (sum, room) => sum + (room.children || 0),
-            0,
-          ),
-        };
-
-        const adultsRequested = parseInt(packageBookingForm.adults);
-        const childrenRequested = parseInt(packageBookingForm.children);
-
-        // Validate adults capacity
-        if (adultsRequested > packageCapacity.adults) {
+        if (requestedAdults > limitAdults) {
           showBannerMessage(
             "error",
-            `The number of adults (${adultsRequested}) exceeds the total adult capacity of the selected rooms (${packageCapacity.adults} adults max). Please select additional rooms or reduce the number of adults.`,
+            `The number of adults (${requestedAdults}) exceeds the package limit (${limitAdults} adults max).`,
           );
           setIsSubmitting(false);
           return;
         }
 
-        // Validate children capacity
-        if (childrenRequested > packageCapacity.children) {
+        if (requestedChildren > limitChildren) {
           showBannerMessage(
             "error",
-            `The number of children (${childrenRequested}) exceeds the total children capacity of the selected rooms (${packageCapacity.children} children max). Please select additional rooms or reduce the number of children.`,
+            `The number of children (${requestedChildren}) exceeds the package limit (${limitChildren} children max).`,
           );
           setIsSubmitting(false);
           return;
@@ -5784,5 +5687,356 @@ const Bookings = () => {
     </DashboardLayout>
   );
 };
+
+
+// Helper Components for Room Allocation Modal
+function RoomFoodOrders({ booking, authHeader, API, formatCurrency }) {
+  const [orders, setOrders] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const navigate = useNavigate();
+
+  React.useEffect(() => {
+    fetchOrders();
+  }, [booking]);
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    try {
+      // Fetch all orders and filter by room (since backend might not support room filtering directly yet)
+      const config = authHeader ? authHeader() : {};
+      const res = await API.get("/food-orders/?limit=1000", config);
+      const allOrders = res.data || [];
+
+      // Filter for this booking's room(s)
+      // Booking can have multiple rooms? Usually one per allocation modal instance.
+      // Use booking.rooms (array of objects with room_id or room object)
+      const roomIds = booking.rooms?.map(r => r.id || r.room_id) || [];
+
+      const filtered = allOrders.filter(o => {
+        // order can have room_id directly
+        if (roomIds.includes(o.room_id)) {
+          // check if order date is within booking range to be safe?
+          // For now assume room_id match is enough if room is currently occupied by this booking
+          return true;
+        }
+        return false;
+      });
+
+      setOrders(filtered);
+    } catch (error) {
+      console.error("Failed to fetch food orders", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const currentRoom = booking.rooms && booking.rooms[0];
+  const roomNumber = currentRoom?.number || currentRoom?.room?.number;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center mb-4">
+        <h4 className="text-lg font-semibold text-gray-800">Food Orders for Room {roomNumber}</h4>
+        <div className="flex gap-2">
+          <button
+            onClick={fetchOrders}
+            className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 text-sm"
+          >
+            Refresh
+          </button>
+          <button
+            onClick={() => navigate('/food-management/orders')}
+            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm"
+          >
+            Go to Food Orders
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-8 text-gray-500">Loading orders...</div>
+      ) : orders.length === 0 ? (
+        <div className="text-center py-8 bg-gray-50 rounded-lg">
+          <p className="text-gray-500">No food orders found for this room.</p>
+          <p className="text-xs text-gray-400 mt-1">Visit the Food Orders page to create a new order.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Order #</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Items</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Payment</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {orders.map((order) => (
+                <tr key={order.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 text-sm font-medium text-gray-900">
+                    {order.id}
+                    <div className="text-xs text-gray-500">{new Date(order.created_at).toLocaleString()}</div>
+                  </td>
+                  <td className="px-3 py-2 text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold 
+                      ${order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                        order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          order.status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'}`}>
+                      {order.status}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-sm text-gray-600">
+                    {order.items?.length || 0} items
+                  </td>
+                  <td className="px-3 py-2 text-sm font-semibold text-gray-900">
+                    {formatCurrency(order.total_amount || order.amount || 0)}
+                  </td>
+                  <td className="px-3 py-2 text-sm">
+                    <span className={`px-2 py-1 rounded-full text-xs 
+                      ${order.payment_status === 'paid' ? 'text-green-600' : 'text-orange-600'}`}>
+                      {order.billing_status === 'billed' ? 'Billed' : (order.payment_status || 'Unpaid')}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RoomServiceAssignments({ booking, authHeader, API, formatCurrency }) {
+  const [assignments, setAssignments] = React.useState([]);
+  const [services, setServices] = React.useState([]);
+  const [employees, setEmployees] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [assignForm, setAssignForm] = React.useState({ service_id: "", employee_id: "" });
+  const [submitting, setSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    fetchData();
+  }, [booking]);
+
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      console.log("[RoomServiceAssignments] === FETCH DATA START ===");
+      console.log("[RoomServiceAssignments] Booking object:", JSON.stringify(booking, null, 2));
+      console.log("[RoomServiceAssignments] Booking.rooms:", booking.rooms);
+
+      const roomIds = booking.rooms?.map(r => {
+        const id = r.id || r.room_id;
+        console.log("[RoomServiceAssignments] Room object:", r, "=> Extracted ID:", id);
+        return id;
+      }) || [];
+
+      console.log("[RoomServiceAssignments] Final extracted room IDs:", roomIds);
+
+      const config = authHeader ? authHeader() : {};
+      console.log("[RoomServiceAssignments] Auth config:", config ? "✓ Present" : "✗ Missing");
+
+      // Parallel fetch with better error handling
+      const [servicesRes, assignmentsRes, employeesRes] = await Promise.all([
+        API.get("/services?limit=100", config).catch((err) => {
+          console.error("[RoomServiceAssignments] Services API error:", err.response?.data || err.message);
+          return { data: [] };
+        }),
+        API.get("/services/assigned?limit=1000", config).catch((err) => {
+          console.error("[RoomServiceAssignments] Assignments API error:", err.response?.data || err.message);
+          return { data: [] };
+        }),
+        API.get("/employees?limit=100", config).catch((err) => {
+          console.error("[RoomServiceAssignments] Employees API error:", err.response?.data || err.message);
+          return { data: [] };
+        })
+      ]);
+
+      // Process services
+      const servicesArray = Array.isArray(servicesRes.data) ? servicesRes.data : [];
+      const employeesArray = Array.isArray(employeesRes.data) ? employeesRes.data : [];
+
+      console.log("[RoomServiceAssignments] ✓ Fetched", servicesArray.length, "services");
+      console.log("[RoomServiceAssignments] ✓ Fetched", employeesArray.length, "employees");
+
+      if (servicesArray.length > 0) {
+        console.log("[RoomServiceAssignments] Sample service:", servicesArray[0]);
+      } else {
+        console.warn("[RoomServiceAssignments] ⚠️  No services found! Please create services first.");
+      }
+
+      setServices(servicesArray);
+      setEmployees(employeesArray);
+
+      // Filter assignments for ONLY this booking's rooms (last checked-in customer)
+      const allAssignments = assignmentsRes.data || [];
+      console.log("[RoomServiceAssignments] Total assignments from API:", allAssignments.length);
+
+      if (allAssignments.length > 0) {
+        console.log("[RoomServiceAssignments] First 3 assignments:", allAssignments.slice(0, 3));
+      }
+
+      const filtered = allAssignments.filter(a => {
+        const matches = roomIds.includes(a.room_id);
+        console.log(`[RoomServiceAssignments] Assignment ${a.id}: room_id=${a.room_id}, matches=${matches}`);
+        return matches;
+      });
+
+      console.log("[RoomServiceAssignments] ✓ Filtered", filtered.length, "assignments for current booking (from", allAssignments.length, "total)");
+      setAssignments(filtered);
+      console.log("[RoomServiceAssignments] === FETCH DATA END ===");
+
+    } catch (error) {
+      console.error("[RoomServiceAssignments] ✗ Fatal error:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAssign = async (e) => {
+    e.preventDefault();
+    if (!assignForm.service_id || !assignForm.employee_id) {
+      alert("Please select service and employee");
+      return;
+    }
+
+    const currentRoom = booking.rooms && booking.rooms[0];
+    if (!currentRoom) {
+      alert("Room information missing");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const config = authHeader ? authHeader() : {};
+      await API.post("/services/assign", {
+        service_id: parseInt(assignForm.service_id),
+        employee_id: parseInt(assignForm.employee_id),
+        room_id: currentRoom.id || currentRoom.room_id
+      }, config);
+
+      alert("Service assigned successfully");
+      setAssignForm({ service_id: "", employee_id: "" });
+      fetchData(); // Refresh list
+    } catch (error) {
+      console.error("Failed to assign service", error);
+      alert("Failed to assign service: " + (error.response?.data?.detail || error.message));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Assign Form */}
+      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <h5 className="font-semibold text-gray-700 mb-3">Assign New Service</h5>
+        {console.log("[RoomServiceAssignments RENDER] services:", services, "length:", services.length)}
+        <form onSubmit={handleAssign} className="flex flex-wrap gap-4 items-end">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Service</label>
+            <select
+              value={assignForm.service_id}
+              onChange={e => setAssignForm({ ...assignForm, service_id: e.target.value })}
+              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+            >
+              <option value="">Select Service</option>
+              {services.map(s => (
+                <option key={s.id} value={s.id}>{s.name} ({formatCurrency(s.charges)})</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs font-medium text-gray-700 mb-1">Assign To (Employee)</label>
+            <select
+              value={assignForm.employee_id}
+              onChange={e => setAssignForm({ ...assignForm, employee_id: e.target.value })}
+              className="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2 border"
+            >
+              <option value="">Select Employee</option>
+              {employees.map(e => (
+                <option key={e.id} value={e.id}>{e.name} ({e.role})</option>
+              ))}
+            </select>
+          </div>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+          >
+            {submitting ? "Assigning..." : "Assign"}
+          </button>
+        </form>
+      </div>
+
+      {/* List - Show ALL assigned services (completed and pending) */}
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <h4 className="text-lg font-semibold text-gray-800">
+            Assigned Services
+            <span className="ml-2 text-sm font-normal text-gray-500">
+              ({assignments.length} total)
+            </span>
+          </h4>
+          <button
+            onClick={fetchData}
+            className="px-3 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 text-sm"
+          >
+            Refresh
+          </button>
+        </div>
+        {loading ? (
+          <div className="text-center py-4 text-gray-500">Loading assignments...</div>
+        ) : assignments.length === 0 ? (
+          <div className="text-center py-8 text-gray-500 bg-white border rounded-lg">
+            <p className="font-medium">No services assigned yet.</p>
+            <p className="text-xs mt-1">Use the form above to assign a service.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto bg-white border rounded-lg">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Room</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assigned To</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Assigned At</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {assignments.map(a => (
+                  <tr key={a.id} className="hover:bg-gray-50">
+                    <td className="px-3 py-2">
+                      <div className="text-sm font-medium text-gray-900">{a.service?.name || "Unknown"}</div>
+                      <div className="text-xs text-gray-500">{formatCurrency(a.service?.charges || 0)}</div>
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-600">
+                      {a.room?.number || "N/A"}
+                    </td>
+                    <td className="px-3 py-2 text-sm text-gray-600">{a.employee?.name || "Unassigned"}</td>
+                    <td className="px-3 py-2">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold
+                                        ${a.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          a.status === 'in_progress' ? 'bg-blue-100 text-blue-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                        {a.status || 'pending'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-gray-500">
+                      {a.assigned_at ? new Date(a.assigned_at).toLocaleString() : 'N/A'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default Bookings;

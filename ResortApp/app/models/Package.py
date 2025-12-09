@@ -11,6 +11,14 @@ class Package(Base):
     price = Column(Float, nullable=False)
     booking_type = Column(String, default="room_type")  # "whole_property" or "room_type"
     room_types = Column(String, nullable=True)  # Comma-separated list of room types (e.g., "Cottage,Non AC Double Room")
+    
+    # New fields
+    theme = Column(String, nullable=True)  # Romance, Wellness, Adventure, Family, etc.
+    default_adults = Column(Integer, default=2)  # Default number of adults for this package
+    default_children = Column(Integer, default=0)  # Default number of children for this package
+    max_stay_days = Column(Integer, nullable=True)  # Maximum number of days allowed for this package
+    food_included = Column(String, nullable=True)  # Comma-separated list of included meals (e.g., "Breakfast,Lunch,Dinner")
+    food_timing = Column(String, nullable=True)    # JSON string: {"Breakfast": "08:00", ...}
 
     # Relationships
     images = relationship("PackageImage", back_populates="package", cascade="all, delete-orphan")
@@ -44,6 +52,7 @@ class PackageBooking(Base):
     children = Column(Integer, default=0)
     id_card_image_url = Column(String, nullable=True)
     guest_photo_url = Column(String, nullable=True)
+
     status = Column(String)
     advance_deposit = Column(Float, default=0.0)  # Advance payment made during booking
 

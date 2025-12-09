@@ -3,10 +3,10 @@ Write-Host "Stopping any running Python processes on port 8011..." -ForegroundCo
 
 # Find and kill processes using port 8011
 $processes = Get-NetTCPConnection -LocalPort 8011 -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique
-foreach ($pid in $processes) {
-    if ($pid) {
-        Write-Host "Killing process $pid on port 8011..." -ForegroundColor Yellow
-        Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+foreach ($proc_id in $processes) {
+    if ($proc_id) {
+        Write-Host "Killing process $proc_id on port 8011..." -ForegroundColor Yellow
+        Stop-Process -Id $proc_id -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -21,4 +21,5 @@ Write-Host "`nIf you see error messages instead, share them." -ForegroundColor Y
 Write-Host "=" * 60 -ForegroundColor Gray
 
 # Start the server
+$Env:PYTHONIOENCODING = "utf-8"
 python main.py

@@ -781,7 +781,22 @@ const Billing = () => {
     }
     if (billData.charges.package_charges > 0) chargesBody.push(['Package Charges', `Package for ${billData.stay_nights} nights`, formatCurrency(billData.charges.package_charges)]);
     billData.charges.food_items.forEach(item => chargesBody.push([`Food: ${item.item_name}`, `Quantity: ${item.quantity}`, formatCurrency(item.amount)]));
-    billData.charges.service_items.forEach(item => chargesBody.push([`Service: ${item.service_name}`, '', formatCurrency(item.charges)]));
+    billData.charges.service_items.forEach(item => {
+      const serviceLabel = item.is_paid ? `Service: ${item.service_name} (Previously Billed)` : `Service: ${item.service_name}`;
+      chargesBody.push([serviceLabel, '', formatCurrency(item.charges)]);
+    });
+
+    // Add Inventory Usage (Optional display)
+    if (billData.charges.inventory_usage && billData.charges.inventory_usage.length > 0) {
+      chargesBody.push([{ content: 'Inventory / Amenities Usage', colSpan: 3, styles: { fillColor: [240, 240, 240], fontStyle: 'bold' } }]);
+      billData.charges.inventory_usage.forEach(item => {
+        chargesBody.push([
+          `Inventory: ${item.item_name}`,
+          `Qty: ${item.quantity} ${item.unit} (${new Date(item.date).toLocaleDateString()})`,
+          '' // No charge shown here as it's usage history
+        ]);
+      });
+    }
 
     autoTable(doc, {
       startY: 65,
@@ -881,9 +896,18 @@ const Billing = () => {
     if (billData.charges.service_items.length > 0) {
       text += `\nAdditional Services:\n`;
       billData.charges.service_items.forEach(item => {
-        text += `- ${item.service_name}: ${formatCurrency(item.charges)}\n`;
+        const serviceLabel = item.is_paid ? `${item.service_name} (Previously Billed)` : item.service_name;
+        text += `- ${serviceLabel}: ${formatCurrency(item.charges)}\n`;
       });
     }
+
+    if (billData.charges.inventory_usage && billData.charges.inventory_usage.length > 0) {
+      text += `\nInventory Usage:\n`;
+      billData.charges.inventory_usage.forEach(item => {
+        text += `- ${item.item_name} (x${item.quantity} ${item.unit})\n`;
+      });
+    }
+
     text += `${line}\n`;
     text += `Subtotal: ${formatCurrency(billData.charges.total_due)}\n`;
     // GST Breakdown
@@ -1229,7 +1253,28 @@ const Billing = () => {
                     <div className="mt-3">
                       <h4 className="font-semibold text-gray-600">Additional Services:</h4>
                       <ul className="list-decimal list-inside ml-4 text-xs text-gray-500">
-                        {billData.charges.service_items.map((item, i) => <li key={i}>{item.service_name} - {formatCurrency(item.charges)}</li>)}
+                        {billData.charges.service_items.map((item, i) => (
+                          <li key={i} className={item.is_paid ? "text-gray-400 line-through" : ""}>
+                            {item.service_name} - {formatCurrency(item.charges)}
+                            {item.is_paid && <span className="ml-2 text-green-600 text-xs font-semibold no-underline">(Previously Billed)</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {billData.charges.inventory_usage && billData.charges.inventory_usage.length > 0 && (
+                    <div className="mt-3">
+                      <h4 className="font-semibold text-gray-600">Inventory Usage (Amenities / Stock Issued):</h4>
+                      <ul className="list-disc list-inside ml-4 text-xs text-gray-500">
+                        {billData.charges.inventory_usage.map((item, i) => (
+                          <li key={i}>
+                            <span className="font-medium text-gray-700">{item.item_name}</span>
+                            {item.quantity > 0 && ` (x${item.quantity} ${item.unit})`}
+                            {item.room_number && ` - Room ${item.room_number}`}
+                            <span className="text-gray-400 ml-1">[{new Date(item.date).toLocaleDateString()}]</span>
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   )}

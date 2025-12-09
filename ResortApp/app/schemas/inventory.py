@@ -249,6 +249,7 @@ class InventoryItemOut(InventoryItemBase):
     created_at: datetime
     updated_at: datetime
     is_low_stock: bool = False
+    last_purchase_price: Optional[float] = 0.0
     
     class Config:
         from_attributes = True

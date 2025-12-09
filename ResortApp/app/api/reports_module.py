@@ -77,6 +77,24 @@ def get_daily_arrival_report(
                 })
         
         for pkg_booking in package_bookings:
+            # Calculate total amount dynamically if missing
+            calculated_total = 0.0
+            if hasattr(pkg_booking, 'total_amount'):
+                calculated_total = pkg_booking.total_amount
+            elif pkg_booking.package:
+                # Basic calculation: Price per night * nights * rooms
+                try:
+                    check_in = pkg_booking.check_in
+                    check_out = pkg_booking.check_out
+                    nights = (check_out - check_in).days
+                    nights = max(1, nights)
+                    num_rooms = len(pkg_booking.rooms) if pkg_booking.rooms else 1
+                    calculated_total = pkg_booking.package.price * nights * num_rooms
+                except:
+                    calculated_total = 0.0
+
+            package_title = pkg_booking.package.title if pkg_booking.package else 'N/A'
+
             for pbr in pkg_booking.rooms:
                 result.append({
                     "guest_name": pkg_booking.guest_name,
@@ -87,8 +105,8 @@ def get_daily_arrival_report(
                     "adults": pkg_booking.adults,
                     "children": pkg_booking.children,
                     "advance_paid": pkg_booking.advance_deposit,
-                    "total_amount": pkg_booking.total_amount,
-                    "special_requests": f"Package: {pkg_booking.package.name if pkg_booking.package else 'N/A'}",
+                    "total_amount": calculated_total,
+                    "special_requests": f"Package: {package_title}",
                     "booking_type": "Package"
                 })
         

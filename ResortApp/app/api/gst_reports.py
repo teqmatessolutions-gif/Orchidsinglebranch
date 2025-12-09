@@ -17,7 +17,7 @@ try:
     PANDAS_AVAILABLE = True
 except ImportError:
     PANDAS_AVAILABLE = False
-    print("Warning: pandas not installed. GSTR-2B reconciliation feature will be unavailable.")
+    # print("Warning: pandas not installed. GSTR-2B reconciliation feature will be unavailable.")
 
 from app.database import get_db
 from app.utils.auth import get_current_user
@@ -193,7 +193,7 @@ def get_b2b_sales_register(
             gstin_validation = validate_gstin(c.guest_gstin)
             if not gstin_validation["valid"]:
                 invalid_gstin_count += 1
-                print(f"Warning: Invalid GSTIN {c.guest_gstin} for checkout {c.id}: {gstin_validation['error']}")
+                # print(f"Warning: Invalid GSTIN {c.guest_gstin} for checkout {c.id}: {gstin_validation['error']}")
                 continue
             
             # Get place of supply
@@ -643,7 +643,7 @@ def get_hsn_sac_summary(
                     dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
                     start_dt = dt.date() if isinstance(dt, datetime) else dt
             except Exception as e:
-                print(f"HSN/SAC Summary: Error parsing start_date {start_date}: {str(e)}")
+                # print(f"HSN/SAC Summary: Error parsing start_date {start_date}: {str(e)}")
                 start_dt = None
         if end_date:
             try:
@@ -653,7 +653,7 @@ def get_hsn_sac_summary(
                     dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
                     end_dt = dt.date() if isinstance(dt, datetime) else dt
             except Exception as e:
-                print(f"HSN/SAC Summary: Error parsing end_date {end_date}: {str(e)}")
+                # print(f"HSN/SAC Summary: Error parsing end_date {end_date}: {str(e)}")
                 end_dt = None
 
         # Query ALL checkouts with booking relationships to get actual nights
@@ -676,7 +676,7 @@ def get_hsn_sac_summary(
             # Get all checkouts - no limit for accurate reporting
             checkouts = query.all()
         except Exception as query_error:
-            print(f"HSN/SAC Summary: Error in query - {str(query_error)}")
+            # print(f"HSN/SAC Summary: Error in query - {str(query_error)}")
             import traceback
             traceback.print_exc()
             # Fallback: query without eager loading
@@ -689,7 +689,7 @@ def get_hsn_sac_summary(
             checkouts = query.all()
         
         # Debug: Log checkout count
-        print(f"HSN/SAC Summary: Found {len(checkouts)} checkouts")
+        # print(f"HSN/SAC Summary: Found {len(checkouts)} checkouts")
 
         # Group by HSN/SAC code and tax rate
         # Key: (hsn_sac_code, tax_rate)
@@ -1035,17 +1035,18 @@ def get_hsn_sac_summary(
                         continue
             else:
                 # Column doesn't exist, skip consumables processing
-                print("HSN/SAC Summary: consumables_audit_data column not found, skipping consumables processing")
+                # print("HSN/SAC Summary: consumables_audit_data column not found, skipping consumables processing")
+                pass
         except Exception as consumables_error:
             # Log error but don't crash the entire endpoint
-            print(f"HSN/SAC Summary: Error processing consumables - {str(consumables_error)}")
+            # print(f"HSN/SAC Summary: Error processing consumables - {str(consumables_error)}")
             import traceback
             traceback.print_exc()
             # Continue with the rest of the function even if consumables processing fails
 
         # Debug: Log summary counts
-        print(f"HSN/SAC Summary: Rooms={room_count}, Food={food_count}, Services={service_count}, Packages={package_count}, Consumables={consumables_count}")
-        print(f"HSN/SAC Summary: Total HSN/SAC codes={len(hsn_summary)}")
+        # print(f"HSN/SAC Summary: Rooms={room_count}, Food={food_count}, Services={service_count}, Packages={package_count}, Consumables={consumables_count}")
+        # print(f"HSN/SAC Summary: Total HSN/SAC codes={len(hsn_summary)}")
         
         # Round all values and convert to list
         result_data = []
@@ -1089,8 +1090,8 @@ def get_hsn_sac_summary(
         # Catch any unhandled errors and return a proper error response
         import traceback
         error_trace = traceback.format_exc()
-        print(f"HSN/SAC Summary: Unhandled error - {str(e)}")
-        print(error_trace)
+        # print(f"HSN/SAC Summary: Unhandled error - {str(e)}")
+        # print(error_trace)
         from fastapi import HTTPException
         raise HTTPException(
             status_code=500,
@@ -1180,10 +1181,11 @@ def get_itc_register(
         purchases = query.limit(1000).all()
         
         # Debug: Log purchase count and date range
-        print(f"ITC Register: Date range - start_dt={start_dt}, end_dt={end_dt}")
-        print(f"ITC Register: Found {len(purchases)} purchases")
+        # print(f"ITC Register: Date range - start_dt={start_dt}, end_dt={end_dt}")
+        # print(f"ITC Register: Found {len(purchases)} purchases")
         if purchases:
-            print(f"ITC Register: First purchase date={purchases[0].purchase_date}, Last purchase date={purchases[-1].purchase_date}")
+            # print(f"ITC Register: First purchase date={purchases[0].purchase_date}, Last purchase date={purchases[-1].purchase_date}")
+            pass
 
         # Pre-load all vendors to ensure they're available (fallback for edge cases)
         vendor_ids = list(set([p.vendor_id for p in purchases if p.vendor_id]))
@@ -1191,7 +1193,7 @@ def get_itc_register(
         if vendor_ids:
             vendors = db.query(Vendor).filter(Vendor.id.in_(vendor_ids)).all()
             vendors_map = {v.id: v for v in vendors}
-            print(f"ITC Register: Loaded {len(vendors)} vendors")
+            # print(f"ITC Register: Loaded {len(vendors)} vendors")
 
         # Categorize ITC records
         input_goods = []      # Standard consumables (Eligible)
@@ -1228,12 +1230,12 @@ def get_itc_register(
                 vendor_state = (vendor.billing_state and vendor.billing_state.strip()) or (getattr(vendor, 'state', None) and getattr(vendor, 'state', None).strip()) or None
                 
                 # Debug: Verify vendor details
-                print(f"ITC Register: Purchase {p.id} - Vendor loaded: {vendor_name}, GST: {vendor_gstin}")
+                # print(f"ITC Register: Purchase {p.id} - Vendor loaded: {vendor_name}, GST: {vendor_gstin}")
             else:
                 vendor_gstin = ""
                 vendor_name = "Unknown Vendor"
                 vendor_state = None
-                print(f"ITC Register: WARNING - Purchase {p.id} has no vendor! vendor_id={p.vendor_id}")
+                # print(f"ITC Register: WARNING - Purchase {p.id} has no vendor! vendor_id={p.vendor_id}")
             place_of_supply = f"{RESORT_STATE_CODE}-{STATE_CODES.get(RESORT_STATE_CODE, 'Unknown')}"
             if vendor_state:
                 # Try to match vendor state to state code
@@ -1247,7 +1249,7 @@ def get_itc_register(
             invoice_value = float(p.total_amount or 0)
             
             # Debug: Log invoice details
-            print(f"ITC Register: Processing purchase {p.id}, Invoice: {invoice_number}, Date: {invoice_date}, Vendor: {vendor_name}, GST: {vendor_gstin}")
+            # print(f"ITC Register: Processing purchase {p.id}, Invoice: {invoice_number}, Date: {invoice_date}, Vendor: {vendor_name}, GST: {vendor_gstin}")
             
             for detail in p.details:
                 item = detail.item
@@ -1304,21 +1306,21 @@ def get_itc_register(
                 }
 
                 # Debug: Log the record being created
-                print(f"ITC Register: Creating record - Vendor: {vendor_name} ({vendor_gstin}), Invoice: {invoice_number}, Item: {item.name if item else 'None'}, Tax: {total_tax}, Eligibility: {itc_eligibility}, Type: {itc_type}")
+                # print(f"ITC Register: Creating record - Vendor: {vendor_name} ({vendor_gstin}), Invoice: {invoice_number}, Item: {item.name if item else 'None'}, Tax: {total_tax}, Eligibility: {itc_eligibility}, Type: {itc_type}")
                 
                 # Categorize based on eligibility and type
                 if itc_eligibility == "Ineligible":
                     ineligible.append(itc_record)
-                    print(f"ITC Register: ✓ Added to ineligible - {vendor_name}, Invoice: {invoice_number}, Tax: {total_tax}")
+                    # print(f"ITC Register: [OK] Added to ineligible - {vendor_name}, Invoice: {invoice_number}, Tax: {total_tax}")
                 elif itc_type == "Capital Goods":
                     capital_goods.append(itc_record)
-                    print(f"ITC Register: ✓ Added to capital_goods - {vendor_name}, Invoice: {invoice_number}, Tax: {total_tax}")
+                    # print(f"ITC Register: [OK] Added to capital_goods - {vendor_name}, Invoice: {invoice_number}, Tax: {total_tax}")
                 elif itc_type == "Input Services":
                     input_services.append(itc_record)
-                    print(f"ITC Register: ✓ Added to input_services - {vendor_name}, Invoice: {invoice_number}, Tax: {total_tax}")
+                    # print(f"ITC Register: [OK] Added to input_services - {vendor_name}, Invoice: {invoice_number}, Tax: {total_tax}")
                 else:  # Input Goods
                     input_goods.append(itc_record)
-                    print(f"ITC Register: ✓ Added to input_goods - {vendor_name}, Invoice: {invoice_number}, Tax: {total_tax}")
+                    # print(f"ITC Register: [OK] Added to input_goods - {vendor_name}, Invoice: {invoice_number}, Tax: {total_tax}")
 
         # Calculate totals
         def calculate_totals(records):
@@ -1335,14 +1337,16 @@ def get_itc_register(
         ineligible_total = calculate_totals(ineligible)
         
         # Debug: Log totals and sample data
-        print(f"ITC Register: Input Goods={len(input_goods)}, Capital Goods={len(capital_goods)}, Input Services={len(input_services)}, Ineligible={len(ineligible)}")
-        print(f"ITC Register: Total Eligible ITC={eligible_total['total_tax']}, Total Ineligible ITC={ineligible_total['total_tax']}")
-        print(f"ITC Register: All Eligible records={len(input_goods + capital_goods + input_services)}")
+        # print(f"ITC Register: Input Goods={len(input_goods)}, Capital Goods={len(capital_goods)}, Input Services={len(input_services)}, Ineligible={len(ineligible)}")
+        # print(f"ITC Register: Total Eligible ITC={eligible_total['total_tax']}, Total Ineligible ITC={ineligible_total['total_tax']}")
+        # print(f"ITC Register: All Eligible records={len(input_goods + capital_goods + input_services)}")
         if input_goods:
-            print(f"ITC Register: Sample Input Goods record: Vendor={input_goods[0].get('supplier_name')}, GST={input_goods[0].get('vendor_gstin')}, Invoice={input_goods[0].get('invoice_number')}")
+            # print(f"ITC Register: Sample Input Goods record: Vendor={input_goods[0].get('supplier_name')}, GST={input_goods[0].get('vendor_gstin')}, Invoice={input_goods[0].get('invoice_number')}")
+            pass
         if input_goods + capital_goods + input_services:
             all_eligible_sample = (input_goods + capital_goods + input_services)[0]
-            print(f"ITC Register: Sample All Eligible record: Vendor={all_eligible_sample.get('supplier_name')}, GST={all_eligible_sample.get('vendor_gstin')}, Invoice={all_eligible_sample.get('invoice_number')}")
+            # print(f"ITC Register: Sample All Eligible record: Vendor={all_eligible_sample.get('supplier_name')}, GST={all_eligible_sample.get('vendor_gstin')}, Invoice={all_eligible_sample.get('invoice_number')}")
+            pass
 
         return {
             "period": {"start_date": start_date, "end_date": end_date},
@@ -1381,7 +1385,9 @@ def get_itc_register(
         }
     except Exception as e:
         import traceback
-        print(f"Error in ITC Register: {str(e)}\n{traceback.format_exc()}")
+        # print(f"Error in ITC Register: {str(e)}\n{traceback.format_exc()}")
+        tb = traceback.format_exc()
+        # traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error generating ITC Register: {str(e)}")
 
 
@@ -2030,14 +2036,15 @@ def get_room_tariff_slab_report(
         checkouts = query.all()
         
         # Debug: Log checkout count and date range
-        print(f"Room Tariff Slab: Date range - start_dt={start_dt}, end_dt={end_dt}")
-        print(f"Room Tariff Slab: Found {len(checkouts)} checkouts with room_total > 0")
+        # print(f"Room Tariff Slab: Date range - start_dt={start_dt}, end_dt={end_dt}")
+        # print(f"Room Tariff Slab: Found {len(checkouts)} checkouts with room_total > 0")
         if checkouts:
-            print(f"Room Tariff Slab: First checkout date={checkouts[0].checkout_date}, Last checkout date={checkouts[-1].checkout_date}")
+            # print(f"Room Tariff Slab: First checkout date={checkouts[0].checkout_date}, Last checkout date={checkouts[-1].checkout_date}")
+            pass
 
-        slab_5 = []   # <= ₹4,999 (5% GST)
-        slab_12 = []  # ₹5,000 - ₹7,499 (12% GST)
-        slab_18 = []  # ≥ ₹7,500 (18% GST)
+        slab_5 = []   # <= Rs.4,999 (5% GST)
+        slab_12 = []  # Rs.5,000 - Rs.7,499 (12% GST)
+        slab_18 = []  # >= Rs.7,500 (18% GST)
 
         for c in checkouts:
             room_total = float(c.room_total or 0)
@@ -2054,7 +2061,7 @@ def get_room_tariff_slab_report(
             }
             
             # Debug: Log room data
-            print(f"Room Tariff Slab: Checkout {c.id}, Date: {c.checkout_date}, Room Total: ₹{room_total}, Tax Rate: {expected_rate}%, Slab: {'5%' if expected_rate == 5.0 else '12%' if expected_rate == 12.0 else '18%'}")
+            # print(f"Room Tariff Slab: Checkout {c.id}, Date: {c.checkout_date}, Room Total: ₹{room_total}, Tax Rate: {expected_rate}%, Slab: {'5%' if expected_rate == 5.0 else '12%' if expected_rate == 12.0 else '18%'}")
 
             if expected_rate == 5.0:
                 slab_5.append(invoice_data)
@@ -2064,24 +2071,24 @@ def get_room_tariff_slab_report(
                 slab_18.append(invoice_data)
         
         # Debug: Log slab counts
-        print(f"Room Tariff Slab: Slab 5% = {len(slab_5)}, Slab 12% = {len(slab_12)}, Slab 18% = {len(slab_18)}")
+        # print(f"Room Tariff Slab: Slab 5% = {len(slab_5)}, Slab 12% = {len(slab_12)}, Slab 18% = {len(slab_18)}")
 
         return {
             "period": {"start_date": start_date, "end_date": end_date},
             "slab_5_percent": {
-                "description": "Rooms ≤ ₹4,999 (5% GST)",
+                "description": "Rooms <= Rs.4,999 (5% GST)",
                 "total_invoices": len(slab_5),
                 "total_revenue": round(sum([s["room_total"] for s in slab_5]), 2),
                 "data": slab_5
             },
             "slab_12_percent": {
-                "description": "Rooms ₹5,000 - ₹7,499 (12% GST)",
+                "description": "Rooms Rs.5,000 - Rs.7,499 (12% GST)",
                 "total_invoices": len(slab_12),
                 "total_revenue": round(sum([s["room_total"] for s in slab_12]), 2),
                 "data": slab_12
             },
             "slab_18_percent": {
-                "description": "Rooms ≥ ₹7,500 (18% GST)",
+                "description": "Rooms >= Rs.7,500 (18% GST)",
                 "total_invoices": len(slab_18),
                 "total_revenue": round(sum([s["room_total"] for s in slab_18]), 2),
                 "data": slab_18
@@ -2089,8 +2096,9 @@ def get_room_tariff_slab_report(
         }
     except Exception as e:
         import traceback
-        print(f"Error in Room Tariff Slab Report: {str(e)}\n{traceback.format_exc()}")
-        raise HTTPException(status_code=500, detail=f"Error generating Room Tariff Slab Report: {str(e)}")
+        # print(f"Error in Room Tariff Slab Report: {str(e)}\n{traceback.format_exc()}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error generating Room Tariff Slab Report: {repr(e)}")
 
 
 @router.get("/master-summary")
@@ -2176,7 +2184,7 @@ def get_master_gst_summary(
             checkout_query = checkout_query.filter(Checkout.checkout_date <= end_dt)
         
         # Debug: Log query parameters and verify base data matches Room Tariff Slab
-        print(f"Master Summary: Date range - start_dt={start_dt}, end_dt={end_dt}")
+        # print(f"Master Summary: Date range - start_dt={start_dt}, end_dt={end_dt}")
         
         # Verify: Count checkouts that match Room Tariff Slab criteria
         verify_query = db.query(func.count(Checkout.id)).filter(Checkout.room_total > 0)
@@ -2185,12 +2193,12 @@ def get_master_gst_summary(
         if end_dt:
             verify_query = verify_query.filter(Checkout.checkout_date <= end_dt)
         checkout_count = verify_query.scalar() or 0
-        print(f"Master Summary: Found {checkout_count} checkouts with room_total > 0 (should match Room Tariff Slab)")
+        # print(f"Master Summary: Found {checkout_count} checkouts with room_total > 0 (should match Room Tariff Slab)")
         
         result = checkout_query.first()
         
         # Debug: Log aggregation results
-        print(f"Master Summary: SQL Aggregation Result - outward_supplies={result.total_outward_supplies}, room_taxable={result.room_taxable}, room_cgst_sgst={result.room_cgst_sgst}")
+        # print(f"Master Summary: SQL Aggregation Result - outward_supplies={result.total_outward_supplies}, room_taxable={result.room_taxable}, room_cgst_sgst={result.room_cgst_sgst}")
         
         total_outward_supplies = float(result.total_outward_supplies or 0)
         total_taxable_value = float(result.room_taxable or 0) + float(result.food_taxable or 0) + float(result.service_taxable or 0) + float(result.package_taxable or 0)
@@ -2200,7 +2208,7 @@ def get_master_gst_summary(
         total_output_tax = total_output_igst + total_output_cgst + total_output_sgst
         
         # Debug: Log calculated totals
-        print(f"Master Summary: Calculated totals - outward_supplies={total_outward_supplies}, taxable_value={total_taxable_value}, output_tax={total_output_tax}")
+        # print(f"Master Summary: Calculated totals - outward_supplies={total_outward_supplies}, taxable_value={total_taxable_value}, output_tax={total_output_tax}")
         
         # 2. Calculate Total Input Tax Credit (ITC) from Purchases using SQL aggregations
         # Join with PurchaseDetail and InventoryItem/Category to filter eligible ITC

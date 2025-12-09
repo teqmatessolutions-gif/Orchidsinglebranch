@@ -2,7 +2,7 @@ from sqlalchemy.orm import Session
 from app.models.booking import Booking, BookingRoom
 from app.models.room import Room
 from app.schemas.booking import BookingCreate, BookingUpdate
-from app.curd import notification as notification_crud
+# Notification system removed
 
 def create_booking(db: Session, booking_in: BookingCreate):
     booking = Booking(
@@ -29,11 +29,7 @@ def create_booking(db: Session, booking_in: BookingCreate):
     db.commit()
     db.refresh(booking)
     
-    # Send notification
-    try:
-        notification_crud.notify_booking_created(db, booking.guest_name, booking.id)
-    except Exception as e:
-        print(f"Failed to send notification: {e}")
+    # Notification system removed for performance
     
     return booking
 
@@ -55,12 +51,7 @@ def update_booking(db: Session, booking_id: int, booking_in: BookingUpdate):
     db.commit()
     db.refresh(booking)
     
-    # Send notification if status changed
-    if hasattr(booking_in, 'status') and booking_in.status and old_status != booking.status:
-        try:
-            notification_crud.notify_booking_status_changed(db, booking.guest_name, booking.status, booking.id)
-        except Exception as e:
-            print(f"Failed to send notification: {e}")
+    # Notification system removed for performance
     
     return booking
 

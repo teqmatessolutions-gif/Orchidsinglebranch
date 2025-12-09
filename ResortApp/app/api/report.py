@@ -40,13 +40,24 @@ class GuestServiceHistory(BaseModel):
     room_number: Optional[str]
     charges: Optional[float]
     status: str
+    status: str
     assigned_at: datetime
+
+class GuestInventoryUsage(BaseModel):
+    item_name: str
+    quantity: float
+    unit: str
+    issue_date: datetime
+    room_number: str
+    category: Optional[str] = None
+    cost: Optional[float] = None
 
 class GuestProfileOut(BaseModel):
     guest_details: Dict[str, str]
     bookings: List[GuestBookingHistory]
     food_orders: List[GuestFoodOrderHistory]
     services: List[GuestServiceHistory]
+    inventory_usage: List[GuestInventoryUsage]
 
     class Config:
         from_attributes = True
@@ -651,6 +662,62 @@ def _get_guest_profile_data(db: Session, email: Optional[str], mobile: Optional[
                 assigned_at=service.assigned_at
             ))
 
+    # 4.5. Fetch Inventory Usage
+    inventory_history = []
+    
+    # We need to look at each booking time window and the rooms occupied
+    # Import models here to avoid circular imports if any
+    from app.models.inventory import StockIssue, StockIssueDetail, InventoryItem, Location
+    
+    # Pre-fetch room info to get inventory_location_id
+    rooms_info = {r.id: r for r in db.query(models.Room).filter(models.Room.id.in_(all_room_ids)).all()}
+    
+    def fetch_inventory_for_booking(booking_obj, is_package=False):
+        booking_rooms = booking_obj.booking_rooms if not is_package else booking_obj.rooms
+        
+        for br in booking_rooms:
+            if not br.room_id:
+                continue
+                
+            room = rooms_info.get(br.room_id)
+            if not room or not room.inventory_location_id:
+                continue
+                
+            # Find stock issues to this room's location within booking dates
+            # Buffer check-out date by included time if needed, typically check-out is noon, issues might happen that morning
+            
+            issues = (
+                db.query(StockIssueDetail)
+                .join(StockIssue)
+                .join(InventoryItem)
+                .filter(StockIssue.destination_location_id == room.inventory_location_id)
+                .filter(StockIssue.issue_date >= booking_obj.check_in)
+                # Assuming check_in/out are Dates, cast to datetime for comparison or rely on SQL alchemy handling date vs datetime
+                .filter(func.date(StockIssue.issue_date) <= booking_obj.check_out) 
+                .options(
+                    joinedload(StockIssueDetail.item).joinedload(InventoryItem.category),
+                    joinedload(StockIssueDetail.issue)
+                )
+                .all()
+            )
+            
+            for detail in issues:
+                inventory_history.append(GuestInventoryUsage(
+                    item_name=detail.item.name,
+                    quantity=detail.issued_quantity,
+                    unit=detail.unit,
+                    issue_date=detail.issue.issue_date,
+                    room_number=room.number,
+                    category=detail.item.category.name if detail.item.category else None,
+                    cost=(detail.cost or 0) * detail.issued_quantity if detail.cost else 0
+                ))
+
+    for b in regular_bookings:
+        fetch_inventory_for_booking(b, is_package=False)
+        
+    for pb in package_bookings:
+        fetch_inventory_for_booking(pb, is_package=True)
+
     # 5. Assemble the final profile
     return GuestProfileOut(
         guest_details={
@@ -660,5 +727,6 @@ def _get_guest_profile_data(db: Session, email: Optional[str], mobile: Optional[
         },
         bookings=sorted(booking_history, key=lambda b: b.check_in, reverse=True),
         food_orders=sorted(food_orders_history, key=lambda o: o.created_at, reverse=True),
-        services=sorted(services_history, key=lambda s: s.assigned_at, reverse=True)
+        services=sorted(services_history, key=lambda s: s.assigned_at, reverse=True),
+        inventory_usage=sorted(inventory_history, key=lambda x: x.issue_date, reverse=True)
     )

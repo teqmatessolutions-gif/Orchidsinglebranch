@@ -24,10 +24,10 @@ class FoodOrderItemOut(BaseModel):
 
 class FoodOrderOut(BaseModel):
     id: int
-    room_id: int
-    amount: float
+    room_id: Optional[int] = None
+    amount: Optional[float] = 0.0
     status: str
-    assigned_employee_id: int
+    assigned_employee_id: Optional[int] = None
     billing_status: str 
     payment_method: Optional[str] = None
     order_type: Optional[str] = "dine_in"

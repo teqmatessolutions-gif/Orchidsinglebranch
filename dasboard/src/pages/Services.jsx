@@ -98,8 +98,8 @@ const Services = () => {
   };
 
   // Fetch all data
-  const fetchAll = async () => {
-    setLoading(true);
+  const fetchAll = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
       const [sRes, aRes, rRes, eRes, bRes, pbRes, invRes, srRes] = await Promise.all([
         api.get("/services?limit=50").catch(() => ({ data: [] })),
@@ -112,7 +112,7 @@ const Services = () => {
         api.get("/service-requests?limit=50").catch(() => ({ data: [] })),
       ]);
       setServices(sRes?.data || []);
-      setAssignedServices(aRes?.data || []);
+      setAssignedServices((aRes?.data || []).sort((a, b) => new Date(b.assigned_at) - new Date(a.assigned_at)));
       setAllRooms(rRes?.data || []);
       setEmployees(eRes?.data || []);
       setInventoryItems(invRes?.data || []);
@@ -243,7 +243,7 @@ const Services = () => {
       console.error("Error fetching data:", error);
       alert("Failed to load services data. Please refresh the page.");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   };
 
@@ -547,10 +547,15 @@ const Services = () => {
 
       const response = await api.post("/services/assign", payload);
       alert("Service assigned successfully!");
+
+      if (response.data) {
+        setAssignedServices(prev => [response.data, ...prev]);
+      }
+
       setAssignForm({ service_id: "", employee_id: "", room_id: "", status: "pending" });
       setSelectedServiceDetails(null);
       setExtraInventoryItems([]);
-      fetchAll();
+      fetchAll(false);
     } catch (err) {
       console.error("Failed to assign service", err);
       console.error("Error details:", {
@@ -629,7 +634,9 @@ const Services = () => {
 
       // Update status without inventory returns
       await api.patch(`/services/assigned/${id}`, { status: newStatus });
-      fetchAll();
+
+      setAssignedServices(prev => prev.map(s => s.id === id ? { ...s, status: newStatus } : s));
+      fetchAll(false);
     } catch (error) {
       console.error("Failed to update status:", error);
       alert(`Failed to update status: ${error.response?.data?.detail || error.message}`);
@@ -684,11 +691,13 @@ const Services = () => {
         inventory_returns: inventory_returns.length > 0 ? inventory_returns : []
       });
 
+      setAssignedServices(prev => prev.map(s => s.id === completingServiceId ? { ...s, status: "completed" } : s));
+
       // Close modal and refresh
       setCompletingServiceId(null);
       setInventoryAssignments([]);
       setReturnQuantities({});
-      fetchAll();
+      fetchAll(false);
 
       if (inventory_returns.length > 0) {
         alert(`Service marked as completed and ${inventory_returns.length} item(s) returned successfully!`);
@@ -758,7 +767,8 @@ const Services = () => {
     }
     try {
       await api.delete(`/services/assigned/${assignedId}`);
-      fetchAll();
+      setAssignedServices(prev => prev.filter(s => s.id !== assignedId));
+      fetchAll(false);
     } catch (error) {
       console.error("Failed to delete assigned service:", error);
       const msg = error.response?.data?.detail || error.message || "Unknown error";
@@ -1175,12 +1185,18 @@ const Services = () => {
       if (quickAssignModal.isReassignment && quickAssignModal.assignedService) {
         // Update the employee for an existing assigned service
         const assignedService = quickAssignModal.assignedService;
-        await api.patch(`/services/assigned/${assignedService.id}`, {
-          employee_id: parseInt(quickAssignModal.employeeId)
-        });
+        const empId = parseInt(quickAssignModal.employeeId);
+        const emp = employees.find(e => e.id === empId);
+
+        setAssignedServices(prev => prev.map(s =>
+          s.id === assignedService.id
+            ? { ...s, employee_id: empId, employee: emp || s.employee }
+            : s
+        ));
+
         alert("Employee reassigned successfully!");
         setQuickAssignModal(null);
-        fetchAll();
+        fetchAll(false);
         return;
       }
 
@@ -1209,9 +1225,14 @@ const Services = () => {
       }
 
       alert("Service assigned successfully!");
+
+      if (response.data) {
+        setAssignedServices(prev => [response.data, ...prev]);
+      }
+
       setQuickAssignModal(null);
       fetchServiceRequests();
-      fetchAll();
+      fetchAll(false);
     } catch (err) {
       console.error("Failed to assign service", err);
       let errorMsg = "Failed to assign service. ";
@@ -3015,7 +3036,7 @@ const Services = () => {
                           </td>
                         </tr>
                       ) : (
-                        serviceRequests.sort((a, b) => {
+                        [...serviceRequests].sort((a, b) => {
                           // Sort: pending first, then in_progress, then others
                           const statusOrder = { 'pending': 0, 'in_progress': 1, 'inventory_checked': 2, 'completed': 3, 'cancelled': 4 };
                           const aOrder = statusOrder[a.status] ?? 5;

@@ -1109,9 +1109,17 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
                     .filter(BookingRoom.room_id == room.id, Booking.status.in_(['checked-in', 'checked_in', 'booked']))
                     .order_by(Booking.id.desc()).first())
     
+    # Fallback: Check for recently checked out booking if no active booking found
+    if not booking_link:
+        booking_link = (db.query(BookingRoom)
+                        .join(Booking)
+                        .options(joinedload(BookingRoom.booking))
+                        .filter(BookingRoom.room_id == room.id, Booking.status.in_(['checked-out', 'checked_out', 'checked out']))
+                        .order_by(Booking.id.desc()).first())
+
     if booking_link:
         booking = booking_link.booking
-        if booking.status not in ['checked-in', 'checked_in', 'booked']:
+        if booking.status not in ['checked-in', 'checked_in', 'booked', 'checked-out', 'checked_out', 'checked out']:
             raise HTTPException(status_code=400, detail=f"Booking is not in a valid state for checkout. Current status: {booking.status}")
     else:
         package_link = (db.query(PackageBookingRoom)
@@ -1119,10 +1127,19 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
                         .options(joinedload(PackageBookingRoom.package_booking))
                         .filter(PackageBookingRoom.room_id == room.id, PackageBooking.status.in_(['checked-in', 'checked_in', 'booked']))
                         .order_by(PackageBooking.id.desc()).first())
+        
+        # Fallback for package
+        if not package_link:
+            package_link = (db.query(PackageBookingRoom)
+                            .join(PackageBooking)
+                            .options(joinedload(PackageBookingRoom.package_booking))
+                            .filter(PackageBookingRoom.room_id == room.id, PackageBooking.status.in_(['checked-out', 'checked_out', 'checked out']))
+                            .order_by(PackageBooking.id.desc()).first())
+                            
         if package_link:
             booking = package_link.package_booking
             is_package = True
-            if booking.status not in ['checked-in', 'checked_in', 'booked']:
+            if booking.status not in ['checked-in', 'checked_in', 'booked', 'checked-out', 'checked_out', 'checked out']:
                 raise HTTPException(status_code=400, detail=f"Package booking is not in a valid state for checkout. Current status: {booking.status}")
     
     if not booking:
@@ -1215,13 +1232,15 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
     billed_food_order_items = [item for item in all_food_order_items 
                                if item.order and item.order.billing_status == "billed"]
     
-    # Get ALL unbilled services for this room
-    # Note: Services can be pre-assigned before check-in, so we don't filter by assigned_at
-    # We only filter by billing_status to avoid double-billing
-    unbilled_services = db.query(AssignedService).options(joinedload(AssignedService.service)).filter(
-        AssignedService.room_id == room.id, 
-        AssignedService.billing_status == "unbilled"
+    # Get ALL assigned services for this room (both billed and unbilled)
+    # Similar to food items, we show billed services as "Paid" with zero charge
+    all_assigned_services = db.query(AssignedService).options(joinedload(AssignedService.service)).filter(
+        AssignedService.room_id == room.id
     ).all()
+    
+    # Separate unbilled and billed services
+    unbilled_services = [ass for ass in all_assigned_services if ass.billing_status == "unbilled"]
+    billed_services = [ass for ass in all_assigned_services if ass.billing_status == "billed"]
     
     # Calculate charges: only unbilled items contribute to charges
     charges.food_charges = sum(item.quantity * item.food_item.price for item in unbilled_food_order_items if item.food_item)
@@ -1267,7 +1286,26 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
                 "payment_status": "Previously Billed"
             })
     
-    charges.service_items = [{"service_name": ass.service.name, "charges": ass.service.charges} for ass in unbilled_services]
+    # Include ALL service items with payment status (similar to food items)
+    charges.service_items = []
+    
+    # Add unbilled services with their actual charges
+    for ass in unbilled_services:
+        charges.service_items.append({
+            "service_name": ass.service.name, 
+            "charges": ass.service.charges,
+            "is_paid": False,
+            "payment_status": "Unpaid"
+        })
+    
+    # Add billed services with zero charge (marked as paid)
+    for ass in billed_services:
+        charges.service_items.append({
+            "service_name": ass.service.name, 
+            "charges": 0.0,  # Don't add to bill
+            "is_paid": True,
+            "payment_status": "Previously Billed"
+        })
     
     # Calculate Consumables Charges from CheckoutRequest
     from app.models.inventory import InventoryItem
@@ -1329,6 +1367,41 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
                     "charge_per_unit": unit_price,
                     "total_charge": missing_item_charge
                 })
+
+    # 7. Fetch Inventory Usage (Amenities/Stock Issued) for this room
+    from app.models.inventory import StockIssue, StockIssueDetail
+    
+    if room.inventory_location_id:
+        stock_issues = (db.query(StockIssue)
+                        .options(joinedload(StockIssue.details).joinedload(StockIssueDetail.item))
+                        .filter(
+                            StockIssue.destination_location_id == room.inventory_location_id,
+                            StockIssue.issue_date >= check_in_datetime
+                        )
+                        .order_by(StockIssue.issue_date)
+                        .all())
+        
+        for issue in stock_issues:
+            for detail in issue.details:
+                if detail.item:
+                    charges.inventory_usage.append({
+                        "date": issue.issue_date,
+                        "item_name": detail.item.name,
+                        "category": detail.item.category.name if detail.item.category else "N/A",
+                        "quantity": detail.issued_quantity,
+                        "unit": detail.unit,
+                        "cost": detail.cost or 0.0,
+                        "room_number": room.number,
+                        "is_payable": getattr(detail, 'is_payable', False),
+                        "is_paid": getattr(detail, 'is_paid', False)
+                    })
+                    
+                    # Calculate inventory charges for payable items
+                    if getattr(detail, 'is_payable', False) and not getattr(detail, 'is_paid', False):
+                        # Get item price (use selling_price if available, otherwise unit_price)
+                        item_price = detail.item.selling_price or detail.item.unit_price or 0.0
+                        item_charge = item_price * detail.issued_quantity
+                        charges.inventory_charges = (charges.inventory_charges or 0) + item_charge
     
     # Calculate GST
     # Room charges: 5% GST if < 5000, 12% GST if 5000-7500, 18% GST if > 7500
@@ -1376,8 +1449,12 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
     if charges.consumables_charges and charges.consumables_charges > 0:
         charges.consumables_gst = charges.consumables_charges * 0.05
     
+    # Inventory GST: 18% (default for most inventory items)
+    if charges.inventory_charges and charges.inventory_charges > 0:
+        charges.inventory_gst = charges.inventory_charges * 0.18
+    
     # Total GST
-    charges.total_gst = (charges.room_gst or 0) + (charges.food_gst or 0) + (charges.service_gst or 0) + (charges.package_gst or 0) + (charges.consumables_gst or 0)
+    charges.total_gst = (charges.room_gst or 0) + (charges.food_gst or 0) + (charges.service_gst or 0) + (charges.package_gst or 0) + (charges.consumables_gst or 0) + (charges.inventory_gst or 0)
     
     # Total due (subtotal before GST)
     charges.total_due = sum([
@@ -1385,7 +1462,8 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
         charges.food_charges or 0, 
         charges.service_charges or 0, 
         charges.package_charges or 0,
-        charges.consumables_charges or 0
+        charges.consumables_charges or 0,
+        charges.inventory_charges or 0
     ])
     
     # Add advance deposit info to charges
@@ -1421,10 +1499,18 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
                     .filter(BookingRoom.room_id == initial_room.id, Booking.status.in_(['checked-in', 'checked_in', 'booked']))
                     .order_by(Booking.id.desc()).first())
 
+    # Fallback: Check for recently checked out booking
+    if not booking_link:
+        booking_link = (db.query(BookingRoom)
+                        .join(Booking)
+                        .options(joinedload(BookingRoom.booking))
+                        .filter(BookingRoom.room_id == initial_room.id, Booking.status.in_(['checked-out', 'checked_out', 'checked out']))
+                        .order_by(Booking.id.desc()).first())
+
     if booking_link:
         booking = booking_link.booking
         # Validate booking status before proceeding
-        if booking.status not in ['checked-in', 'checked_in', 'booked']:
+        if booking.status not in ['checked-in', 'checked_in', 'booked', 'checked-out', 'checked_out', 'checked out']:
             raise HTTPException(status_code=400, detail=f"Booking is not in a valid state for checkout. Current status: {booking.status}")
     else:
         package_link = (db.query(PackageBookingRoom)
@@ -1432,11 +1518,20 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
                         .options(joinedload(PackageBookingRoom.package_booking)) # Eager load the booking
                         .filter(PackageBookingRoom.room_id == initial_room.id, PackageBooking.status.in_(['checked-in', 'checked_in', 'booked']))
                         .order_by(PackageBooking.id.desc()).first())
+        
+        # Fallback for package
+        if not package_link:
+            package_link = (db.query(PackageBookingRoom)
+                            .join(PackageBooking)
+                            .options(joinedload(PackageBookingRoom.package_booking))
+                            .filter(PackageBookingRoom.room_id == initial_room.id, PackageBooking.status.in_(['checked-out', 'checked_out', 'checked out']))
+                            .order_by(PackageBooking.id.desc()).first())
+
         if package_link:
             booking = package_link.package_booking
             is_package = True
             # Validate booking status before proceeding
-            if booking.status not in ['checked-in', 'checked_in', 'booked']:
+            if booking.status not in ['checked-in', 'checked_in', 'booked', 'checked-out', 'checked_out', 'checked out']:
                 raise HTTPException(status_code=400, detail=f"Package booking is not in a valid state for checkout. Current status: {booking.status}")
 
     if not booking:
@@ -1542,7 +1637,14 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
     billed_food_order_items = [item for item in all_food_order_items 
                                if item.order and item.order.billing_status == "billed"]
 
-    unbilled_services = db.query(AssignedService).options(joinedload(AssignedService.service)).filter(AssignedService.room_id.in_(room_ids), AssignedService.billing_status == "unbilled").all()
+    # Get ALL assigned services for these rooms (both billed and unbilled)
+    all_assigned_services = db.query(AssignedService).options(joinedload(AssignedService.service)).filter(
+        AssignedService.room_id.in_(room_ids)
+    ).all()
+    
+    # Separate unbilled and billed services
+    unbilled_services = [ass for ass in all_assigned_services if ass.billing_status == "unbilled"]
+    billed_services = [ass for ass in all_assigned_services if ass.billing_status == "billed"]
 
     # Calculate total food charges from the individual items (only unbilled items)
     charges.food_charges = sum(item.quantity * item.food_item.price for item in unbilled_food_order_items if item.food_item)
@@ -1569,7 +1671,26 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
                 "is_paid": True
             })
     
-    charges.service_items = [{"service_name": ass.service.name, "charges": ass.service.charges} for ass in unbilled_services]
+    # Include ALL service items with payment status
+    charges.service_items = []
+    
+    # Add unbilled services with their actual charges
+    for ass in unbilled_services:
+        charges.service_items.append({
+            "service_name": ass.service.name, 
+            "charges": ass.service.charges,
+            "is_paid": False,
+            "payment_status": "Unpaid"
+        })
+    
+    # Add billed services with zero charge (marked as paid)
+    for ass in billed_services:
+        charges.service_items.append({
+            "service_name": ass.service.name, 
+            "charges": 0.0,
+            "is_paid": True,
+            "payment_status": "Previously Billed"
+        })
 
     # Calculate Consumables Charges from CheckoutRequest
     from app.models.inventory import InventoryItem
@@ -1611,6 +1732,48 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
                                 "charge_per_unit": price,
                                 "total_charge": amount
                             })
+
+    # Fetch Inventory Usage (Amenities/Stock Issued) for all rooms
+    from app.models.inventory import StockIssue, StockIssueDetail
+    
+    room_location_ids = [r.inventory_location_id for r in all_rooms if r.inventory_location_id]
+    
+    if room_location_ids:
+        stock_issues = (db.query(StockIssue)
+                        .options(joinedload(StockIssue.details).joinedload(StockIssueDetail.item))
+                        .filter(
+                            StockIssue.destination_location_id.in_(room_location_ids),
+                            StockIssue.issue_date >= check_in_datetime
+                        )
+                        .order_by(StockIssue.issue_date)
+                        .all())
+        
+        # Helper to map location ID to room number
+        loc_to_room = {r.inventory_location_id: r.number for r in all_rooms if r.inventory_location_id}
+        
+        for issue in stock_issues:
+            room_num = loc_to_room.get(issue.destination_location_id, "Unknown")
+            for detail in issue.details:
+                if detail.item:
+                    charges.inventory_usage.append({
+                        "date": issue.issue_date,
+                        "item_name": detail.item.name,
+                        "category": detail.item.category.name if detail.item.category else "N/A",
+                        "quantity": detail.issued_quantity,
+                        "unit": detail.unit,
+                        "cost": detail.cost or 0.0,
+                        "room_number": room_num,
+                        "is_payable": getattr(detail, 'is_payable', False),
+                        "is_paid": getattr(detail, 'is_paid', False)
+                    })
+                    
+                    # Calculate inventory charges for payable items
+                    if getattr(detail, 'is_payable', False) and not getattr(detail, 'is_paid', False):
+                        # Get item price (use selling_price if available, otherwise unit_price)
+                        item_price = detail.item.selling_price or detail.item.unit_price or 0.0
+                        item_charge = item_price * detail.issued_quantity
+                        charges.inventory_charges = (charges.inventory_charges or 0) + item_charge
+
 
     # Calculate GST
     # Room charges: 5% GST if < 5000, 12% GST if 5000-7500, 18% GST if > 7500
@@ -1662,8 +1825,12 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
     if charges.consumables_charges and charges.consumables_charges > 0:
         charges.consumables_gst = charges.consumables_charges * 0.05
     
+    # Inventory GST: 18% (default for most inventory items)
+    if charges.inventory_charges and charges.inventory_charges > 0:
+        charges.inventory_gst = charges.inventory_charges * 0.18
+    
     # Total GST
-    charges.total_gst = (charges.room_gst or 0) + (charges.food_gst or 0) + (charges.service_gst or 0) + (charges.package_gst or 0) + (charges.consumables_gst or 0)
+    charges.total_gst = (charges.room_gst or 0) + (charges.food_gst or 0) + (charges.service_gst or 0) + (charges.package_gst or 0) + (charges.consumables_gst or 0) + (charges.inventory_gst or 0)
     
     # Total due (subtotal before GST)
     charges.total_due = sum([
@@ -1671,7 +1838,8 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
         charges.food_charges or 0, 
         charges.service_charges or 0, 
         charges.package_charges or 0,
-        charges.consumables_charges or 0
+        charges.consumables_charges or 0,
+        charges.inventory_charges or 0
     ])
     
     # Add advance deposit info to charges
@@ -2081,16 +2249,20 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                 db.add(payment_record)
             
             # 11. Update billing status for food orders and services
+            # Auto-complete pending orders/services when billing them
             db.query(FoodOrder).filter(
                 FoodOrder.room_id == room.id, 
-                FoodOrder.billing_status == "unbilled"
-            ).update({"billing_status": "billed"})
+                FoodOrder.billing_status == "unbilled",
+                FoodOrder.status != "cancelled"  # Don't complete cancelled orders
+            ).update({"billing_status": "billed", "status": "completed"})
             
             db.query(AssignedService).filter(
                 AssignedService.room_id == room.id, 
-                AssignedService.billing_status == "unbilled"
+                AssignedService.billing_status == "unbilled",
+                AssignedService.status != "cancelled" # Don't complete cancelled services
             ).update({
                 "billing_status": "billed",
+                "status": "completed",
                 "last_used_at": datetime.utcnow()
             })
             
@@ -2609,16 +2781,20 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                 db.add(payment_record)
             
             # 10. Update billing status
+            # Auto-complete pending orders/services when billing them
             db.query(FoodOrder).filter(
                 FoodOrder.room_id.in_(room_ids), 
-                FoodOrder.billing_status == "unbilled"
-            ).update({"billing_status": "billed"})
+                FoodOrder.billing_status == "unbilled",
+                FoodOrder.status != "cancelled"  # Don't complete cancelled orders
+            ).update({"billing_status": "billed", "status": "completed"})
             
             db.query(AssignedService).filter(
                 AssignedService.room_id.in_(room_ids), 
-                AssignedService.billing_status == "unbilled"
+                AssignedService.billing_status == "unbilled",
+                AssignedService.status != "cancelled" # Don't complete cancelled services
             ).update({
                 "billing_status": "billed",
+                "status": "completed",
                 "last_used_at": datetime.utcnow()
             })
             

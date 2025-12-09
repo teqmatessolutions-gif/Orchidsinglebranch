@@ -218,6 +218,26 @@ def get_items(
     """Optimized endpoint with eager loading - no N+1 queries"""
     try:
         items = inventory_crud.get_all_items(db, skip=skip, limit=limit, category_id=category_id, active_only=active_only)
+        
+        # Fetch last purchase prices efficiently
+        item_ids = [i.id for i in items]
+        last_prices = {}
+        if item_ids:
+            from app.models.inventory import PurchaseDetail, PurchaseMaster
+            # Fetch most recent purchase details for these items
+            # statuses: confirmed or received are valid for "last price"
+            rows = db.query(PurchaseDetail.item_id, PurchaseDetail.unit_price)\
+                .join(PurchaseMaster)\
+                .filter(PurchaseDetail.item_id.in_(item_ids))\
+                .filter(PurchaseMaster.status.in_(['received', 'confirmed']))\
+                .order_by(PurchaseMaster.purchase_date.desc(), PurchaseDetail.id.desc())\
+                .all()
+            
+            # Since we ordered by date desc, the first time we see an item_id, it is the latest
+            for iid, price in rows:
+                if iid not in last_prices:
+                    last_prices[iid] = float(price) if price else 0.0
+
         result = []
         for item in items:
             # Category is already loaded via eager loading (when configured), no extra query needed
@@ -227,6 +247,7 @@ def get_items(
                 "category_name": category.name if category else None,
                 "department": category.parent_department if category else None,  # Add department from category
                 "is_low_stock": item.current_stock <= item.min_stock_level if item.min_stock_level else False,
+                "last_purchase_price": last_prices.get(item.id, 0.0)
             })
         return result
     except Exception as e:
@@ -1167,6 +1188,12 @@ def create_issue(
     except Exception as e:
         import traceback
         traceback.print_exc()
+        # Log to file for debugging
+        try:
+            with open("api_stock_issue_error.log", "a") as f:
+                f.write(f"\n{'='*80}\n{datetime.now()}\nError: {str(e)}\n{traceback.format_exc()}{'='*80}\n")
+        except:
+            pass
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error creating issue: {str(e)}")
 
@@ -1478,8 +1505,9 @@ def get_location_items(
     current_user: User = Depends(get_current_user)
 ):
     """Get all inventory items and their stock levels for a specific location"""
-    from app.models.inventory import InventoryItem, AssetMapping, AssetRegistry, StockIssueDetail, StockIssue, LocationStock
+    from app.models.inventory import InventoryItem, AssetMapping, AssetRegistry, StockIssueDetail, StockIssue, LocationStock, WasteLog
     from sqlalchemy import func
+    from sqlalchemy.orm import joinedload
     
     location = inventory_crud.get_location_by_id(db, location_id)
     if not location:
@@ -1573,8 +1601,58 @@ def get_location_items(
                 "status": asset.status
             }
     
-        
-    # Calculate totals
+    # 4. Get History (Stock Issues & Waste Logs)
+    history = []
+    
+    # Stock Issues (Inbound to location)
+    stock_issues = db.query(StockIssue).options(
+        joinedload(StockIssue.details).joinedload(StockIssueDetail.item),
+        joinedload(StockIssue.issuer)
+    ).filter(
+        StockIssue.destination_location_id == location_id
+    ).order_by(StockIssue.issue_date.desc()).limit(50).all()
+    
+    for issue in stock_issues:
+        for detail in issue.details:
+            if detail.item:
+                history.append({
+                    "date": issue.issue_date,
+                    "type": "Stock Received",
+                    "item_name": detail.item.name,
+                    "quantity": detail.issued_quantity,
+                    "unit": detail.unit,
+                    "reference": issue.issue_number,
+                    "user": issue.issuer.name if issue.issuer else "Unknown",
+                    "notes": detail.notes or issue.notes,
+                    "color": "green"
+                })
+
+    # Waste Logs (Outbound/Loss from location)
+    waste_logs = db.query(WasteLog).options(
+        joinedload(WasteLog.item),
+        joinedload(WasteLog.food_item),
+        joinedload(WasteLog.reporter)
+    ).filter(
+        WasteLog.location_id == location_id
+    ).order_by(WasteLog.waste_date.desc()).limit(50).all()
+    
+    for log in waste_logs:
+        item_name = log.item.name if log.item else (log.food_item.name if log.food_item else "Unknown Item")
+        history.append({
+            "date": log.waste_date,
+            "type": f"Waste ({log.reason_code})",
+            "item_name": item_name,
+            "quantity": log.quantity,
+            "unit": log.unit,
+            "reference": log.log_number,
+            "user": log.reporter.name if log.reporter else "Unknown",
+            "notes": log.notes,
+            "color": "red"
+        })
+    
+    # Sort combined history by date desc
+    history.sort(key=lambda x: x["date"], reverse=True)
+
     items_list = list(items_dict.values())
     total_items = sum(item["current_stock"] for item in items_list)
     total_value = sum(item["total_value"] for item in items_list)
@@ -1590,7 +1668,8 @@ def get_location_items(
         },
         "total_items": total_items,
         "total_stock_value": total_value,
-        "items": items_list
+        "items": items_list,
+        "history": history
     }
 
 
@@ -1964,14 +2043,6 @@ def update_stock_requisition_status(
     return updated
 
 
-# Stock Issue Endpoints
-@router.post("/issues", response_model=StockIssueOut)
-def create_stock_issue(
-    issue: StockIssueCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    return inventory_crud.create_stock_issue(db, issue, issued_by_id=current_user.id)
 
 
 @router.get("/issues", response_model=List[StockIssueOut])

@@ -19,6 +19,12 @@ class PackageOut(BaseModel):
     booking_type: Optional[str] = "room_type"  # "whole_property" or "room_type"
     room_types: Optional[str] = None  # Comma-separated list of room types
     images: List[PackageImageOut] = Field(default_factory=list)
+    theme: Optional[str] = None
+    default_adults: int = 2
+    default_children: int = 0
+    max_stay_days: Optional[int] = None
+    food_included: Optional[str] = None
+    food_timing: Optional[str] = None
 
     class Config:
         from_attributes = True

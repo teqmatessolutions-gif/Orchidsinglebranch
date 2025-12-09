@@ -5,35 +5,52 @@ from app.models.Package import PackageBooking, PackageBookingRoom
 from app.models.service_request import ServiceRequest
 from app.schemas.foodorder import FoodOrderCreate, FoodOrderUpdate
 from datetime import datetime
-from app.curd import notification as notification_crud
+# Notification system removed
 
-def get_guest_for_room(room_id, db: Session):
+def get_guest_for_room(room_id, db: Session, reference_date=None):
     """Get guest name for a room from either regular or package bookings"""
     if not room_id:
         return None
     
+    # Ensure reference_date is a date object for comparison with Date columns
+    ref_date = reference_date.date() if reference_date and isinstance(reference_date, datetime) else reference_date
+    
     # Check regular bookings first
-    active_booking = (
+    query = (
         db.query(Booking)
         .join(BookingRoom)
         .filter(BookingRoom.room_id == room_id)
-        .filter(Booking.status.in_(["checked-in", "booked"]))
-        .order_by(Booking.id.desc())
-        .first()
     )
+    
+    if ref_date:
+        # Find booking covering the reference date
+        query = query.filter(Booking.check_in <= ref_date)\
+                     .filter(Booking.check_out >= ref_date)\
+                     .filter(Booking.status != "cancelled")
+    else:
+        # Check active bookings
+        query = query.filter(Booking.status.in_(["checked-in", "booked"]))
+        
+    active_booking = query.order_by(Booking.id.desc()).first()
     
     if active_booking:
         return active_booking.guest_name
     
     # Check package bookings
-    active_package_booking = (
+    pkg_query = (
         db.query(PackageBooking)
         .join(PackageBookingRoom)
         .filter(PackageBookingRoom.room_id == room_id)
-        .filter(PackageBooking.status.in_(["checked-in", "booked"]))
-        .order_by(PackageBooking.id.desc())
-        .first()
     )
+    
+    if ref_date:
+        pkg_query = pkg_query.filter(PackageBooking.check_in <= ref_date)\
+                             .filter(PackageBooking.check_out >= ref_date)\
+                             .filter(PackageBooking.status != "cancelled")
+    else:
+        pkg_query = pkg_query.filter(PackageBooking.status.in_(["checked-in", "booked"]))
+        
+    active_package_booking = pkg_query.order_by(PackageBooking.id.desc()).first()
     
     if active_package_booking:
         return active_package_booking.guest_name
@@ -45,7 +62,7 @@ def create_food_order(db: Session, order_data: FoodOrderCreate):
         room_id=order_data.room_id,
         amount=order_data.amount,
         assigned_employee_id=order_data.assigned_employee_id,
-        status="active",
+        status="pending",
         billing_status="unbilled",
         order_type=getattr(order_data, 'order_type', 'dine_in'),
         delivery_request=getattr(order_data, 'delivery_request', None)
@@ -82,15 +99,9 @@ def create_food_order(db: Session, order_data: FoodOrderCreate):
             db.add(service_request)
             db.commit()
     
-    # Send notification
-    try:
-        # Get room number
-        from app.models.room import Room
-        room = db.query(Room).filter(Room.id == order.room_id).first()
-        room_number = room.number if room else "Unknown"
-        notification_crud.notify_food_order_created(db, room_number, order.id)
-    except Exception as e:
-        print(f"Failed to send notification: {e}")
+    
+    # Notification system removed for performance
+    
     
     # Reload order with relationships to ensure response has all data (especially food_item_name)
     from sqlalchemy.orm import joinedload
@@ -143,8 +154,9 @@ def get_food_orders(db: Session, skip: int = 0, limit: int = 100):
             else:
                 order.room_number = None
             
-            # Set guest name from room's active booking
-            order.guest_name = get_guest_for_room(order.room_id, db)
+            # Set guest name significantly improved logic:
+            # Search for booking that was active at the time the order was created
+            order.guest_name = get_guest_for_room(order.room_id, db, order.created_at)
         
         return orders
     except Exception as e:
@@ -176,12 +188,7 @@ def update_food_order_status(db: Session, order_id: int, status: str):
             except Exception as e:
                 print(f"Failed to process inventory usage: {e}")
         
-        # Send notification
-        try:
-            room_number = order.room.number if order.room else "Unknown"
-            notification_crud.notify_food_order_status_changed(db, room_number, status, order.id)
-        except Exception as e:
-            print(f"Failed to send notification: {e}")
+        # Notification system removed for performance
             
     return order
 
@@ -225,12 +232,7 @@ def update_food_order(db: Session, order_id: int, update_data: FoodOrderUpdate):
                 )
                 db.add(service_request)
         
-        # Send notification for status change
-        try:
-            room_number = order.room.number if order.room else "Unknown"
-            notification_crud.notify_food_order_status_changed(db, room_number, update_data.status, order.id)
-        except Exception as e:
-            print(f"Failed to send notification: {e}")
+        # Notification system removed for performance
 
     if update_data.billing_status is not None:
         order.billing_status = update_data.billing_status

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, Float, String, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.database import Base
@@ -10,7 +10,7 @@ class FoodOrder(Base):
     room_id = Column(Integer, ForeignKey("rooms.id"))
     amount = Column(Float)  # Base amount without GST
     assigned_employee_id = Column(Integer, ForeignKey("employees.id"))
-    status = Column(String, default="active")
+    status = Column(String, default="pending")
     billing_status = Column(String, default="unbilled")  # "unbilled", "billed", "paid"
     order_type = Column(String, default="dine_in")  # "dine_in" or "room_service"
     delivery_request = Column(String, nullable=True)  # Delivery request/notes for room service
@@ -18,6 +18,7 @@ class FoodOrder(Base):
     payment_time = Column(DateTime, nullable=True)  # When payment was made
     gst_amount = Column(Float, nullable=True)  # GST amount (5% of food)
     total_with_gst = Column(Float, nullable=True)  # Total including GST
+    is_deleted = Column(Boolean, default=False, nullable=False)  # Soft delete flag
     created_at = Column(DateTime, default=datetime.utcnow)
 
     items = relationship("FoodOrderItem", back_populates="order", cascade="all, delete-orphan")

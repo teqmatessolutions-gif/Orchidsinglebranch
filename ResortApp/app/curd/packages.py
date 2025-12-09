@@ -9,14 +9,20 @@ from app.schemas.packages import PackageBookingCreate
 
 # ------------------- Packages -------------------
 
-def create_package(db: Session, title: str, description: str, price: float, image_urls: List[str], booking_type: str = "room_type", room_types: str = None):
+def create_package(db: Session, title: str, description: str, price: float, image_urls: List[str], booking_type: str = "room_type", room_types: str = None, theme: str = None, default_adults: int = 2, default_children: int = 0, max_stay_days: int = None, food_included: str = None, food_timing: str = None):
     try:
         pkg = Package(
             title=title, 
             description=description, 
             price=price,
             booking_type=booking_type,
-            room_types=room_types
+            room_types=room_types,
+            theme=theme,
+            default_adults=default_adults,
+            default_children=default_children,
+            max_stay_days=max_stay_days,
+            food_included=food_included,
+            food_timing=food_timing
         )
         db.add(pkg)
         db.commit()
@@ -206,24 +212,18 @@ def book_package(db: Session, booking: PackageBookingCreate):
     
     is_whole_property = selected_package.booking_type == 'whole_property'
     
-    if not is_whole_property and booking.room_ids:
-        selected_rooms = db.query(Room).filter(Room.id.in_(booking.room_ids)).all()
-        if len(selected_rooms) != len(booking.room_ids):
-            raise HTTPException(status_code=400, detail="One or more selected rooms are invalid.")
-        
-        total_adult_capacity = sum(room.adults or 0 for room in selected_rooms)
-        total_children_capacity = sum(room.children or 0 for room in selected_rooms)
-        
-        if booking.adults > total_adult_capacity:
+    if not is_whole_property:
+        # Enforce package limits instead of room capacity
+        if booking.adults > selected_package.default_adults:
             raise HTTPException(
                 status_code=400,
-                detail=f"The number of adults ({booking.adults}) exceeds the total adult capacity of the selected rooms ({total_adult_capacity} adults max). Please select additional rooms or reduce the number of adults."
+                detail=f"The number of adults ({booking.adults}) exceeds the package limit ({selected_package.default_adults} adults max)."
             )
         
-        if booking.children > total_children_capacity:
+        if booking.children > selected_package.default_children:
             raise HTTPException(
                 status_code=400,
-                detail=f"The number of children ({booking.children}) exceeds the total children capacity of the selected rooms ({total_children_capacity} children max). Please select additional rooms or reduce the number of children."
+                detail=f"The number of children ({booking.children}) exceeds the package limit ({selected_package.default_children} children max)."
             )
 
     # CRITICAL FIX: Check for conflicts BEFORE creating the booking

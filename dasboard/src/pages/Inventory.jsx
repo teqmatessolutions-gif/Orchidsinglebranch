@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import DashboardLayout from "../layout/DashboardLayout";
-import { useNotifications } from "../contexts/NotificationContext";
+import { toast } from "react-hot-toast";
 import API from "../services/api";
 import { formatCurrency, formatIndianCurrencyCompact } from "../utils/currency";
 import { getApiBaseUrl } from "../utils/env";
@@ -43,6 +43,7 @@ import CategoriesTable from "./inventory/components/CategoriesTable";
 import VendorsTable from "./inventory/components/VendorsTable";
 import PurchasesTable from "./inventory/components/PurchasesTable";
 import ItemFormModal from "./inventory/modals/ItemFormModal";
+import UnitFormModal from "./inventory/modals/UnitFormModal";
 
 
 
@@ -342,6 +343,94 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
             </div>
           </div>
 
+
+          {/* Inventory History Section */}
+          <div className="mt-8 pt-6 border-t border-gray-100">
+            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-indigo-600" />
+              Inventory History (Issues & Waste)
+            </h3>
+            <div className="overflow-x-auto rounded-lg border border-gray-200">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Date
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Item
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Quantity
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Reference
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      User
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {locationData.history && locationData.history.length > 0 ? (
+                    locationData.history.map((record, idx) => (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">
+                          {formatDateTimeIST(record.date)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`px-2 py-1 text-xs rounded-full font-medium ${record.color === "green"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                              }`}
+                          >
+                            {record.type}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900 font-medium">
+                          {record.item_name}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-900">
+                          <span
+                            className={`font-semibold ${record.color === "green"
+                              ? "text-green-600"
+                              : "text-red-600"
+                              }`}
+                          >
+                            {record.color === "green" ? "+" : "-"}
+                            {record.quantity}
+                          </span>{" "}
+                          <span className="text-gray-500 text-xs">
+                            {record.unit}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">
+                          {record.reference}
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-600">
+                          {record.user}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td
+                        colSpan="6"
+                        className="px-4 py-8 text-center text-gray-500 italic"
+                      >
+                        No history found for this location.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div className="flex justify-end pt-4 border-t">
             <button
               onClick={onClose}
@@ -352,12 +441,164 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
           </div>
         </div>
       </div>
+    </div >
+  );
+};
+
+// Transaction Details Modal
+const TransactionDetailsModal = ({
+  transaction,
+  items,
+  foodItems,
+  categories,
+  purchases,
+  onClose,
+}) => {
+  if (!transaction) return null;
+
+  const item =
+    items.find((i) => i.id === transaction.item_id) ||
+    foodItems?.find((f) => f.id === transaction.item_id);
+  const category = categories.find((c) => c.id === item?.category_id);
+
+  // Helper to get transaction type label and color
+  const getTypeInfo = () => {
+    if (transaction.transaction_type === "in") {
+      return { label: "Purchase (In)", color: "bg-green-100 text-green-800" };
+    } else if (transaction.transaction_type === "out") {
+      if (transaction.notes?.toLowerCase().includes("waste") || transaction.notes?.toLowerCase().includes("spoilage")) {
+        return { label: "Waste/Spoilage", color: "bg-red-100 text-red-800" };
+      } else if (transaction.notes?.toLowerCase().includes("kitchen")) {
+        return { label: "Kitchen Usage", color: "bg-yellow-100 text-yellow-800" };
+      }
+      return { label: "Usage (Out)", color: "bg-orange-100 text-orange-800" };
+    }
+    return { label: "Adjustment", color: "bg-blue-100 text-blue-800" };
+  };
+
+  const typeInfo = getTypeInfo();
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
+          <div>
+            <h2 className="text-xl font-bold text-gray-800">
+              Transaction Details
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">
+              Ref: {transaction.reference_number || `TRX-${transaction.id}`}
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Header Info */}
+          <div className="flex flex-wrap gap-4 items-center justify-between bg-gray-50 p-4 rounded-lg">
+            <div>
+              <p className="text-sm text-gray-500">Date</p>
+              <p className="font-medium text-gray-900">{formatDateIST(transaction.created_at)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Type</p>
+              <span className={`px-2 py-1 text-xs rounded-full font-medium ${typeInfo.color}`}>
+                {typeInfo.label}
+              </span>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Amount</p>
+              <p className="font-bold text-gray-900">{formatCurrency(transaction.total_amount || 0)}</p>
+            </div>
+          </div>
+
+          {/* Item Details */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">Item Information</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-sm text-gray-500">Item Name</p>
+                <p className="font-medium text-gray-900">{item?.name || "Unknown Item"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Category</p>
+                <p className="font-medium text-gray-900">{category?.name || "-"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Quantity Change</p>
+                <p className={`font-medium ${transaction.transaction_type === "in" ? "text-green-600" : "text-red-600"}`}>
+                  {transaction.transaction_type === "in" ? "+" : "-"} {transaction.quantity} {item?.unit || "pcs"}
+                </p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-500">Unit Price</p>
+                <p className="font-medium text-gray-900">{formatCurrency(transaction.unit_price || 0)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Additional Info */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">Additional Details</h3>
+            <div className="space-y-3">
+              {transaction.notes && (
+                <div>
+                  <p className="text-sm text-gray-500">Notes</p>
+                  <div className="bg-gray-50 p-3 rounded text-sm text-gray-700 whitespace-pre-wrap">
+                    {transaction.notes}
+                  </div>
+                </div>
+              )}
+              {/* Extract Batch/Expiry from notes if available */}
+              {(transaction.notes?.includes("Batch:") || transaction.notes?.includes("Exp:")) && (
+                <div className="flex gap-4">
+                  {transaction.notes.match(/Batch: ([^\n]+)/) && (
+                    <div>
+                      <p className="text-sm text-gray-500">Batch Number</p>
+                      <p className="font-medium text-gray-900">{transaction.notes.match(/Batch: ([^\n]+)/)[1]}</p>
+                    </div>
+                  )}
+                  {transaction.notes.match(/Exp: ([^\n]+)/) && (
+                    <div>
+                      <p className="text-sm text-gray-500">Expiry Date</p>
+                      <p className="font-medium text-orange-600">{transaction.notes.match(/Exp: ([^\n]+)/)[1]}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6 border-t border-gray-200 flex justify-end">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 };
 
 const Inventory = () => {
-  const { addNotification } = useNotifications();
+  // Helper to replace missing NotificationContext
+  const addNotification = useCallback(({ title, message, type }) => {
+    if (type === 'success') {
+      toast.success(message);
+    } else if (type === 'error') {
+      toast.error(`${title}: ${message}`);
+    } else {
+      toast(message);
+    }
+  }, []);
   const [activeTab, setActiveTab] = useState("items");
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -442,6 +683,12 @@ const Inventory = () => {
     { value: "pair", label: "Pairs" },
   ]);
   const [newUnit, setNewUnit] = useState({ value: "", label: "" });
+
+  const handleAddUnit = (unit) => {
+    setUnits([...units, unit]);
+    setShowUnitForm(false);
+    addNotification({ message: "Unit added successfully!", type: "success" });
+  };
 
   // Item form - comprehensive fields
   const [itemForm, setItemForm] = useState({
@@ -768,15 +1015,19 @@ const Inventory = () => {
       });
 
       if (editingItem) {
-        await API.put(`/inventory/items/${editingItem.id}`, formData, {
+        const res = await API.put(`/inventory/items/${editingItem.id}`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         addNotification({ title: "Success", message: "Item updated successfully!", type: "success" });
+        // Update local state directly
+        setItems(prev => prev.map(item => item.id === res.data.id ? res.data : item));
       } else {
-        await API.post("/inventory/items", formData, {
+        const res = await API.post("/inventory/items", formData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         addNotification({ title: "Success", message: "Item created successfully!", type: "success" });
+        // Add to local state directly (at the top)
+        setItems(prev => [res.data, ...prev]);
       }
 
       // Reset form
@@ -812,10 +1063,7 @@ const Inventory = () => {
       });
       setShowItemForm(false);
       setEditingItem(null);
-
-      // Directly fetch items to ensure immediate refresh
-      const res = await API.get('/inventory/items?limit=1000');
-      setItems(res.data || []);
+      // Removed re-fetch to rely on local update for speed
     } catch (error) {
       console.error("Error submitting item:", error);
       addNotification({
@@ -831,7 +1079,7 @@ const Inventory = () => {
     try {
       await API.delete(`/inventory/items/${id}`);
       addNotification({ title: "Success", message: "Item deleted successfully", type: "success" });
-      fetchData();
+      setItems(prev => prev.filter(item => item.id !== id));
     } catch (error) {
       console.error("Error deleting item:", error);
       addNotification({ title: "Error", message: "Failed to delete item: " + (error.response?.data?.detail || error.message), type: "error" });
@@ -853,11 +1101,13 @@ const Inventory = () => {
     e.preventDefault();
     try {
       if (editingCategory) {
-        await API.put(`/inventory/categories/${editingCategory.id}`, categoryForm);
+        const res = await API.put(`/inventory/categories/${editingCategory.id}`, categoryForm);
         addNotification({ title: "Success", message: "Category updated successfully!", type: "success" });
+        setCategories(prev => prev.map(c => c.id === res.data.id ? res.data : c));
       } else {
-        await API.post("/inventory/categories", categoryForm);
+        const res = await API.post("/inventory/categories", categoryForm);
         addNotification({ title: "Success", message: "Category created successfully!", type: "success" });
+        setCategories(prev => [res.data, ...prev]);
       }
 
       setCategoryForm({
@@ -880,13 +1130,7 @@ const Inventory = () => {
       });
       setEditingCategory(null);
       setShowCategoryForm(false);
-
-      // Directly fetch categories to ensure immediate refresh
-      console.log('[Category Submit] Fetching categories...');
-      const res = await API.get('/inventory/categories?limit=1000');
-      console.log('[Category Submit] Received categories:', res.data?.length);
-      setCategories(res.data || []);
-      console.log('[Category Submit] Categories state updated');
+      // Removed re-fetch to rely on local update for speed
     } catch (error) {
       console.error("Error submitting category:", error);
       addNotification({ title: "Error", message: "Failed to submit category: " + (error.response?.data?.detail || error.message), type: "error" });
@@ -908,7 +1152,7 @@ const Inventory = () => {
     try {
       await API.delete(`/inventory/categories/${id}`);
       addNotification({ title: "Success", message: "Category deleted successfully", type: "success" });
-      fetchData();
+      setCategories(prev => prev.filter(c => c.id !== id));
     } catch (error) {
       console.error("Error deleting category:", error);
       addNotification({ title: "Error", message: "Failed to delete category: " + (error.response?.data?.detail || error.message), type: "error" });
@@ -966,11 +1210,13 @@ const Inventory = () => {
 
     try {
       if (editingVendor) {
-        await API.put(`/inventory/vendors/${editingVendor.id}`, cleanedData);
+        const res = await API.put(`/inventory/vendors/${editingVendor.id}`, cleanedData);
         addNotification({ title: "Success", message: "Vendor updated successfully!", type: "success" });
+        setVendors(prev => prev.map(v => v.id === res.data.id ? res.data : v));
       } else {
-        await API.post("/inventory/vendors", cleanedData);
+        const res = await API.post("/inventory/vendors", cleanedData);
         addNotification({ title: "Success", message: "Vendor created successfully!", type: "success" });
+        setVendors(prev => [res.data, ...prev]);
       }
 
       setVendorForm({
@@ -1013,10 +1259,7 @@ const Inventory = () => {
       });
       setEditingVendor(null);
       setShowVendorForm(false);
-
-      // Directly fetch vendors to ensure immediate refresh
-      const res = await API.get('/inventory/vendors?limit=1000');
-      setVendors(res.data || []);
+      // Removed re-fetch to rely on local update
     } catch (error) {
       console.error("Error submitting vendor:", error);
       const errorMessage =
@@ -1135,7 +1378,9 @@ const Inventory = () => {
         details: details,
       };
 
-      await API.post("/inventory/purchases", purchaseData);
+      const res = await API.post("/inventory/purchases", purchaseData);
+      setPurchases(prev => [res.data, ...prev]);
+
       setPurchaseForm({
         purchase_number: "",
         vendor_id: "",
@@ -1165,7 +1410,7 @@ const Inventory = () => {
         ],
       });
       setShowPurchaseForm(false);
-      fetchData();
+      // Remove fetchData()
     } catch (error) {
       console.error("Error submitting purchase:", error);
       const errorMessage =
@@ -1422,6 +1667,7 @@ const Inventory = () => {
           },
         ],
       });
+      setActiveTab("issues");
       fetchData();
     } catch (error) {
       console.error("Error creating issue:", error);
@@ -1562,11 +1808,13 @@ const Inventory = () => {
       if (wasteForm.notes) formData.append("notes", wasteForm.notes);
       if (wasteForm.photo) formData.append("photo", wasteForm.photo);
 
-      await API.post("/inventory/waste-logs", formData, {
+      const res = await API.post("/inventory/waste-logs", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
       addNotification({ title: "Success", message: "Waste log created successfully!", type: "success" });
+      setWasteLogs(prev => [res.data, ...prev]);
+
       setShowWasteForm(false);
       setWasteForm({
         item_id: "",
@@ -1581,7 +1829,7 @@ const Inventory = () => {
         notes: "",
         photo: null,
       });
-      fetchData();
+      // Removed fetchData
     } catch (error) {
       console.error("Error creating waste log:", error);
       addNotification({
@@ -4089,6 +4337,7 @@ const SmartTransactionsTab = ({
                           <button
                             className="p-1 text-gray-600 hover:text-indigo-600"
                             title="View Details"
+                            onClick={() => onTransactionClick && onTransactionClick(trans)}
                           >
                             <Eye className="w-4 h-4" />
                           </button>
@@ -6118,6 +6367,12 @@ const PurchaseFormModal = ({
           </div>
         </form>
       </div >
+      {showUnitForm && (
+        <UnitFormModal
+          onClose={() => setShowUnitForm(false)}
+          onSave={handleAddUnit}
+        />
+      )}
     </div >
   );
 };
@@ -6802,72 +7057,7 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
   );
 };
 
-const UnitFormModal = ({ unit, setUnit, onSubmit, onClose }) => {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl max-w-md w-full mx-4">
-        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-800">Add New Unit</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-        <form onSubmit={onSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Unit Value (Code) <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={unit.value}
-              onChange={(e) => setUnit({ ...unit, value: e.target.value })}
-              placeholder="e.g., carton, bundle, set"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Short code (will be converted to lowercase)
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Unit Label (Display Name) <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={unit.label}
-              onChange={(e) => setUnit({ ...unit, label: e.target.value })}
-              placeholder="e.g., Carton, Bundle, Set"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              required
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Full display name shown in dropdown
-            </p>
-          </div>
-          <div className="flex justify-end gap-4 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-            >
-              Add Unit
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
+
 
 // Requisition Form Modal
 const IssueFormModal = ({
@@ -6915,7 +7105,7 @@ const IssueFormModal = ({
                         item_id: detail.item_id,
                         issued_quantity: detail.requested_quantity || detail.approved_quantity,
                         unit: detail.unit,
-                        cost: items.find(i => i.id === detail.item_id)?.unit_price || 0,
+                        cost: items.find(i => i.id === detail.item_id)?.last_purchase_price || items.find(i => i.id === detail.item_id)?.unit_price || 0,
                         notes: `From ${selectedReq.requisition_number}`,
                         batch_lot_number: "",
                       }));
@@ -7092,7 +7282,7 @@ const IssueFormModal = ({
                                 newDetails[index].unit =
                                   selectedItem.unit || "pcs";
                                 newDetails[index].cost =
-                                  selectedItem.unit_price || 0;
+                                  selectedItem.last_purchase_price || selectedItem.unit_price || 0;
                               }
                               setForm({ ...form, details: newDetails });
                             }}
@@ -8809,7 +8999,7 @@ const RecipeFormModal = ({
       ...form,
       ingredients: [
         ...form.ingredients,
-        { inventory_item_id: "", quantity: 0, unit: "pcs", notes: "" },
+        { inventory_item_id: "", quantity: 0, unit: "", notes: "" },
       ],
     });
   };
@@ -8987,13 +9177,21 @@ const RecipeFormModal = ({
                       </label>
                       <select
                         value={ingredient.inventory_item_id}
-                        onChange={(e) =>
-                          updateIngredient(
-                            index,
-                            "inventory_item_id",
-                            e.target.value,
-                          )
-                        }
+                        onChange={(e) => {
+                          const selectedItemId = e.target.value;
+                          const selectedItem = items.find(
+                            (i) => i.id === parseInt(selectedItemId),
+                          );
+                          const newIngredients = [...form.ingredients];
+                          newIngredients[index] = {
+                            ...newIngredients[index],
+                            inventory_item_id: selectedItemId,
+                            unit: selectedItem
+                              ? selectedItem.unit
+                              : newIngredients[index].unit,
+                          };
+                          setForm({ ...form, ingredients: newIngredients });
+                        }}
                         className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
                         required
                       >

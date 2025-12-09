@@ -18,7 +18,7 @@ echo.
 echo ========================================
 echo Both servers are starting...
 echo ========================================
-echo Backend: http://localhost:8000
+echo Backend: http://localhost:8011
 echo Frontend: http://localhost:3000
 echo.
 echo Close the windows to stop the servers

@@ -89,7 +89,7 @@ const GuestProfile = () => {
         if (!path) return null;
         // Get the correct API base URL based on environment
         const apiBaseUrl = getApiBaseUrl();
-        
+
         // Package booking images start with 'id_pkg_' or 'guest_pkg_'
         if (path.startsWith('id_pkg_') || path.startsWith('guest_pkg_')) {
             return `${apiBaseUrl}/packages/booking/checkin-image/${path}`;
@@ -215,8 +215,8 @@ const GuestProfile = () => {
                                             <td className="p-3">{b.rooms.join(', ')}</td>
                                             <td className="p-3"><span className="px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">{b.status}</span></td>
                                             <td className="p-3 flex items-center gap-4">
-                                                {b.id_card_image_url && <a href={getImageUrl(b.id_card_image_url)} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline flex items-center"><FileText size={16} className="mr-1"/> ID Card</a>}
-                                                {b.guest_photo_url && <a href={getImageUrl(b.guest_photo_url)} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline flex items-center"><Camera size={16} className="mr-1"/> Photo</a>}
+                                                {b.id_card_image_url && <a href={getImageUrl(b.id_card_image_url)} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline flex items-center"><FileText size={16} className="mr-1" /> ID Card</a>}
+                                                {b.guest_photo_url && <a href={getImageUrl(b.guest_photo_url)} target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline flex items-center"><Camera size={16} className="mr-1" /> Photo</a>}
                                             </td>
                                         </tr>
                                     ))}
@@ -226,7 +226,7 @@ const GuestProfile = () => {
 
                         {/* Food Order History */}
                         <SectionCard title="Food Order History">
-                             <table className="min-w-full text-sm">
+                            <table className="min-w-full text-sm">
                                 <thead className="bg-gray-50">
                                     <tr>
                                         <th className="p-3 text-left">Order ID</th>
@@ -279,10 +279,46 @@ const GuestProfile = () => {
                                 </tbody>
                             </table>
                         </SectionCard>
+
+
+                        {/* Inventory Usage Section */}
+                        <SectionCard title="Inventory Usage & Amenities">
+                            <table className="min-w-full text-sm">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="p-3 text-left">Date</th>
+                                        <th className="p-3 text-left">Item</th>
+                                        <th className="p-3 text-left">Category</th>
+                                        <th className="p-3 text-left">Room</th>
+                                        <th className="p-3 text-right">Quantity</th>
+                                        <th className="p-3 text-right">Cost (Est.)</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y">
+                                    {profile.inventory_usage && profile.inventory_usage.length > 0 ? (
+                                        profile.inventory_usage.map((usage, idx) => (
+                                            <tr key={idx}>
+                                                <td className="p-3">{new Date(usage.issue_date).toLocaleString()}</td>
+                                                <td className="p-3 font-medium text-gray-900">{usage.item_name}</td>
+                                                <td className="p-3"><span className="px-2 py-1 bg-gray-100 rounded-full text-xs">{usage.category || 'N/A'}</span></td>
+                                                <td className="p-3">{usage.room_number}</td>
+                                                <td className="p-3 text-right font-semibold">{usage.quantity} {usage.unit}</td>
+                                                <td className="p-3 text-right text-gray-500">₹{usage.cost ? usage.cost.toFixed(2) : '0.00'}</td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="6" className="p-4 text-center text-gray-500 italic">No inventory consumption recorded.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </SectionCard>
                     </div>
-                )}
-            </div>
-        </DashboardLayout>
+                )
+                }
+            </div >
+        </DashboardLayout >
     );
 };
 

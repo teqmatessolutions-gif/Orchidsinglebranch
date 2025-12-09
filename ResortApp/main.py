@@ -87,6 +87,13 @@ app = FastAPI(
     redirect_slashes=False,  # Prevent automatic trailing slash redirects
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Start background tasks"""
+    from app.utils.food_scheduler import run_food_scheduler
+    import asyncio
+    asyncio.create_task(run_food_scheduler())
+
 # Exception handlers for proper error logging and responses
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(request: Request, exc: StarletteHTTPException):
@@ -127,9 +134,14 @@ async def global_exception_handler(request: Request, exc: Exception):
     import sys
     
     # Log the full error with traceback
-    error_detail = f"Unhandled exception in {request.method} {request.url.path}: {str(exc)}\n{traceback.format_exc()}"
-    print(f"ERROR (global handler): {error_detail}")
-    sys.stderr.write(f"ERROR (global handler): {error_detail}\n")
+    # Log the full error with traceback
+    # error_detail = f"Unhandled exception in {request.method} {request.url.path}: {str(exc)}\n{traceback.format_exc()}"
+    # try:
+    #     print(f"ERROR (global handler): {error_detail}")
+    #     sys.stderr.write(f"ERROR (global handler): {error_detail}\n")
+    # except Exception:
+    #     pass
+    traceback.print_exc()
     
     # Return 500 with error message and CORS headers
     return JSONResponse(
@@ -249,7 +261,8 @@ app.include_router(account.router, prefix="/api", tags=["Accounts"])
 app.include_router(gst_reports.router, prefix="/api", tags=["GST Reports"])
 app.include_router(reports_module.router, prefix="/api", tags=["Reports Module"])
 app.include_router(attendance.router, prefix="/api", tags=["Attendance"])
-app.include_router(notification.router, prefix="/api", tags=["Notifications"])
+# Notification system removed for performance
+# app.include_router(notification.router, prefix="/api", tags=["Notifications"])
 
 # Include comprehensive reports router if it was imported successfully
 if comprehensive_reports is not None:

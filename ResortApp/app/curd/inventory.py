@@ -1,4 +1,4 @@
-from sqlalchemy.orm import Session, joinedload, selectinload
+﻿from sqlalchemy.orm import Session, joinedload, selectinload
 from sqlalchemy import func
 from decimal import Decimal
 from datetime import datetime
@@ -548,7 +548,7 @@ def create_stock_issue(db: Session, data: dict, issued_by: int):
         # Create transaction record with destination location info
         transaction_notes = f"Stock Issue: {issue_number}"
         if dest_location_name:
-            transaction_notes += f" → {dest_location_name}"
+            transaction_notes += f" â†’ {dest_location_name}"
         if data.get('notes'):
             transaction_notes += f" - {data.get('notes', '')}"
         
@@ -567,6 +567,46 @@ def create_stock_issue(db: Session, data: dict, issued_by: int):
         # Update requisition status if linked
         if data.get("requisition_id"):
             update_requisition_status(db, data["requisition_id"], "issued")
+
+        # Update Destination Location Stock
+        # This ensures the item appears in the room's inventory list
+        dest_loc_id = data.get("destination_location_id")
+        if dest_loc_id:
+             from app.models.inventory import LocationStock
+             
+             loc_stock = db.query(LocationStock).filter(
+                 LocationStock.location_id == dest_loc_id,
+                 LocationStock.item_id == detail_data["item_id"]
+             ).first()
+             
+             if loc_stock:
+                 loc_stock.quantity += issued_qty
+                 loc_stock.last_updated = datetime.utcnow()
+             else:
+                 new_stock = LocationStock(
+                     location_id=dest_loc_id,
+                     item_id=detail_data["item_id"],
+                     quantity=issued_qty,
+                     last_updated=datetime.utcnow()
+                 )
+                 db.add(new_stock)
+
+        # Update Source Location Stock (Deduct)
+        source_loc_id = data.get("source_location_id")
+        if source_loc_id:
+             from app.models.inventory import LocationStock
+             
+             source_stock = db.query(LocationStock).filter(
+                 LocationStock.location_id == source_loc_id,
+                 LocationStock.item_id == detail_data["item_id"]
+             ).first()
+             
+             if source_stock:
+                 source_stock.quantity -= issued_qty
+                 if source_stock.quantity < 0:
+                      # Warn but allow (or set to 0? For now allow negative to track deficit)
+                      pass
+                 source_stock.last_updated = datetime.utcnow()
     
     db.commit()
     db.refresh(issue)
@@ -601,7 +641,7 @@ def generate_waste_log_number(db: Session):
 
 def create_waste_log(db: Session, data: dict, reported_by: int):
     from app.models.inventory import WasteLog, InventoryTransaction, InventoryItem
-    from app.models.food import FoodItem
+    from app.models.food_item import FoodItem
     from datetime import datetime
     
     is_food = data.get("is_food_item", False)
@@ -919,34 +959,6 @@ def update_stock_requisition_status(db: Session, requisition_id: int, status: st
 
 
 # Stock Issue CRUD
-def create_stock_issue(db: Session, data: StockIssueCreate, issued_by_id: int):
-    # Create master
-    issue_data = data.dict(exclude={"details"})
-    issue = StockIssue(**issue_data, issued_by=issued_by_id)
-    
-    # Generate issue number (ISS-YYYYMMDD-XXX)
-    today_str = datetime.now().strftime("%Y%m%d")
-    count = db.query(StockIssue).filter(StockIssue.issue_number.like(f"ISS-{today_str}-%")).count()
-    issue.issue_number = f"ISS-{today_str}-{count + 1:03d}"
-    
-    db.add(issue)
-    db.flush()
-    
-    # Create details and update stock
-    for detail_data in data.details:
-        detail = StockIssueDetail(**detail_data.dict(), issue_id=issue.id)
-        db.add(detail)
-        
-        # Update stock (deduct from source)
-        # Note: This logic assumes simple item stock. For location-based stock, we need more complex logic.
-        # For now, we'll update the global item stock as a fallback, 
-        # but ideally we should update LocationStock if implemented.
-        update_item_stock(db, detail.item_id, detail.issued_quantity, "out")
-    
-    db.commit()
-    db.refresh(issue)
-    return issue
-
 
 def get_all_stock_issues(db: Session, skip: int = 0, limit: int = 100):
     return db.query(StockIssue).options(

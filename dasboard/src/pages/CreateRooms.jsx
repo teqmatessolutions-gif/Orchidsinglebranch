@@ -34,16 +34,16 @@ const BookingModal = ({ onClose, roomNumber, bookings, filter, setFilter, checki
   const filteredBookings = bookings.filter(booking => {
     // Status filter
     const statusMatch = filter === "all" || booking.status === filter;
-    
+
     // Check-in date filter
     const checkinMatch = !checkinFilter || booking.check_in === checkinFilter;
-    
+
     // Check-out date filter
     const checkoutMatch = !checkoutFilter || booking.check_out === checkoutFilter;
-    
+
     return statusMatch && checkinMatch && checkoutMatch;
   });
-  
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-2 sm:p-4">
       <div className="bg-white p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg relative max-w-5xl w-full max-h-[90vh] sm:max-h-[80vh] overflow-hidden">
@@ -115,12 +115,11 @@ const BookingModal = ({ onClose, roomNumber, bookings, filter, setFilter, checki
                     <td className="border border-gray-300 px-2 sm:px-4 py-2 text-xs sm:text-sm">{booking.check_out}</td>
                     <td className="border border-gray-300 px-2 sm:px-4 py-2 text-xs sm:text-sm hidden md:table-cell">{booking.adults}A, {booking.children}C</td>
                     <td className="border border-gray-300 px-2 sm:px-4 py-2 text-xs sm:text-sm">
-                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                        booking.status === 'booked' ? 'bg-blue-100 text-blue-800' :
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${booking.status === 'booked' ? 'bg-blue-100 text-blue-800' :
                         booking.status === 'checked-in' ? 'bg-green-100 text-green-800' :
-                        booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
+                          booking.status === 'cancelled' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                        }`}>
                         {booking.status || 'Pending'}
                       </span>
                     </td>
@@ -220,7 +219,7 @@ const Rooms = ({ noLayout = false }) => {
 
   const fetchRooms = async () => {
     try {
-      const res = await API.get("/rooms/test?skip=0&limit=20");
+      const res = await API.get(`/rooms/test?skip=0&limit=20&_t=${Date.now()}`);
       const dataWithTrend = res.data.map((r) => ({
         ...r,
         trend:
@@ -259,13 +258,13 @@ const Rooms = ({ noLayout = false }) => {
       // Get all bookings and filter by room number
       const response = await API.get("/bookings?limit=1000");
       const allBookings = response.data.bookings || [];
-      
+
       // Filter bookings that include this room (all statuses)
       const roomBookings = allBookings.filter(booking => {
         const hasRoom = booking.rooms && booking.rooms.some(room => room.number === roomNumber);
         return hasRoom;
       });
-      
+
       setBookings(roomBookings);
       setSelectedRoomNumber(roomNumber);
       setBookingFilter("booked"); // Reset to default filter
@@ -283,9 +282,7 @@ const Rooms = ({ noLayout = false }) => {
       const formData = new FormData();
       formData.append("status", newStatus);
 
-      await API.put(`/rooms/${roomId}`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      await API.put(`/rooms/${roomId}`, formData);
 
       showBannerMessage("success", `Room status updated to ${newStatus}!`);
       fetchRooms();
@@ -306,7 +303,7 @@ const Rooms = ({ noLayout = false }) => {
           showBannerMessage("error", "Image file is too large. Please select an image smaller than 5MB.");
           return;
         }
-        
+
         // Check file type
         const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
         if (!allowedTypes.includes(file.type)) {
@@ -333,7 +330,7 @@ const Rooms = ({ noLayout = false }) => {
     formData.append("adults", form.adults);
     formData.append("children", form.children);
     if (form.image) formData.append("image", form.image);
-    
+
     // Append feature fields
     formData.append("air_conditioning", form.air_conditioning);
     formData.append("wifi", form.wifi);
@@ -350,19 +347,19 @@ const Rooms = ({ noLayout = false }) => {
 
     try {
       if (isEditing) {
-        await API.put(`/rooms/${editRoomId}`, formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
-        showBannerMessage("success", "Room updated successfully!");
+        await API.put(`/rooms/${editRoomId}`, formData);
         setIsEditing(false);
         setEditRoomId(null);
+        showBannerMessage("success", "Room updated successfully!");
       } else {
-        await API.post("/rooms/test", formData, {
-          headers: { "Content-Type": "multipart/form-data" },
-        });
+        await API.post("/rooms/test", formData);
         showBannerMessage("success", "Room created successfully!");
       }
 
+      // Fetch rooms first to ensure the new room is loaded
+      await fetchRooms();
+
+      // Then reset the form
       setForm({
         number: "",
         type: "",
@@ -385,7 +382,6 @@ const Rooms = ({ noLayout = false }) => {
         breakfast: false,
       });
       setPreviewImage(null);
-      fetchRooms();
     } catch (err) {
       console.error("API error:", err);
       showBannerMessage("error", `Error ${isEditing ? "updating" : "creating"} room`);
@@ -450,8 +446,8 @@ const Rooms = ({ noLayout = false }) => {
 
   const content = (
     <>
-      <BannerMessage 
-        message={bannerMessage} 
+      <BannerMessage
+        message={bannerMessage}
         onClose={closeBannerMessage}
         autoDismiss={true}
         duration={5000}
@@ -569,7 +565,7 @@ const Rooms = ({ noLayout = false }) => {
               className="w-full h-32 object-cover rounded-lg border-2 border-gray-200"
             />
           )}
-          
+
           {/* Room Features Section */}
           <div className="md:col-span-2 lg:col-span-3">
             <label className="block text-sm font-medium text-gray-700 mb-3">Room Features & Amenities</label>
@@ -696,49 +692,49 @@ const Rooms = ({ noLayout = false }) => {
               </label>
             </div>
           </div>
-        <div className="md:col-span-2 lg:col-span-3 flex items-center gap-4">
-          <button
-            type="submit"
-            className="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-transform transform hover:-translate-y-1"
-          >
-            {isEditing ? "Update Room" : "Add Room"}
-          </button>
-          {isEditing && (
+          <div className="md:col-span-2 lg:col-span-3 flex items-center gap-4">
             <button
-              type="button"
-              onClick={() => {
-                setIsEditing(false);
-                setEditRoomId(null);
-                setForm({
-                  number: "",
-                  type: "",
-                  price: "",
-                  status: "Available",
-                  adults: 2,
-                  children: 0,
-                  image: null,
-                  air_conditioning: false,
-                  wifi: false,
-                  bathroom: false,
-                  living_area: false,
-                  terrace: false,
-                  parking: false,
-                  kitchen: false,
-                  family_room: false,
-                  bbq: false,
-                  garden: false,
-                  dining: false,
-                  breakfast: false,
-                });
-                setPreviewImage(null);
-                setBannerMessage({ type: null, text: "" });
-              }}
-              className="w-full bg-gray-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-600 transition"
+              type="submit"
+              className="w-full bg-indigo-600 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:bg-indigo-700 transition-transform transform hover:-translate-y-1"
             >
-              Cancel Edit
+              {isEditing ? "Update Room" : "Add Room"}
             </button>
-          )}
-        </div>
+            {isEditing && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(false);
+                  setEditRoomId(null);
+                  setForm({
+                    number: "",
+                    type: "",
+                    price: "",
+                    status: "Available",
+                    adults: 2,
+                    children: 0,
+                    image: null,
+                    air_conditioning: false,
+                    wifi: false,
+                    bathroom: false,
+                    living_area: false,
+                    terrace: false,
+                    parking: false,
+                    kitchen: false,
+                    family_room: false,
+                    bbq: false,
+                    garden: false,
+                    dining: false,
+                    breakfast: false,
+                  });
+                  setPreviewImage(null);
+                  setBannerMessage({ type: null, text: "" });
+                }}
+                className="w-full bg-gray-500 text-white font-semibold py-3 px-6 rounded-lg hover:bg-gray-600 transition"
+              >
+                Cancel Edit
+              </button>
+            )}
+          </div>
         </div>
       </form>
 
@@ -769,9 +765,8 @@ const Rooms = ({ noLayout = false }) => {
                   className="h-48 w-full object-cover cursor-pointer"
                   onClick={() => setSelectedImage(room.image_url)}
                 />
-                <span className={`absolute top-2 right-2 px-3 py-1 text-xs font-semibold text-white rounded-full ${
-                  room.status === 'Available' ? 'bg-green-500' : room.status === 'Booked' ? 'bg-red-500' : 'bg-yellow-500'
-                }`}>{room.status}</span>
+                <span className={`absolute top-2 right-2 px-3 py-1 text-xs font-semibold text-white rounded-full ${room.status === 'Available' ? 'bg-green-500' : room.status === 'Booked' ? 'bg-red-500' : 'bg-yellow-500'
+                  }`}>{room.status}</span>
               </div>
               <div className="p-5 flex flex-col flex-grow">
                 <div className="flex justify-between items-start">
@@ -782,7 +777,7 @@ const Rooms = ({ noLayout = false }) => {
                   <p className="text-indigo-600 font-bold text-xl">{formatCurrency(room.price)}</p>
                 </div>
                 <p className="text-sm text-gray-600 mt-2">Capacity: {room.adults} Adults, {room.children} Children</p>
-                
+
                 {/* Room Features */}
                 {(room.air_conditioning || room.wifi || room.bathroom || room.living_area || room.terrace || room.parking || room.kitchen || room.family_room || room.bbq || room.garden || room.dining || room.breakfast) && (
                   <div className="mt-3 flex flex-wrap gap-1">
@@ -800,7 +795,7 @@ const Rooms = ({ noLayout = false }) => {
                     {room.breakfast && <span className="px-2 py-1 text-xs bg-cyan-100 text-cyan-700 rounded-full">Breakfast</span>}
                   </div>
                 )}
-                
+
                 <div className="h-16 mt-4">
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={(room.trend || []).map((v, i) => ({ day: i + 1, value: v }))}>

@@ -6,7 +6,7 @@ from app.models.employee import Employee
 from app.schemas.service_request import ServiceRequestCreate, ServiceRequestUpdate
 from typing import List, Optional
 from datetime import datetime
-from app.curd import notification as notification_crud
+# Notification system removed
 
 def create_service_request(db: Session, request_data: ServiceRequestCreate):
     request = ServiceRequest(
@@ -21,13 +21,7 @@ def create_service_request(db: Session, request_data: ServiceRequestCreate):
     db.commit()
     db.refresh(request)
     
-    # Send notification
-    try:
-        room = db.query(Room).filter(Room.id == request.room_id).first()
-        room_number = room.number if room else str(request.room_id)
-        notification_crud.notify_service_request_created(db, request.request_type, room_number, request.id)
-    except Exception as e:
-        print(f"Failed to send notification: {e}")
+    # Notification system removed for performance
     
     return request
 
@@ -48,11 +42,7 @@ def create_cleaning_service_request(db: Session, room_id: int, room_number: str,
     db.commit()
     db.refresh(request)
     
-    # Send notification
-    try:
-        notification_crud.notify_service_request_created(db, "cleaning", room_number, request.id)
-    except Exception as e:
-        print(f"Failed to send notification: {e}")
+    # Notification system removed for performance
     
     return request
 
@@ -198,6 +188,55 @@ def update_service_request(db: Session, request_id: int, update_data: ServiceReq
                         food_order.billing_status = "unpaid"
                     
                     print(f"[INFO] Food order {food_order.id} marked as completed (billing: {food_order.billing_status}) due to delivery service completion")
+
+            # Sync with AssignedService: Heuristic to auto-complete duplicate manual assignments
+            if is_completing:
+                try:
+                    from app.models.service import AssignedService, Service
+                    from app.curd.service import update_assigned_service_status
+                    from app.schemas.service import AssignedServiceUpdate
+
+                    target_employee_id = update_data.employee_id or request.employee_id
+                    
+                    if target_employee_id and request.room_id:
+                        # Use nested transaction to isolate failures
+                        try:
+                            with db.begin_nested():
+                                # Find pending assigned services for this room/employee
+                                query = db.query(AssignedService).join(Service).filter(
+                                    AssignedService.room_id == request.room_id,
+                                    AssignedService.employee_id == target_employee_id,
+                                    AssignedService.status.notin_(['completed', 'cancelled', 'rejected'])
+                                )
+                                
+                                # Apply name filter based on request type to avoid false positives
+                                if request.request_type == 'delivery':
+                                    query = query.filter(Service.name.ilike('%food%') | Service.name.ilike('%delivery%'))
+                                elif request.request_type == 'cleaning':
+                                    query = query.filter(Service.name.ilike('%clean%') | Service.name.ilike('%housekeep%') | Service.name.ilike('%room%'))
+                                elif request.request_type == 'refill':
+                                    query = query.filter(Service.name.ilike('%refill%'))
+                                
+                                # Only auto-complete services assigned within the last 48 hours to be safe
+                                matching_services = query.all()
+                                
+                                for svc in matching_services:
+                                    # Verify timestamp safely
+                                    assigned_time = svc.assigned_at or datetime.utcnow()
+                                    time_diff = datetime.utcnow() - assigned_time
+                                    if time_diff.total_seconds() < 172800: # 48 hours
+                                        print(f"[INFO] Auto-completing linked AssignedService {svc.id} ({svc.service.name}) matching ServiceRequest {request.id}")
+                                        update_assigned_service_status(db, svc.id, AssignedServiceUpdate(status='completed'), commit=False)
+                        except Exception as nested_error:
+                            print(f"[WARNING] Nested transaction failed during AssignedService sync: {nested_error}")
+                            import traceback
+                            print(traceback.format_exc())
+                            # Don't rollback - continue with main update even if sync fails
+                except Exception as sync_error:
+                    print(f"[WARNING] Failed to sync AssignedService status: {sync_error}")
+                    import traceback
+                    print(traceback.format_exc())
+                    # Don't rollback - continue with main update even if sync fails
     
     if update_data.employee_id is not None:
         request.employee_id = update_data.employee_id
@@ -207,14 +246,8 @@ def update_service_request(db: Session, request_id: int, update_data: ServiceReq
     db.commit()
     db.refresh(request)
     
-    # Send notification if status changed
-    if update_data.status and old_status != request.status:
-        try:
-            room = db.query(Room).filter(Room.id == request.room_id).first()
-            room_number = room.number if room else str(request.room_id)
-            notification_crud.notify_service_request_status_changed(db, request.request_type, room_number, request.status, request.id)
-        except Exception as e:
-            print(f"Failed to send notification: {e}")
+    
+    # Notification system removed for performance
     
     return request
 

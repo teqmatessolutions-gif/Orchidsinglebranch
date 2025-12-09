@@ -25,6 +25,7 @@ class BillBreakdown(BaseModel):
     
     # Enhanced charges
     consumables_charges: Optional[float] = 0.0
+    inventory_charges: Optional[float] = 0.0  # Charges for payable inventory items issued
     asset_damage_charges: Optional[float] = 0.0
     key_card_fee: Optional[float] = 0.0
     late_checkout_fee: Optional[float] = 0.0
@@ -37,6 +38,7 @@ class BillBreakdown(BaseModel):
     service_gst: Optional[float] = 0.0  # GST on service charges (variable, default 18%)
     package_gst: Optional[float] = 0.0  # GST on package charges (12% if < 7500, 18% if >= 7500)
     consumables_gst: Optional[float] = 0.0  # GST on consumables (5%)
+    inventory_gst: Optional[float] = 0.0  # GST on inventory charges (variable, default 18%?)
     asset_damage_gst: Optional[float] = 0.0  # GST on asset damages (18%)
     total_gst: Optional[float] = 0.0  # Total GST amount
     
@@ -45,6 +47,7 @@ class BillBreakdown(BaseModel):
     service_items: List[ServiceItem] = []
     consumables_items: List[dict] = []  # Consumables charged
     asset_damages: List[dict] = []  # Asset damages
+    inventory_usage: List[dict] = []  # All inventory items used/issued
     
     total_due: float = 0.0
 

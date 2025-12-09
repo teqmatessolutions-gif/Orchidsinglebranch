@@ -299,6 +299,8 @@ class StockIssueDetail(Base):
     unit_price = Column(Float, nullable=True)
     cost = Column(Float, nullable=True)  # Calculated value of goods issued
     notes = Column(Text, nullable=True)
+    is_payable = Column(Boolean, default=False, nullable=True)  # Is this item chargeable to guest?
+    is_paid = Column(Boolean, default=False, nullable=True)     # Has the guest paid for it?
     
     issue = relationship("StockIssue", back_populates="details")
     item = relationship("InventoryItem")

@@ -13,6 +13,7 @@ from app.models.service import Service, AssignedService, service_inventory_item
 from app.models.inventory import InventoryItem
 from app.curd import service as service_crud
 from app.utils.auth import get_db, get_current_user
+from app.curd.notification import notify_service_assigned, notify_service_status_changed
 
 router = APIRouter(prefix="/services", tags=["Services"])
 
@@ -596,8 +597,21 @@ def assign_service(
             raise HTTPException(status_code=400, detail="room_id is required")
         
         result = service_crud.create_assigned_service(db, payload)
+        db.commit() # Force commit to ensure visibility
         print(f"[DEBUG assign_service] Successfully created assigned service ID: {result.id}")
         
+        # Send Notification (best effort)
+        try:
+            notify_service_assigned(
+                db, 
+                service_name=result.service.name if result.service else "Unknown Service",
+                employee_name=result.employee.name if result.employee else "Unknown Employee", 
+                room_number=result.room.number if result.room else "Unknown Room", 
+                assigned_id=result.id
+            )
+        except Exception as notif_error:
+            print(f"[WARNING] Failed to send assignment notification: {notif_error}")
+
         # Manually construct response to avoid serialization issues
         response_data = {
             "id": result.id,
@@ -647,10 +661,10 @@ def get_all_assigned_services(db: Session = Depends(get_db), current_user: User 
     try:
         # Cap limit to prevent performance issues
         # Optimized for low network
-        if limit > 50:
-            limit = 50
+        if limit > 200:
+            limit = 200
         if limit < 1:
-            limit = 20
+            limit = 50
         assigned_services = service_crud.get_assigned_services(db, skip=skip, limit=limit)
         
         # Manually construct response to ensure proper serialization
@@ -671,6 +685,9 @@ def get_all_assigned_services(db: Session = Depends(get_db), current_user: User 
             
             result.append({
                 "id": assigned.id,
+                "service_id": assigned.service.id,  # Add service_id for filtering
+                "employee_id": assigned.employee.id,  # Add employee_id for filtering
+                "room_id": assigned.room.id,  # Add room_id for filtering
                 "service": {
                     "id": assigned.service.id,
                     "name": assigned.service.name,
@@ -756,7 +773,24 @@ def update_assigned_status(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        return service_crud.update_assigned_service_status(db, assigned_id, status_update)
+        updated_service = service_crud.update_assigned_service_status(db, assigned_id, status_update)
+        
+        if updated_service and status_update.status:
+            # Send Notification if status changed
+            try:
+                # Ensure relationships are loaded for notification message
+                service_name = updated_service.service.name if updated_service.service else "Unknown Service"
+                
+                notify_service_status_changed(
+                    db,
+                    service_name=service_name,
+                    status=str(updated_service.status),
+                    assigned_id=updated_service.id
+                )
+            except Exception as notif_error:
+                print(f"[WARNING] Failed to send status notification: {notif_error}")
+        
+        return updated_service
     except Exception as e:
         import traceback
         print(f"[ERROR] Error updating assigned service status: {str(e)}")
