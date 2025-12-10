@@ -1,8 +1,8 @@
 import React from "react";
-import { Trash2, Edit } from "lucide-react";
+import { Trash2, Edit, History } from "lucide-react";
 import { formatCurrency } from "../../../utils/currency";
 
-const ItemsTable = ({ items, categories, onDelete, onEdit }) => {
+const ItemsTable = ({ items, categories, onDelete, onEdit, onViewHistory }) => {
     return (
         <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -93,14 +93,23 @@ const ItemsTable = ({ items, categories, onDelete, onEdit }) => {
                                 </td>
                                 <td className="px-4 py-3 text-sm">
                                     <button
+                                        onClick={() => onViewHistory && onViewHistory(item)}
+                                        className="text-indigo-600 hover:text-indigo-800 mr-2"
+                                        title="View History"
+                                    >
+                                        <History className="w-4 h-4" />
+                                    </button>
+                                    <button
                                         onClick={() => onEdit(item)}
                                         className="text-blue-600 hover:text-blue-800 mr-2"
+                                        title="Edit Item"
                                     >
                                         <Edit className="w-4 h-4" />
                                     </button>
                                     <button
                                         onClick={() => onDelete(item.id)}
                                         className="text-red-600 hover:text-red-800"
+                                        title="Delete Item"
                                     >
                                         <Trash2 className="w-4 h-4" />
                                     </button>

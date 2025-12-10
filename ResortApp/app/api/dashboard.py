@@ -691,3 +691,166 @@ def get_summary(period: str = "all", db: Session = Depends(get_db), current_user
     kpis["department_kpis"] = department_kpis
 
     return kpis
+
+@router.get("/department/{department_name}/details")
+def get_department_details(department_name: str, db: Session = Depends(get_db)):
+    """
+    Returns detailed breakdown for a specific department:
+    - Assets (Fixed & High Value)
+    - Capital Investment (Purchases)
+    - Operational Expenses
+    - Inventory Consumption
+    """
+    from app.models.inventory import PurchaseDetail, PurchaseMaster, InventoryItem, InventoryCategory, InventoryTransaction
+    from app.models.expense import Expense
+    from app.models.foodorder import FoodOrder
+    # from app.models.checkout import Checkout # Already imported at top
+    import traceback
+
+    details = {
+        "assets": [],
+        "capital_investment": [],
+        "expenses": [],
+        "inventory_consumption": [],
+        "income": []
+    }
+
+    try:
+        # 1. Assets
+        # Fixed assets
+        fixed_assets = db.query(InventoryItem).join(InventoryCategory).filter(
+            InventoryCategory.parent_department == department_name,
+            InventoryItem.is_asset_fixed == True,
+            InventoryItem.current_stock != 0
+        ).all()
+        
+        # High value items (> 10000)
+        high_value = db.query(InventoryItem).join(InventoryCategory).filter(
+            InventoryCategory.parent_department == department_name,
+            InventoryItem.is_asset_fixed == False,
+            InventoryItem.unit_price >= 10000,
+            InventoryItem.current_stock != 0
+        ).all()
+
+        for item in fixed_assets:
+            details["assets"].append({
+                "name": item.name,
+                "quantity": item.current_stock,
+                "unit_price": item.unit_price,
+                "value": item.current_stock * item.unit_price,
+                "type": "Fixed Asset"
+            })
+            
+        for item in high_value:
+            details["assets"].append({
+                "name": item.name,
+                "quantity": item.current_stock,
+                "unit_price": item.unit_price,
+                "value": item.current_stock * item.unit_price,
+                "type": "High Value Item"
+            })
+
+        # 2. Capital Investment (Purchases)
+        purchase_details = db.query(PurchaseDetail, PurchaseMaster, InventoryItem).join(
+            PurchaseMaster, PurchaseDetail.purchase_master_id == PurchaseMaster.id
+        ).join(
+            InventoryItem, PurchaseDetail.item_id == InventoryItem.id
+        ).join(
+            InventoryCategory, InventoryItem.category_id == InventoryCategory.id
+        ).filter(
+            InventoryCategory.parent_department == department_name
+        ).order_by(PurchaseMaster.purchase_date.desc()).all()
+
+        for detail, master, item in purchase_details:
+            details["capital_investment"].append({
+                "date": master.purchase_date,
+                "po_number": master.purchase_number,
+                "item_name": item.name,
+                "quantity": detail.quantity,
+                "unit_price": detail.unit_price,
+                "total_amount": detail.total_amount
+            })
+
+        # 3. Operational Expenses
+        # Direct Department Match
+        dept_expenses = db.query(Expense).filter(Expense.department == department_name).all()
+        for exp in dept_expenses:
+            details["expenses"].append({
+                "date": exp.date,
+                "category": exp.category,
+                "description": exp.description,
+                "amount": exp.amount,
+                "type": "Direct Expense"
+            })
+            
+        # Category Match (Fallback)
+        expense_category_to_dept = {
+            "food": "Restaurant", "beverage": "Restaurant", "kitchen": "Restaurant", "restaurant": "Restaurant",
+            "housekeeping": "Hotel", "laundry": "Hotel", "room": "Hotel", "maintenance": "Hotel",
+            "electricity": "Facility", "water": "Facility", "plumbing": "Facility", "facility": "Facility",
+            "stationery": "Office", "office": "Office", "admin": "Office", "communication": "Office",
+            "security": "Security", "safety": "Security",
+            "fire": "Fire & Safety", "safety equipment": "Fire & Safety",
+        }
+        
+        target_categories = [cat for cat, dept in expense_category_to_dept.items() if dept == department_name]
+        
+        if target_categories:
+            cat_expenses = db.query(Expense).filter(
+                (Expense.department.is_(None)) | (Expense.department == ""),
+                or_(*[func.lower(Expense.category).like(f"%{cat.lower()}%") for cat in target_categories])
+            ).all()
+            
+            for exp in cat_expenses:
+                details["expenses"].append({
+                    "date": exp.date,
+                    "category": exp.category,
+                    "description": exp.description,
+                    "amount": exp.amount,
+                    "type": "Category Match"
+                })
+
+        # 4. Inventory Consumption
+        consumption = db.query(InventoryTransaction, InventoryItem).join(
+            InventoryItem, InventoryTransaction.item_id == InventoryItem.id
+        ).filter(
+            InventoryTransaction.transaction_type == "out",
+            InventoryTransaction.department == department_name
+        ).order_by(InventoryTransaction.created_at.desc()).all()
+
+        for txn, item in consumption:
+            details["inventory_consumption"].append({
+                "date": txn.created_at,
+                "item_name": item.name,
+                "quantity": txn.quantity,
+                "amount": txn.total_amount or (txn.quantity * item.unit_price), 
+                "notes": txn.notes
+            })
+            
+        # 5. Income (Restaurant/Hotel)
+        if department_name == "Restaurant":
+            orders = db.query(FoodOrder).order_by(FoodOrder.created_at.desc()).limit(100).all()
+            for order in orders:
+                 details["income"].append({
+                    "date": order.created_at,
+                    "source": f"Order #{order.id} (Room {order.room_id})",
+                    "amount": order.amount
+                 })
+        elif department_name == "Hotel":
+            try:
+                checkouts = db.query(Checkout).order_by(Checkout.checkout_date.desc()).limit(50).all()
+                for chk in checkouts:
+                    details["income"].append({
+                        "date": chk.checkout_date,
+                         "source": f"Checkout #{chk.id} ({chk.guest_name})",
+                         "amount": chk.grand_total 
+                    })
+            except Exception:
+                pass
+
+
+    except Exception as e:
+        print(f"Error fetching department details: {e}")
+        traceback.print_exc()
+        
+    return details

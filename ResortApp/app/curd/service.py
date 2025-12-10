@@ -641,6 +641,67 @@ def update_assigned_service_status(db: Session, assigned_id: int, update_data: A
                     assignment.status = "completed"  # Ready for return
                     print(f"[DEBUG] Marked inventory assignment {assignment.id} as completed (ready for return)")
                 
+                # --- NEW: Textile/Laundry Automatic Collection Logic ---
+                # "Collect every washable thing... at time of refill"
+                # If the service involves items with track_laundry_cycle=True, we assume they are "Collected Dirty"
+                # and move them to the Laundry location.
+                
+                # 1. Get items linked to this service definition
+                service_items_stmt = select(
+                    service_inventory_item.c.inventory_item_id,
+                    service_inventory_item.c.quantity
+                ).where(service_inventory_item.c.service_id == assigned.service_id)
+                service_items_rows = db.execute(service_items_stmt).fetchall()
+                
+                if service_items_rows:
+                    # 2. Find Laundry Location
+                    laundry_loc = db.query(Location).filter(
+                        (Location.name.ilike("%Laundry%")) | 
+                        (Location.location_type == "LAUNDRY")
+                    ).first()
+                    
+                    if laundry_loc:
+                        print(f"[DEBUG] Found Laundry Location: {laundry_loc.name}")
+                        
+                        for row in service_items_rows:
+                            item_id = row[0] if isinstance(row, tuple) else row.inventory_item_id
+                            qty_defined = row[1] if isinstance(row, tuple) else row.quantity
+                            
+                            # 3. Check if item is Washable
+                            inv_item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+                            
+                            if inv_item and (inv_item.track_laundry_cycle or (inv_item.category and inv_item.category.track_laundry)):
+                                print(f"[DEBUG] Auto-collecting Laundry Item: {inv_item.name} (Qty: {qty_defined})")
+                                
+                                # 4. "Receive" into Laundry (Increment Laundry Stock)
+                                # Note: Ideally we should track "Dirty Stock" separate from "Clean Stock" if it's the same Item ID.
+                                # For now, we will assume the Laundry Location simply holds the items.
+                                # Future improvement: Use a separate 'State' or 'Batch' for Dirty.
+                                
+                                # We treat this as a "Transfer In" (Recovery) from the Room
+                                inv_item.current_stock += qty_defined  # Add back to global stock (it exists again)
+                                
+                                # Record Transaction
+                                laundry_txn = InventoryTransaction(
+                                    item_id=inv_item.id,
+                                    transaction_type="transfer_in",  # Returning from Room/Service
+                                    quantity=qty_defined,
+                                    unit_price=inv_item.unit_price,
+                                    total_amount=0,  # Internal transfer
+                                    reference_number=f"LNDRY-COL-{assigned_id}",
+                                    department="Housekeeping",
+                                    notes=f"Auto-collected Dirty Linen from Room {assigned.room.number if assigned.room else 'Unknown'} (Service: {assigned.service.name}) -> To {laundry_loc.name}",
+                                    created_by=None, # System
+                                    created_at=datetime.utcnow()
+                                )
+                                db.add(laundry_txn)
+                                
+                                # Optional: If your system tracks stock PER LOCATION, you would add an entry to LocationStock here.
+                                # Assuming simplified global stock + transaction logs for now.
+                    else:
+                        print("[WARNING] No 'Laundry' location found. Cannot auto-collect dirty linens.")
+                # -------------------------------------------------------
+                
                 # Process inventory returns if provided
                 if update_data.inventory_returns and len(update_data.inventory_returns) > 0:
                     print(f"[DEBUG] Processing {len(update_data.inventory_returns)} inventory returns")

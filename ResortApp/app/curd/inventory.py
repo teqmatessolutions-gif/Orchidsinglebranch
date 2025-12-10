@@ -512,10 +512,9 @@ def create_stock_issue(db: Session, data: dict, issued_by: int):
         
         # Allow issuing even if stock is 0 (for initial allocations or adjustments)
         # Only warn if stock would go negative
+        # Strict Stock Check
         if item.current_stock < issued_qty:
-            # For auto-allocations from check-in, allow it but log a warning
-            import logging
-            logging.warning(f"Stock issue: {item.name} - Available: {item.current_stock}, Requested: {issued_qty}. Allowing negative stock for allocation.")
+                raise ValueError(f"Insufficient stock for {item.name}. Available: {item.current_stock}, Requested: {issued_qty}")
         
         # Calculate cost
         cost = item.unit_price * issued_qty if item.unit_price else None
@@ -548,13 +547,19 @@ def create_stock_issue(db: Session, data: dict, issued_by: int):
         # Create transaction record with destination location info
         transaction_notes = f"Stock Issue: {issue_number}"
         if dest_location_name:
-            transaction_notes += f" â†’ {dest_location_name}"
+            transaction_notes += f" → {dest_location_name}"
         if data.get('notes'):
             transaction_notes += f" - {data.get('notes', '')}"
         
-        transaction = InventoryTransaction(
+        # Determine transaction type based on whether this is a transfer or consumption
+        # If there's a destination location, it's a transfer (stock still exists)
+        # If no destination, it's actual consumption (stock is used up)
+        out_transaction_type = "transfer_out" if dest_location else "out"
+        
+        # OUT transaction (from source/global inventory)
+        transaction_out = InventoryTransaction(
             item_id=detail_data["item_id"],
-            transaction_type="out",
+            transaction_type=out_transaction_type,
             quantity=issued_qty,
             unit_price=item.unit_price,
             total_amount=cost,
@@ -562,7 +567,38 @@ def create_stock_issue(db: Session, data: dict, issued_by: int):
             notes=transaction_notes,
             created_by=issued_by
         )
-        db.add(transaction)
+        db.add(transaction_out)
+        
+        # IN transaction (to destination location) - shows as "Stock Received" at destination
+        if dest_location:
+            transaction_in = InventoryTransaction(
+                item_id=detail_data["item_id"],
+                transaction_type="transfer_in",
+                quantity=issued_qty,
+                unit_price=item.unit_price,
+                total_amount=cost,
+                reference_number=issue_number,
+                notes=f"Stock Received: {issue_number} from {data.get('source_location_id', 'Central')}",
+                created_by=issued_by,
+                department=dest_location_name  # Track which location received it
+            )
+            db.add(transaction_in)
+        
+        # Create Journal Entry for Consumption (COGS)
+        # ONLY if this is actual consumption (no destination location)
+        # If there's a destination, it's just a transfer - inventory still exists
+        if cost and cost > 0 and not dest_location:
+            try:
+                from app.utils.accounting_helpers import create_consumption_journal_entry
+                create_consumption_journal_entry(
+                    db=db,
+                    consumption_id=issue.id,
+                    cogs_amount=float(cost),
+                    inventory_item_name=item.name,
+                    created_by=issued_by
+                )
+            except Exception as e:
+                print(f"[WARNING] Could not create consumption journal entry: {e}")
         
         # Update requisition status if linked
         if data.get("requisition_id"):
@@ -705,6 +741,54 @@ def create_waste_log(db: Session, data: dict, reported_by: int):
         
         item.current_stock -= data["quantity"]
         
+        # Deduct from Location Stock if location is specified
+        if data.get("location_id"):
+            from app.models.inventory import LocationStock, AssetMapping, AssetRegistry
+            
+            # 1. Try Deducting from Location Stock
+            loc_stock = db.query(LocationStock).filter(
+                LocationStock.location_id == data["location_id"],
+                LocationStock.item_id == item_id
+            ).first()
+            if loc_stock:
+                loc_stock.quantity -= data["quantity"]
+                loc_stock.last_updated = datetime.utcnow()
+            
+            # 2. Try Deducting from Asset Mappings (e.g. "light" in Room 101)
+            # This is likely where the user's issue lies if it's an asset
+            mappings = db.query(AssetMapping).filter(
+                AssetMapping.location_id == data["location_id"],
+                AssetMapping.item_id == item_id,
+                AssetMapping.is_active == True
+            ).all()
+            
+            qty_to_remove = data["quantity"]
+            for mapping in mappings:
+                if qty_to_remove <= 0:
+                    break
+                available = mapping.quantity or 1
+                if available > qty_to_remove:
+                    mapping.quantity = available - qty_to_remove
+                    qty_to_remove = 0
+                else:
+                    # Remove entire mapping or mark inactive
+                    mapping.is_active = False # Soft delete or remove
+                    # db.delete(mapping) # Or hard delete
+                    qty_to_remove -= available
+
+            # 3. Try Removing from Asset Registry (Specific tagged assets)
+            if qty_to_remove > 0:
+                # If we still have quantity to remove, maybe they are tracked individual items?
+                registry_items = db.query(AssetRegistry).filter(
+                    AssetRegistry.current_location_id == data["location_id"],
+                    AssetRegistry.item_id == item_id,
+                    AssetRegistry.status == "active"
+                ).limit(int(qty_to_remove)).all()
+                
+                for asset in registry_items:
+                    asset.status = "written_off" # Or damaged/disposed
+                    asset.notes = (asset.notes or "") + f" [Waste Log: {log_number}]"
+        
         transaction = InventoryTransaction(
             item_id=item_id,
             transaction_type="out",
@@ -793,15 +877,134 @@ def update_location(db: Session, location_id: int, data: dict):
 
 # Asset Mapping CRUD
 def create_asset_mapping(db: Session, data: dict, assigned_by: Optional[int] = None):
-    from app.models.inventory import AssetMapping
+    from app.models.inventory import AssetMapping, InventoryItem, LocationStock
+    from datetime import datetime
+    
+    item_id = data["item_id"]
+    quantity = data.get("quantity", 1.0)
+    
+    # 1. Check Stock Availability
+    item = get_item_by_id(db, item_id)
+    if not item:
+        raise ValueError("Item not found")
+        
+    if item.current_stock < quantity:
+        raise ValueError(f"Insufficient stock for {item.name}. Available: {item.current_stock}, Requested: {quantity}")
+        
+    # 2. Create Mapping
     mapping = AssetMapping(
-        item_id=data["item_id"],
+        item_id=item_id,
         location_id=data["location_id"],
         serial_number=data.get("serial_number"),
         notes=data.get("notes"),
         assigned_by=assigned_by,
+        quantity=quantity
     )
     db.add(mapping)
+    
+    # 3. Deduct from Source Location Stock (e.g. Warehouse)
+    # Do NOT deduct from item.current_stock (Global), as that represents Total Assets Owned.
+    # Only deduct from the specific LocationStock where the item is physically moving from.
+    
+    # Assume source is Central Warehouse (ID 1) strictly for now as per current flow
+    # Assume source is Central Warehouse (ID 1) strictly for now as per current flow
+    # Future improvement: Pass source_location_id in data
+    source_loc_id = 1 
+    
+    from app.models.inventory import LocationStock, InventoryTransaction, Location
+
+    source_stock = db.query(LocationStock).filter(
+        LocationStock.location_id == source_loc_id,
+        LocationStock.item_id == item_id
+    ).first()
+    
+    if source_stock:
+        if source_stock.quantity >= quantity:
+            source_stock.quantity -= quantity
+            source_stock.last_updated = datetime.utcnow()
+        else:
+             # Force deduction to keep sync with global stock, even if it goes negative (should have been checked)
+             source_stock.quantity -= quantity
+             
+    # 3.2 Create Stock Issue (Transfer Record)
+    # This ensures it shows up in history for both Source and Destination
+    from app.models.inventory import StockIssue, StockIssueDetail
+    
+    # Generate Issue Number
+    from app.curd.inventory import generate_issue_number
+    issue_number = generate_issue_number(db)
+    
+    # Fetch Dest Location Name
+    dest_loc = db.query(Location).filter(Location.id == data["location_id"]).first()
+    dest_name = dest_loc.name if dest_loc else "Unknown Location"
+
+    stock_issue = StockIssue(
+        issue_number=issue_number,
+        issued_by=assigned_by,
+        source_location_id=source_loc_id,
+        destination_location_id=data["location_id"],
+        issue_date=datetime.utcnow(),
+        notes=f"Auto-generated from Asset Assignment to {dest_name}"
+    )
+    db.add(stock_issue)
+    db.flush() # Get ID
+    
+    issue_detail = StockIssueDetail(
+        issue_id=stock_issue.id,
+        item_id=item_id,
+        issued_quantity=quantity,
+        unit=item.unit,
+        unit_price=item.unit_price,
+        cost=(item.unit_price or 0) * quantity,
+        notes=f"Asset Mapping ID: {mapping.id}"
+    )
+    db.add(issue_detail)
+
+    # 3.3 Create Transaction Record (Linked to Issue)
+    transaction = InventoryTransaction(
+        item_id=item_id,
+        transaction_type="transfer_out", # snake_case matches frontend logic
+        quantity=quantity,
+        unit_price=item.unit_price,
+        total_amount=item.unit_price * quantity if item.unit_price else 0,
+        reference_number=issue_number, # Link to Stock Issue
+        notes=f"Asset Assigned to {dest_name}",
+        created_by=assigned_by
+    )
+    db.add(transaction)
+    
+    # 3.4 Create Paired "Transfer In" Transaction (Stock Received at Dest)
+    transaction_in = InventoryTransaction(
+        item_id=item_id,
+        transaction_type="transfer_in",
+        quantity=quantity,
+        unit_price=item.unit_price,
+        total_amount=item.unit_price * quantity if item.unit_price else 0,
+        reference_number=issue_number,
+        department=dest_name, # Critical for frontend to show "To Location"
+        notes=f"Asset Received from Central Warehouse",
+        created_by=assigned_by
+    )
+    db.add(transaction_in)
+    
+    # 4. Add to Destination Location Stock
+    loc_stock = db.query(LocationStock).filter(
+        LocationStock.location_id == data["location_id"],
+        LocationStock.item_id == item_id
+    ).first()
+    
+    if loc_stock:
+        loc_stock.quantity += quantity
+        loc_stock.last_updated = datetime.utcnow()
+    else:
+        new_stock = LocationStock(
+            location_id=data["location_id"],
+            item_id=item_id,
+            quantity=quantity,
+            last_updated=datetime.utcnow()
+        )
+        db.add(new_stock)
+    
     db.commit()
     db.refresh(mapping)
     return mapping
@@ -817,17 +1020,93 @@ def get_all_asset_mappings(db: Session, skip: int = 0, limit: int = 100, locatio
 
 def get_asset_mapping_by_id(db: Session, mapping_id: int):
     from app.models.inventory import AssetMapping
+    # Return directly, assuming controller handles 404
     return db.query(AssetMapping).filter(AssetMapping.id == mapping_id).first()
 
 
-def unassign_asset(db: Session, mapping_id: int):
-    from app.models.inventory import AssetMapping
+def update_asset_mapping(db: Session, mapping_id: int, data: dict):
+    from app.models.inventory import AssetMapping, Location, LocationStock
     from datetime import datetime
     mapping = get_asset_mapping_by_id(db, mapping_id)
     if not mapping:
         return None
-    mapping.is_active = False
-    mapping.unassigned_date = datetime.utcnow()
+    
+    # Check if unassigning (is_active -> False)
+    if "is_active" in data and data["is_active"] is False and mapping.is_active:
+        # Transfer stock BACK to Warehouse (Location -> Warehouse)
+        warehouse = db.query(Location).filter(
+            Location.location_type.in_(["WAREHOUSE", "CENTRAL_WAREHOUSE"])
+        ).first()
+        
+        if warehouse:
+            qty = mapping.quantity
+            
+            # 1. Deduct from Target Location
+            target_stock = db.query(LocationStock).filter(
+                LocationStock.location_id == mapping.location_id,
+                LocationStock.item_id == mapping.item_id
+            ).first()
+            
+            if target_stock:
+                target_stock.quantity -= qty
+                target_stock.last_updated = datetime.utcnow()
+                
+            # 2. Add back to Warehouse
+            wh_stock = db.query(LocationStock).filter(
+                LocationStock.location_id == warehouse.id,
+                LocationStock.item_id == mapping.item_id
+            ).first()
+            
+            if wh_stock:
+                wh_stock.quantity += qty
+                wh_stock.last_updated = datetime.utcnow()
+            else:
+                wh_stock = LocationStock(
+                    location_id=warehouse.id,
+                    item_id=mapping.item_id,
+                    quantity=qty,
+                    last_updated=datetime.utcnow()
+                )
+                db.add(wh_stock)
+
+    # Update allowed fields
+    for field in ["location_id", "serial_number", "quantity", "notes", "is_active"]:
+        if field in data and data[field] is not None:
+             setattr(mapping, field, data[field])
+             
+    db.commit()
+    db.refresh(mapping)
+    return mapping
+
+
+def unassign_asset(db: Session, mapping_id: int):
+    from app.models.inventory import AssetMapping, Location, LocationStock
+    from datetime import datetime
+    
+    mapping = get_asset_mapping_by_id(db, mapping_id)
+    if not mapping:
+        return None
+        
+    if mapping.is_active:
+        mapping.is_active = False
+        mapping.unassigned_date = datetime.utcnow()
+        
+        # Return stock to Warehouse/Available
+        # 1. Deduct from Location
+        loc_stock = db.query(LocationStock).filter(
+            LocationStock.location_id == mapping.location_id,
+            LocationStock.item_id == mapping.item_id
+        ).first()
+        
+        if loc_stock:
+            loc_stock.quantity = max(0, loc_stock.quantity - mapping.quantity)
+            loc_stock.last_updated = datetime.utcnow()
+            
+        # 2. Add back to Main Item Stock (Available)
+        item = get_item_by_id(db, mapping.item_id)
+        if item:
+            item.current_stock += mapping.quantity
+            
     db.commit()
     db.refresh(mapping)
     return mapping
@@ -843,8 +1122,61 @@ def generate_asset_tag_id(db: Session, item_id: int):
     return f"AST-{item_prefix}-{str(count).zfill(3)}"
 
 
-def create_asset_registry(db: Session, data: dict):
-    from app.models.inventory import AssetRegistry
+def create_asset_registry(db: Session, data: dict, created_by: int = None):
+    from app.models.inventory import AssetRegistry, LocationStock, Location, InventoryTransaction, PurchaseMaster
+    
+    # 1. Determine Source Location (Automatic Detection)
+    source_loc_id = None
+    
+    # Strategy A: Check Purchase Master
+    if data.get("purchase_master_id"):
+        purchase = db.query(PurchaseMaster).filter(PurchaseMaster.id == data["purchase_master_id"]).first()
+        if purchase and purchase.destination_location_id:
+            source_loc_id = purchase.destination_location_id
+    
+    # Strategy B: Check Item's default string location
+    if not source_loc_id:
+        item = get_item_by_id(db, data["item_id"])
+        if item and item.location:
+             # Try to map string to ID
+             # This is a basic lookup. can be optimized with a pre-fetched map if needed
+             loc = db.query(Location).filter(Location.name.ilike(item.location.strip())).first()
+             if loc:
+                 source_loc_id = loc.id
+    
+    # Strategy C: Default to Central Warehouse (ID 1) if nothing else found
+    if not source_loc_id:
+        # Check if ID 1 exists and is a warehouse
+        central = db.query(Location).filter(Location.id == 1).first()
+        if central:
+            source_loc_id = 1
+            
+    # 2. Deduct from Source Stock
+    if source_loc_id:
+        stock = db.query(LocationStock).filter(
+            LocationStock.location_id == source_loc_id,
+            LocationStock.item_id == data["item_id"]
+        ).first()
+        
+        if stock:
+            if stock.quantity >= 1:
+                stock.quantity -= 1
+            else:
+                # Stock is 0 or negative. Still deduct? User wants "reduced from source".
+                # Let's allow it to go negative or stay 0 based on policy. 
+                # Usually better to decrement to track deficit.
+                stock.quantity -= 1
+        else:
+            # Create negative stock entry if it doesn't exist? 
+            # Or assume it wasn't tracked. Let's create it to be safe/explicit.
+            new_stock = LocationStock(
+                location_id=source_loc_id,
+                item_id=data["item_id"],
+                quantity=-1
+            )
+            db.add(new_stock)
+            
+    # 3. Create Asset
     asset_tag_id = generate_asset_tag_id(db, data["item_id"])
     asset = AssetRegistry(
         asset_tag_id=asset_tag_id,
@@ -860,6 +1192,36 @@ def create_asset_registry(db: Session, data: dict):
         notes=data.get("notes")
     )
     db.add(asset)
+    
+    # 4. Create Transaction
+    # Get names for notes
+    source_name = "Unknown Source"
+    if source_loc_id:
+        src = db.query(Location).filter(Location.id == source_loc_id).first()
+        if src: source_name = src.name
+        
+    dest_name = "Unknown Destination"
+    if data.get("current_location_id"):
+        dst = db.query(Location).filter(Location.id == data["current_location_id"]).first()
+        if dst: dest_name = dst.name
+
+    transaction = InventoryTransaction(
+        item_id=data["item_id"],
+        transaction_type="Transfer Out", # Matching frontend filter
+        quantity=1,
+        # unit_price=?, FIXME: Need item price
+        reference_number=asset_tag_id,
+        notes=f"Asset Assigned: {source_name} -> {dest_name}",
+        created_by=created_by
+    )
+    # Fetch item for price
+    item_obj = get_item_by_id(db, data["item_id"])
+    if item_obj:
+        transaction.unit_price = item_obj.unit_price
+        transaction.total_amount = item_obj.unit_price * 1
+        
+    db.add(transaction)
+
     db.commit()
     db.refresh(asset)
     return asset
@@ -902,28 +1264,7 @@ def delete_asset_registry(db: Session, asset_id: int):
     return asset
 
 
-# Stock Requisition CRUD
-def create_stock_requisition(db: Session, data: StockRequisitionCreate, requested_by_id: int):
-    # Create master
-    requisition_data = data.dict(exclude={"details"})
-    requisition = StockRequisition(**requisition_data, requested_by=requested_by_id)
-    
-    # Generate requisition number (REQ-YYYYMMDD-XXX)
-    today_str = datetime.now().strftime("%Y%m%d")
-    count = db.query(StockRequisition).filter(StockRequisition.requisition_number.like(f"REQ-{today_str}-%")).count()
-    requisition.requisition_number = f"REQ-{today_str}-{count + 1:03d}"
-    
-    db.add(requisition)
-    db.flush()  # Get ID
-    
-    # Create details
-    for detail_data in data.details:
-        detail = StockRequisitionDetail(**detail_data.dict(), requisition_id=requisition.id)
-        db.add(detail)
-    
-    db.commit()
-    db.refresh(requisition)
-    return requisition
+
 
 
 def get_all_stock_requisitions(db: Session, skip: int = 0, limit: int = 100, status: Optional[str] = None):

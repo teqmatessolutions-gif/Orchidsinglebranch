@@ -121,6 +121,12 @@ async def create_package_api_slash(
     price: float = Form(...),
     booking_type: str = Form("room_type"),
     room_types: str = Form(None),
+    theme: str = Form(None),
+    default_adults: int = Form(2),
+    default_children: int = Form(0),
+    max_stay_days: int = Form(None),
+    food_included: str = Form(None),
+    food_timing: str = Form(None),
     images: List[UploadFile] = File([]),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)

@@ -392,6 +392,7 @@ class AssetMapping(Base):
     notes = Column(Text, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     unassigned_date = Column(DateTime, nullable=True)
+    quantity = Column(Float, default=1.0, nullable=False) # Added quantity for bulk assignment
     
     item = relationship("InventoryItem")
     location = relationship("Location", back_populates="asset_mappings")

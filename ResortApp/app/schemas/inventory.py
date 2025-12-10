@@ -604,6 +604,7 @@ class AssetRegistryOut(AssetRegistryBase):
 class AssetMappingBase(BaseModel):
     item_id: int
     location_id: int
+    quantity: float = 1.0
     serial_number: Optional[str] = None
     notes: Optional[str] = None
     is_active: bool = True
@@ -616,6 +617,7 @@ class AssetMappingCreate(AssetMappingBase):
 class AssetMappingUpdate(BaseModel):
     location_id: Optional[int] = None
     serial_number: Optional[str] = None
+    quantity: Optional[float] = None
     notes: Optional[str] = None
     is_active: Optional[bool] = None
     unassigned_date: Optional[datetime] = None

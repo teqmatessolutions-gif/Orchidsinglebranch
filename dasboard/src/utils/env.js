@@ -15,14 +15,14 @@ export const isOrchidDeployment = () => {
 };
 
 export const getMediaBaseUrl = () => {
-  // For local development (localhost or 127.0.0.1), always use port 8011 for Orchid
+  // For local development (localhost or 127.0.0.1 or LAN IP), always use port 8011 for Orchid
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname || "";
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return "http://localhost:8011";
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
+      return `http://${hostname}:8011`;
     }
   }
-  
+
   // For production deployments
   if (typeof window !== "undefined" && isOrchidDeployment()) {
     return `${window.location.origin}/orchidfiles`;
@@ -46,22 +46,23 @@ export const getApiBaseUrl = () => {
     const hostname = window.location.hostname || "";
     const port = window.location.port || "";
     console.log("Hostname:", hostname, "Port:", port, "Pathname:", window.location.pathname);
-    
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      // Orchid uses port 8011 for local development
-      const apiUrl = "http://localhost:8011/api";
-      console.log("Using localhost API URL (overriding env var):", apiUrl);
+
+    // Check if running on localhost or a local network IP (e.g. 192.168.x.x)
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
+      // Use the SAME hostname as the frontend, but port 8011
+      const apiUrl = `http://${hostname}:8011/api`;
+      console.log("Using dynamic local API URL:", apiUrl);
       return apiUrl;
     }
   }
-  
+
   // Prefer explicit env override in all environments (dev/prod)
   // But only if not on localhost (checked above)
   if (process.env.REACT_APP_API_BASE_URL) {
     console.log("Using REACT_APP_API_BASE_URL:", process.env.REACT_APP_API_BASE_URL);
     return process.env.REACT_APP_API_BASE_URL;
   }
-  
+
   // For production deployments (not localhost)
   // For assets served under /orchidadmin or /orchid in production,
   // build absolute API path off the current origin.

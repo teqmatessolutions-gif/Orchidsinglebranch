@@ -18,7 +18,7 @@ from app.schemas.inventory import (
     StockIssueCreate, StockIssueOut,
     WasteLogCreate, WasteLogOut,
     LocationCreate, LocationOut,
-    AssetMappingCreate, AssetMappingOut,
+    AssetMappingCreate, AssetMappingOut, AssetMappingUpdate,
     AssetRegistryCreate, AssetRegistryOut, AssetRegistryUpdate
 )
 
@@ -135,7 +135,7 @@ async def create_item(
             image_path = f"uploads/inventory_items/{filename}".replace("\\", "/")
         
         # Create item
-        from app.models.inventory import InventoryItem, InventoryTransaction
+        from app.models.inventory import InventoryItem, InventoryTransaction, Location, LocationStock
         
         created_item = InventoryItem(
             name=name,
@@ -183,6 +183,29 @@ async def create_item(
                 created_by=current_user.id
             )
             db.add(transaction)
+
+            # Create LocationStock entry if location is specified
+            if location:
+                # Try to find location by name (case-insensitive)
+                # We need to be careful with exact matches vs partial
+                loc_obj = db.query(Location).filter(Location.name.ilike(location.strip())).first()
+                
+                # If not found directly, try seeing if it matches known patterns or valid locations
+                if not loc_obj:
+                    # Fallback: Check if user typed something like "General Store" that maps to "Central Warehouse"?
+                    # For now, strict match or partial contains might be safer?
+                    pass
+
+                if loc_obj:
+                    loc_stock = LocationStock(
+                        location_id=loc_obj.id,
+                        item_id=created_item.id,
+                        quantity=initial_stock
+                    )
+                    db.add(loc_stock)
+                else:
+                    # Optional: Log warning that location name didn't match any Location ID
+                    print(f"Warning: Item created with location '{location}' but no matching Location found in DB.")
         
         db.commit()
         db.refresh(created_item)
@@ -833,7 +856,53 @@ def update_purchase(
                 notes=f"Purchase cancelled: {updated.purchase_number}",
                 created_by=current_user.id
             )
+
             db.add(transaction)
+            
+        # Automatically create journal entry (if not exists)
+        try:
+            from app.models.account import JournalEntry
+            from app.utils.accounting_helpers import create_purchase_journal_entry
+            from app.api.gst_reports import RESORT_STATE_CODE
+            
+            # Check if entry already exists
+            existing_entry = db.query(JournalEntry).filter(
+                JournalEntry.reference_type == "purchase",
+                JournalEntry.reference_id == purchase_id
+            ).first()
+            
+            if not existing_entry:
+                vendor = inventory_crud.get_vendor_by_id(db, updated.vendor_id)
+                vendor_name = (vendor.legal_name or vendor.name) if vendor else "Unknown"
+                
+                # Determine if inter-state purchase
+                is_interstate = False
+                if vendor and vendor.gst_number and len(vendor.gst_number) >= 2:
+                    vendor_state_code = vendor.gst_number[:2]
+                    is_interstate = vendor_state_code != RESORT_STATE_CODE
+                
+                # Calculate inventory amount (sub_total) and tax amounts
+                inventory_amount = float(updated.sub_total or 0)
+                cgst_amount = float(updated.cgst or 0)
+                sgst_amount = float(updated.sgst or 0)
+                igst_amount = float(updated.igst or 0)
+                
+                # Create journal entry
+                create_purchase_journal_entry(
+                    db=db,
+                    purchase_id=updated.id,
+                    vendor_id=updated.vendor_id,
+                    inventory_amount=inventory_amount,
+                    cgst_amount=cgst_amount,
+                    sgst_amount=sgst_amount,
+                    igst_amount=igst_amount,
+                    vendor_name=vendor_name,
+                    is_interstate=is_interstate,
+                    created_by=current_user.id
+                )
+                print(f"[INFO] Created missing journal entry for purchase #{updated.id}")
+        except Exception as e:
+            print(f"[WARNING] Could not create journal entry on update: {str(e)}")
     
     db.commit()
     return get_purchase(purchase_id, db, current_user)
@@ -1550,7 +1619,8 @@ def get_location_items(
                 "unit_price": item.unit_price,
                 "total_value": stock.quantity * (item.unit_price or 0),
                 "source": "Stock",
-                "last_updated": stock.last_updated
+                "last_updated": stock.last_updated,
+                "type": "asset" if item.is_asset_fixed else "consumable"
             }
 
     # Add items from asset mappings
@@ -1566,18 +1636,21 @@ def get_location_items(
                     "item_code": item.item_code,
                     "category_name": category.name if category else None,
                     "unit": item.unit,
-                    "current_stock": 1, # Assets are usually 1 per mapping
+                    "current_stock": mapping.quantity or 1, # Use mapping quantity
+                    "location_stock": mapping.quantity or 1, # Alias for frontend
                     "min_stock_level": item.min_stock_level,
                     "unit_price": item.unit_price,
-                    "total_value": item.unit_price or 0,
+                    "total_value": (item.unit_price or 0) * (mapping.quantity or 1),
                     "source": "Asset Mapping",
                     "serial_number": mapping.serial_number,
-                    "assigned_date": mapping.assigned_date
+                    "assigned_date": mapping.assigned_date,
+                    "type": "asset"
                 }
             else:
                 # If already exists (e.g. multiple assets of same type), increment count
-                items_dict[key]["current_stock"] += 1
-                items_dict[key]["total_value"] += (item.unit_price or 0)
+                items_dict[key]["current_stock"] += (mapping.quantity or 1)
+                items_dict[key]["location_stock"] += (mapping.quantity or 1)
+                items_dict[key]["total_value"] += (item.unit_price or 0) * (mapping.quantity or 1)
 
     # Add items from asset registry
     for asset in asset_registry:
@@ -1592,27 +1665,29 @@ def get_location_items(
                 "category_name": category.name if category else None,
                 "unit": item.unit,
                 "current_stock": 1,
+                "location_stock": 1, # Alias for frontend
                 "min_stock_level": item.min_stock_level,
                 "unit_price": item.unit_price,
                 "total_value": item.unit_price or 0,
                 "source": "Asset Registry",
                 "serial_number": asset.serial_number,
                 "asset_tag": asset.asset_tag_id,
-                "status": asset.status
+                "status": asset.status,
+                "type": "asset"
             }
     
     # 4. Get History (Stock Issues & Waste Logs)
     history = []
     
     # Stock Issues (Inbound to location)
-    stock_issues = db.query(StockIssue).options(
+    stock_issues_in = db.query(StockIssue).options(
         joinedload(StockIssue.details).joinedload(StockIssueDetail.item),
         joinedload(StockIssue.issuer)
     ).filter(
         StockIssue.destination_location_id == location_id
     ).order_by(StockIssue.issue_date.desc()).limit(50).all()
     
-    for issue in stock_issues:
+    for issue in stock_issues_in:
         for detail in issue.details:
             if detail.item:
                 history.append({
@@ -1625,6 +1700,31 @@ def get_location_items(
                     "user": issue.issuer.name if issue.issuer else "Unknown",
                     "notes": detail.notes or issue.notes,
                     "color": "green"
+                })
+
+    # Stock Issues (Outbound from location - Transfers)
+    stock_issues_out = db.query(StockIssue).options(
+        joinedload(StockIssue.details).joinedload(StockIssueDetail.item),
+        joinedload(StockIssue.issuer),
+        joinedload(StockIssue.destination_location)
+    ).filter(
+        StockIssue.source_location_id == location_id
+    ).order_by(StockIssue.issue_date.desc()).limit(50).all()
+
+    for issue in stock_issues_out:
+        dest_name = issue.destination_location.name if issue.destination_location else "Unknown"
+        for detail in issue.details:
+            if detail.item:
+                history.append({
+                    "date": issue.issue_date,
+                    "type": "Transfer Out", # Or "Stock Issued"
+                    "item_name": detail.item.name,
+                    "quantity": detail.issued_quantity,
+                    "unit": detail.unit,
+                    "reference": issue.issue_number,
+                    "user": issue.issuer.name if issue.issuer else "Unknown",
+                    "notes": f"To {dest_name} - {detail.notes or issue.notes}",
+                    "color": "orange" # Distinct color for transfers
                 })
 
     # Waste Logs (Outbound/Loss from location)
@@ -1690,10 +1790,17 @@ def get_stock_by_location(
         for location in locations:
             try:
                 # 1. Count assets in this location
-                asset_count = db.query(AssetMapping).filter(
+                asset_mappings = db.query(AssetMapping).filter(
                     AssetMapping.location_id == location.id,
                     AssetMapping.is_active == True
-                ).count()
+                ).all()
+                
+                asset_count = sum(m.quantity for m in asset_mappings)
+                asset_value = 0
+                for mapping in asset_mappings:
+                    item = inventory_crud.get_item_by_id(db, mapping.item_id)
+                    if item:
+                        asset_value += mapping.quantity * (item.unit_price or 0)
                 
                 registry_count = db.query(AssetRegistry).filter(
                     AssetRegistry.current_location_id == location.id
@@ -1704,7 +1811,7 @@ def get_stock_by_location(
                     LocationStock.location_id == location.id
                 ).all()
                 
-                total_stock_value = 0
+                total_stock_value = asset_value
                 items_count = 0
                 
                 # Calculate from LocationStock
@@ -1847,20 +1954,29 @@ def create_asset_mapping(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    mapping_data = mapping.model_dump()
-    created = inventory_crud.create_asset_mapping(db, mapping_data, assigned_by=current_user.id)
-    
-    # Load relationships for response
-    assigner = db.query(User).filter(User.id == created.assigned_by).first()
-    item = inventory_crud.get_item_by_id(db, created.item_id)
-    location = inventory_crud.get_location_by_id(db, created.location_id)
-    
-    return {
-        **created.__dict__,
-        "assigned_by_name": assigner.name if assigner else None,
-        "item_name": item.name if item else None,
-        "location_name": f"{location.building} - {location.room_area}" if location else None
-    }
+    try:
+        mapping_data = mapping.model_dump()
+        created = inventory_crud.create_asset_mapping(db, mapping_data, assigned_by=current_user.id)
+        
+        # Load relationships for response
+        assigner = db.query(User).filter(User.id == created.assigned_by).first()
+        item = inventory_crud.get_item_by_id(db, created.item_id)
+        location = inventory_crud.get_location_by_id(db, created.location_id)
+        
+        return {
+            **created.__dict__,
+            "assigned_by_name": assigner.name if assigner else None,
+            "item_name": item.name if item else None,
+            "location_name": f"{location.building} - {location.room_area}" if location else None
+        }
+    except ValueError as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error creating asset mapping: {str(e)}")
 
 
 @router.get("/asset-mappings", response_model=List[AssetMappingOut])
@@ -1886,16 +2002,48 @@ def get_asset_mappings(
     return result
 
 
+@router.put("/asset-mappings/{mapping_id}", response_model=AssetMappingOut)
+def update_asset_mapping(
+    mapping_id: int,
+    update_data: AssetMappingUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    data = update_data.model_dump(exclude_unset=True)
+    updated = inventory_crud.update_asset_mapping(db, mapping_id, data)
+    
+    if not updated:
+        raise HTTPException(status_code=404, detail="Asset Mapping not found")
+        
+    # Load relationships for response
+    assigner = db.query(User).filter(User.id == updated.assigned_by).first() if updated.assigned_by else None
+    item = inventory_crud.get_item_by_id(db, updated.item_id)
+    location = inventory_crud.get_location_by_id(db, updated.location_id)
+    
+    return {
+        **updated.__dict__,
+        "assigned_by_name": assigner.name if assigner else None,
+        "item_name": item.name if item else None,
+        "location_name": f"{location.building} - {location.room_area}" if location else None
+    }
+
+
 @router.delete("/asset-mappings/{mapping_id}")
 def unassign_asset(
     mapping_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    mapping = inventory_crud.unassign_asset(db, mapping_id)
-    if not mapping:
-        raise HTTPException(status_code=404, detail="Asset mapping not found")
-    return {"message": "Asset unassigned successfully"}
+    try:
+        mapping = inventory_crud.unassign_asset(db, mapping_id)
+        if not mapping:
+            raise HTTPException(status_code=404, detail="Asset mapping not found")
+        return {"message": "Asset unassigned successfully"}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error unassigning asset: {str(e)}")
 
 
 # Asset Registry Endpoints (The "Profile" - tracks individual instances)
@@ -1906,7 +2054,7 @@ def create_asset_registry(
     current_user: User = Depends(get_current_user)
 ):
     asset_data = asset.model_dump()
-    created = inventory_crud.create_asset_registry(db, asset_data)
+    created = inventory_crud.create_asset_registry(db, asset_data, created_by=current_user.id)
     
     # Load relationships for response
     item = inventory_crud.get_item_by_id(db, created.item_id)
@@ -2053,3 +2201,84 @@ def get_stock_issues(
     current_user: User = Depends(get_current_user)
 ):
     return inventory_crud.get_all_stock_issues(db, skip=skip, limit=limit)
+
+@router.get("/items/{item_id}/transactions", response_model=List[InventoryTransactionOut])
+def get_item_transactions(
+    item_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get all transactions for a specific item to show history/audit trail.
+    """
+    from app.models.inventory import InventoryTransaction, PurchaseMaster
+    from app.models.user import User
+    
+    # Check if item exists
+    item = inventory_crud.get_item_by_id(db, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+        
+    transactions = db.query(InventoryTransaction)\
+        .filter(InventoryTransaction.item_id == item_id)\
+        .order_by(InventoryTransaction.created_at.desc())\
+        .all()
+    
+    # Enrich with details if needed (User name, Reference context)
+    # The response model InventoryTransactionOut should handle basic fields.
+    # We might want to ensure 'created_by_name' is populated if the model expects it.
+    
+    result = []
+    for txn in transactions:
+        user = db.query(User).filter(User.id == txn.created_by).first() if txn.created_by else None
+        
+        # Format the result
+        result.append({
+            **txn.__dict__,
+            "created_by_name": user.name if user else "System",
+            # We can also add more context about reference (link to PO, etc.)
+        })
+        
+    return result
+
+@router.post("/items/{item_id}/fix-stock", response_model=InventoryItemOut)
+def fix_item_stock(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Recalculate item stock based on transaction history and update the current_stock value.
+    This fixes discrepancies caused by manual edits or phantom updates.
+    """
+    from app.models.inventory import InventoryTransaction
+    
+    item = inventory_crud.get_item_by_id(db, item_id)
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+        
+    # Calculate stock from transaction history
+    transactions = db.query(InventoryTransaction).filter(InventoryTransaction.item_id == item_id).all()
+    
+    calculated_stock = 0.0
+    for txn in transactions:
+        # Define logic match frontend
+        if txn.transaction_type in ["in", "adjustment", "transfer_in"]:
+            calculated_stock += txn.quantity
+        elif txn.transaction_type in ["out", "transfer_out"]:
+            calculated_stock -= txn.quantity
+            
+    # Update item
+    item.current_stock = calculated_stock
+    db.commit()
+    db.refresh(item)
+    
+    # Return updated item with category (needed for response model)
+    category = inventory_crud.get_category_by_id(db, item.category_id)
+    
+    return {
+        **item.__dict__,
+        "category_name": category.name if category else None,
+        "department": category.parent_department if category else None,
+        "is_low_stock": item.current_stock <= item.min_stock_level if item.min_stock_level else False
+    }

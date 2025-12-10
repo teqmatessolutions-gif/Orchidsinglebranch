@@ -3,11 +3,12 @@ import DashboardLayout from "../layout/DashboardLayout";
 import API from "../services/api";
 import api from "../services/api";
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, LineChart, Line } from "recharts";
-import { DollarSign, Users, Calendar, BedDouble, Briefcase, Package, Utensils, ConciergeBell, CheckCircle, ShoppingCart, TrendingUp, BookOpen, FileText, Calculator, Plus, Edit, Trash2, CheckCircle as CheckCircleIcon, XCircle, Boxes, Building2, Store, ShoppingBag, Tag, TrendingDown, ArrowUpDown } from "lucide-react";
+import { DollarSign, Users, Calendar, BedDouble, Briefcase, Package, Utensils, ConciergeBell, CheckCircle, ShoppingCart, TrendingUp, BookOpen, FileText, Calculator, Plus, Edit, Trash2, CheckCircle as CheckCircleIcon, XCircle, Boxes, Building2, Store, ShoppingBag, Tag, TrendingDown, ArrowUpDown, History } from "lucide-react";
 import CountUp from "react-countup";
 import { motion } from "framer-motion";
 import { useInfiniteScroll } from "./useInfiniteScroll";
 import { formatDateIST, formatDateTimeIST, getCurrentDateIST, getCurrentDateTimeIST } from "../utils/dateUtils";
+import DepartmentDetailsModal from "./inventory/modals/DepartmentDetailsModal";
 
 // --- Helper Components ---
 
@@ -172,6 +173,15 @@ export default function ReportsDashboard() {
   const [deptReportStartDate, setDeptReportStartDate] = useState("");
   const [deptReportEndDate, setDeptReportEndDate] = useState("");
   const [deptReportDate, setDeptReportDate] = useState(getCurrentDateIST());
+
+  // Department Details Modal State
+  const [selectedDepartment, setSelectedDepartment] = useState(null);
+  const [showDepartmentModal, setShowDepartmentModal] = useState(false);
+
+  const handleOpenDepartmentDetails = (deptName) => {
+    setSelectedDepartment(deptName);
+    setShowDepartmentModal(true);
+  };
 
   // Helper function to extract data array from response
   const extractReportData = (data) => {
@@ -855,6 +865,13 @@ export default function ReportsDashboard() {
         <li></li>
       </div>
 
+      {/* Department Details Modal */}
+      <DepartmentDetailsModal
+        isOpen={showDepartmentModal}
+        onClose={() => setShowDepartmentModal(false)}
+        department={selectedDepartment}
+      />
+
       <div className="p-6 md:p-8 space-y-8 bg-gray-50 min-h-screen">
         {/* Main Tab Selector */}
         <div className="flex items-center justify-between">
@@ -945,7 +962,13 @@ export default function ReportsDashboard() {
                     >
                       <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200">
                         <h4 className="text-lg font-bold text-gray-800">{dept}</h4>
-                        <Building2 className="text-indigo-500 w-5 h-5" />
+                        <button
+                          onClick={() => handleOpenDepartmentDetails(dept)}
+                          className="text-indigo-600 hover:text-indigo-800 p-1 hover:bg-indigo-50 rounded"
+                          title="View History"
+                        >
+                          <History className="w-5 h-5" />
+                        </button>
                       </div>
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">

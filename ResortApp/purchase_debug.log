@@ -8,3 +8,27 @@ Checking if status is 'received': purchase.status = 'received'
 ENTERING stock update block for received purchase
 Details count in created object: 1
 Processing detail: item_id=3, qty=123.0
+
+=== 2025-12-09 20:10:36.851141 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: draft
+  Destination Location ID: 1
+  Details count: 3
+Checking if status is 'received': purchase.status = 'draft'
+
+=== 2025-12-09 22:04:06.482181 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: confirmed
+  Destination Location ID: 1
+  Details count: 5
+Checking if status is 'received': purchase.status = 'confirmed'
+
+=== 2025-12-09 22:20:53.642858 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 3
+  Details count: 1
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 1
+Processing detail: item_id=8, qty=100.0

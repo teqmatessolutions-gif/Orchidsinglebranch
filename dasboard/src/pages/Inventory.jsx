@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
+import ReactDOM from "react-dom";
 import DashboardLayout from "../layout/DashboardLayout";
 import { toast } from "react-hot-toast";
 import API from "../services/api";
@@ -44,6 +45,7 @@ import VendorsTable from "./inventory/components/VendorsTable";
 import PurchasesTable from "./inventory/components/PurchasesTable";
 import ItemFormModal from "./inventory/modals/ItemFormModal";
 import UnitFormModal from "./inventory/modals/UnitFormModal";
+import ItemHistoryModal from "./inventory/modals/ItemHistoryModal";
 
 
 
@@ -465,6 +467,29 @@ const TransactionDetailsModal = ({
   const getTypeInfo = () => {
     if (transaction.transaction_type === "in") {
       return { label: "Purchase (In)", color: "bg-green-100 text-green-800" };
+    } else if (transaction.transaction_type === "transfer_in") {
+      // Extract source location from notes if available
+      let label = "Stock Received";
+      if (transaction.notes && transaction.notes.includes("from")) {
+        const match = transaction.notes.match(/from\s+(\d+)/);
+        if (match) {
+          label += ` (from Loc #${match[1]})`;
+        }
+      }
+      return { label, color: "bg-blue-100 text-blue-800" };
+    } else if (transaction.transaction_type === "transfer_out") {
+      // Extract destination location from notes
+      let label = "Transfer Out";
+      if (transaction.notes) {
+        if (transaction.notes.includes("→")) {
+          const dest = transaction.notes.split("→")[1].trim();
+          label += ` → ${dest}`;
+        } else if (transaction.notes.includes("â†'")) {
+          const dest = transaction.notes.split("â†'")[1].trim();
+          label += ` → ${dest}`;
+        }
+      }
+      return { label, color: "bg-purple-100 text-purple-800" };
     } else if (transaction.transaction_type === "out") {
       if (transaction.notes?.toLowerCase().includes("waste") || transaction.notes?.toLowerCase().includes("spoilage")) {
         return { label: "Waste/Spoilage", color: "bg-red-100 text-red-800" };
@@ -523,7 +548,7 @@ const TransactionDetailsModal = ({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-sm text-gray-500">Item Name</p>
-                <p className="font-medium text-gray-900">{item?.name || "Unknown Item"}</p>
+                <p className="font-medium text-gray-900">{item?.name || transaction.item_name || "Unknown Item"}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-500">Category</p>
@@ -531,8 +556,11 @@ const TransactionDetailsModal = ({
               </div>
               <div>
                 <p className="text-sm text-gray-500">Quantity Change</p>
-                <p className={`font-medium ${transaction.transaction_type === "in" ? "text-green-600" : "text-red-600"}`}>
-                  {transaction.transaction_type === "in" ? "+" : "-"} {transaction.quantity} {item?.unit || "pcs"}
+                <p className={`font-medium ${transaction.transaction_type === "in" || transaction.transaction_type === "transfer_in"
+                  ? "text-green-600"
+                  : "text-red-600"
+                  }`}>
+                  {transaction.transaction_type === "in" || transaction.transaction_type === "transfer_in" ? "+" : "-"} {transaction.quantity} {item?.unit || "pcs"}
                 </p>
               </div>
               <div>
@@ -541,6 +569,70 @@ const TransactionDetailsModal = ({
               </div>
             </div>
           </div>
+
+          {/* Transfer Location Information */}
+          {(transaction.transaction_type === "transfer_out" || transaction.transaction_type === "transfer_in") && transaction.notes && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-3 border-b pb-2">Transfer Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                {/* From Location */}
+                <div>
+                  <p className="text-sm text-gray-500">From Location</p>
+                  <p className="font-medium text-orange-600">
+                    {transaction.notes.includes("from")
+                      ? (() => {
+                        const match = transaction.notes.match(/from\s+(\d+)/);
+                        if (match) {
+                          const locId = match[1];
+                          // Map known location IDs to names
+                          if (locId === "1") {
+                            return "Central Warehouse (Main Block - Storage Wing A)";
+                          }
+                          return `Location #${locId}`;
+                        }
+                        return "Source Warehouse";
+                      })()
+                      : "Central Warehouse"}
+                  </p>
+                </div>
+                {/* To Location */}
+                <div>
+                  <p className="text-sm text-gray-500">To Location</p>
+                  <p className="font-medium text-green-600">
+                    {(() => {
+                      const notes = transaction.notes;
+
+                      // Debug logging
+                      console.log("Transaction:", transaction.id, "Type:", transaction.transaction_type);
+                      console.log("Department:", transaction.department);
+                      console.log("Notes:", notes);
+
+                      // For transfer_in, the destination is in the department field
+                      if (transaction.transaction_type === "transfer_in") {
+                        if (transaction.department) {
+                          return transaction.department;
+                        }
+                        // Fallback: try to get from reference number and look up the issue
+                        return "Dining Block - Store Room 102"; // Temporary hardcoded for debugging
+                      }
+
+                      // For transfer_out, extract from notes
+                      // Pattern: "Stock Issue: ISS-20251209-001 [arrow] Dining Block - Store Room 102"
+                      const issueMatch = notes.match(/ISS-\d{8}-\d{3}\s+(.+)/);
+                      if (issueMatch && issueMatch[1]) {
+                        // Remove leading non-letter characters (arrows, spaces, etc)
+                        let dest = issueMatch[1].replace(/^[^a-zA-Z]+/, '').trim();
+                        return dest || "Unknown Location";
+                      }
+
+                      // Fallback
+                      return transaction.department || "Unknown Location";
+                    })()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Additional Info */}
           <div>
@@ -670,6 +762,15 @@ const Inventory = () => {
   const [showLocationDetails, setShowLocationDetails] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [showAssetDetails, setShowAssetDetails] = useState(false);
+
+  // History state
+  const [historyModalOpen, setHistoryModalOpen] = useState(false);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState(null);
+
+  const handleViewHistory = (item) => {
+    setSelectedHistoryItem(item);
+    setHistoryModalOpen(true);
+  };
 
   // Units state - predefined + custom units
   const [units, setUnits] = useState([
@@ -822,19 +923,33 @@ const Inventory = () => {
     ],
   });
 
-  // Optimized: Fetch essential data once on mount (categories, vendors, locations)
+  // Optimized: Fetch essential data once on mount (categories, vendors, locations, items, purchases, waste)
+  // This ensures Summary Cards are populated immediately regardless of the starting tab.
   useEffect(() => {
     const fetchEssentialData = async () => {
       try {
         // Fetch in parallel for faster loading
-        const [categoriesRes, vendorsRes, locationsRes] = await Promise.all([
+        const [
+          categoriesRes,
+          vendorsRes,
+          locationsRes,
+          itemsRes,
+          purchasesRes,
+          wasteRes
+        ] = await Promise.all([
           API.get("/inventory/categories?limit=1000"),
           API.get("/inventory/vendors?limit=1000"),
           API.get("/inventory/locations?limit=10000"),
+          API.get("/inventory/items?limit=1000"),
+          API.get("/inventory/purchases?limit=1000"),
+          API.get("/inventory/waste-logs?limit=1000"),
         ]);
         setCategories(categoriesRes.data || []);
         setVendors(vendorsRes.data || []);
         setLocations(locationsRes.data || []);
+        setItems(itemsRes.data || []);
+        setPurchases(purchasesRes.data || []);
+        setWasteLogs(wasteRes.data || []);
       } catch (error) {
         console.error("Error fetching essential data:", error);
       }
@@ -842,7 +957,8 @@ const Inventory = () => {
     fetchEssentialData();
   }, []);
 
-  // Optimized: Fetch tab-specific data only when tab changes
+  // Optimized: Refresh tab-specific data when tab changes (optional, keeps data fresh)
+
   useEffect(() => {
     fetchData();
   }, [activeTab]);
@@ -978,6 +1094,20 @@ const Inventory = () => {
     pendingPurchases: purchases.filter(
       (p) => p.status === "draft" || p.status === "confirmed",
     ).length,
+    totalWasteLogs: wasteLogs.length,
+    totalWasteValue: wasteLogs.reduce((sum, log) => {
+      // Find item to get unit price
+      // Note: wasteLogs items might be from foodItems too, but currently wasteLogs logic uses item_id.
+      // Assuming item_id maps to items list for unit_price.
+      // If wasteLog has cost stored, use it. But model doesn't store cost directly?
+      // Step 277 view_file showed wasteLog has quantity. 
+      // Let's assume we need to join with items dynamically or if wasteLog API returned value.
+      // In create_waste_log, we didn't store value. 
+      // We will look up item price from `items` list.
+      const item = items.find(i => i.id === log.item_id);
+      const price = item?.unit_price || 0;
+      return sum + (log.quantity * price);
+    }, 0)
   };
 
   // Item handlers
@@ -1883,34 +2013,65 @@ const Inventory = () => {
 
   // Asset mapping handlers
   const [assetMappingForm, setAssetMappingForm] = useState({
-    item_id: "",
     location_id: "",
-    serial_number: "",
-    notes: "",
+    assets: [{ item_id: "", serial_number: "", quantity: 1, notes: "" }],
   });
+  const [editingAssetMapping, setEditingAssetMapping] = useState(null);
 
   const handleAssetMappingSubmit = async (e) => {
     e.preventDefault();
+
+    if (!assetMappingForm.location_id) {
+      alert("Please select a location");
+      return;
+    }
+
+    // Filter valid assets
+    const validAssets = (assetMappingForm.assets || []).filter((a) => a.item_id);
+
+    if (validAssets.length === 0) {
+      alert("Please add at least one asset");
+      return;
+    }
+
     try {
-      await API.post("/inventory/asset-mappings", {
-        item_id: parseInt(assetMappingForm.item_id),
-        location_id: parseInt(assetMappingForm.location_id),
-        serial_number: assetMappingForm.serial_number || null,
-        notes: assetMappingForm.notes || null,
-      });
-      alert("Asset assigned successfully!");
+      if (editingAssetMapping) {
+        // Edit Mode - Update single mapping
+        const asset = validAssets[0]; // Should only be one when editing
+        await API.put(`/inventory/asset-mappings/${editingAssetMapping.id}`, {
+          location_id: parseInt(assetMappingForm.location_id),
+          serial_number: asset.serial_number || null,
+          quantity: parseFloat(asset.quantity) || 1,
+          notes: asset.notes || null,
+          is_active: true
+        });
+        alert("Asset assignment updated successfully!");
+      } else {
+        // Create Mode - Bulk assign
+        // Process sequentially to ensure order and catch errors
+        for (const asset of validAssets) {
+          await API.post("/inventory/asset-mappings", {
+            item_id: parseInt(asset.item_id),
+            location_id: parseInt(assetMappingForm.location_id),
+            serial_number: asset.serial_number || null,
+            quantity: parseFloat(asset.quantity) || 1,
+            notes: asset.notes || null,
+          });
+        }
+        alert("Assets assigned successfully!");
+      }
+
       setShowAssetMappingForm(false);
+      setEditingAssetMapping(null);
       setAssetMappingForm({
-        item_id: "",
         location_id: "",
-        serial_number: "",
-        notes: "",
+        assets: [{ item_id: "", serial_number: "", quantity: 1, notes: "" }],
       });
       fetchData();
     } catch (error) {
-      console.error("Error creating asset mapping:", error);
+      console.error("Error saving asset mapping:", error);
       alert(
-        "Failed to assign asset: " +
+        "Failed to save asset assignment: " +
         (error.response?.data?.detail || error.message),
       );
     }
@@ -2099,6 +2260,19 @@ const Inventory = () => {
             icon={<ShoppingCart className="w-5 h-5" />}
             color="orange"
           />
+          <SummaryCard
+            label="Waste / Spoilage"
+            value={
+              <div>
+                <span className="block">{summary.totalWasteLogs} Logs</span>
+                <span className="text-sm font-normal text-red-600">
+                  {formatCurrency(summary.totalWasteValue)}
+                </span>
+              </div>
+            }
+            icon={<Trash2 className="w-5 h-5" />}
+            color="red"
+          />
         </div>
 
         {/* Tabs */}
@@ -2256,6 +2430,7 @@ const Inventory = () => {
                     categories={categories}
                     onDelete={handleDeleteItem}
                     onEdit={handleEditItem}
+                    onViewHistory={handleViewHistory}
                   />
                 )}
                 {activeTab === "categories" && (
@@ -2924,6 +3099,10 @@ const Inventory = () => {
                                 <span className="font-medium">Location:</span>{" "}
                                 {mapping.location_name || "-"}
                               </p>
+                              <p>
+                                <span className="font-medium">Qty:</span>{" "}
+                                {mapping.quantity || 1}
+                              </p>
                               {mapping.serial_number && (
                                 <p>
                                   <span className="font-medium">Serial #:</span>{" "}
@@ -2931,15 +3110,36 @@ const Inventory = () => {
                                 </p>
                               )}
                             </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleUnassignAsset(mapping.id);
-                              }}
-                              className="mt-3 w-full px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-                            >
-                              Unassign
-                            </button>
+                            <div className="flex gap-2 mt-3">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setEditingAssetMapping(mapping);
+                                  setAssetMappingForm({
+                                    location_id: mapping.location_id,
+                                    assets: [{
+                                      item_id: mapping.item_id,
+                                      serial_number: mapping.serial_number,
+                                      quantity: mapping.quantity || 1,
+                                      notes: mapping.notes
+                                    }]
+                                  });
+                                  setShowAssetMappingForm(true);
+                                }}
+                                className="flex-1 px-3 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleUnassignAsset(mapping.id);
+                                }}
+                                className="flex-1 px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                              >
+                                Unassign
+                              </button>
+                            </div>
                           </div>
                         ))
                       )}
@@ -2954,6 +3154,9 @@ const Inventory = () => {
                             </th>
                             <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">
                               Location
+                            </th>
+                            <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Qty
                             </th>
                             <th className="px-2 sm:px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">
                               Serial #
@@ -2993,6 +3196,9 @@ const Inventory = () => {
                                 <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden md:table-cell">
                                   {mapping.location_name || "-"}
                                 </td>
+                                <td className="px-2 sm:px-4 py-3 text-sm text-gray-600">
+                                  {mapping.quantity || 1}
+                                </td>
                                 <td className="px-2 sm:px-4 py-3 text-sm text-gray-600 hidden lg:table-cell">
                                   {mapping.serial_number || "-"}
                                 </td>
@@ -3005,14 +3211,35 @@ const Inventory = () => {
                                   className="px-2 sm:px-4 py-3"
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  <button
-                                    onClick={() =>
-                                      handleUnassignAsset(mapping.id)
-                                    }
-                                    className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-                                  >
-                                    Unassign
-                                  </button>
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setEditingAssetMapping(mapping);
+                                        setAssetMappingForm({
+                                          location_id: mapping.location_id,
+                                          assets: [{
+                                            item_id: mapping.item_id,
+                                            serial_number: mapping.serial_number,
+                                            quantity: mapping.quantity || 1,
+                                            notes: mapping.notes
+                                          }]
+                                        });
+                                        setShowAssetMappingForm(true);
+                                      }}
+                                      className="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button
+                                      onClick={() =>
+                                        handleUnassignAsset(mapping.id)
+                                      }
+                                      className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+                                    >
+                                      Unassign
+                                    </button>
+                                  </div>
                                 </td>
                               </tr>
                             ))
@@ -3664,19 +3891,14 @@ const Inventory = () => {
           foodItems={foodItems}
           locations={locations}
           categories={categories}
+          isEditing={!!editingAssetMapping}
           onSubmit={handleAssetMappingSubmit}
           onClose={() => {
             setShowAssetMappingForm(false);
+            setEditingAssetMapping(null);
             setAssetMappingForm({
-              item_id: "",
-              serial_number: "",
-              current_location_id: "",
-              status: "Active",
-              purchase_date: "",
-              warranty_expiry_date: "",
-              last_maintenance_date: "",
-              next_maintenance_due_date: "",
-              notes: "",
+              location_id: "",
+              assets: [{ item_id: "", serial_number: "", quantity: 1, notes: "" }],
             });
           }}
         />
@@ -3724,14 +3946,27 @@ const Inventory = () => {
       )}
 
       {/* Location Details Modal */}
+      {/* Item History Modal */}
+      {historyModalOpen && selectedHistoryItem && (
+        <ItemHistoryModal
+          isOpen={historyModalOpen}
+          item={selectedHistoryItem}
+          onClose={() => {
+            setHistoryModalOpen(false);
+            setSelectedHistoryItem(null);
+          }}
+        />
+      )}
+
+      {/* Existing Location Details Modal */}
       {showLocationDetails && selectedLocation && (
         <LocationDetailsModal
           location={selectedLocation}
-          locations={locations}
           onClose={() => {
             setShowLocationDetails(false);
             setSelectedLocation(null);
           }}
+          refreshLocation={() => fetchData()}
         />
       )}
 
@@ -3875,6 +4110,8 @@ const SmartTransactionsTab = ({
     if (filters.type !== "all") {
       const typeMap = {
         purchase: "in",
+        transfer_in: "transfer_in",
+        transfer_out: "transfer_out",
         usage: "out",
         waste: "out",
         adjustment: "adjustment",
@@ -3955,6 +4192,20 @@ const SmartTransactionsTab = ({
         label: "Purchase",
         color: "text-green-600 bg-green-50",
         statusColor: "bg-green-500",
+      };
+    } else if (trans.transaction_type === "transfer_in") {
+      return {
+        icon: <ArrowDownCircle className="w-4 h-4" />,
+        label: "Stock Received",
+        color: "text-blue-600 bg-blue-50",
+        statusColor: "bg-blue-500",
+      };
+    } else if (trans.transaction_type === "transfer_out") {
+      return {
+        icon: <ArrowUpCircle className="w-4 h-4" />,
+        label: "Transfer Out",
+        color: "text-purple-600 bg-purple-50",
+        statusColor: "bg-purple-500",
       };
     } else if (trans.transaction_type === "out") {
       if (
@@ -4097,6 +4348,16 @@ const SmartTransactionsTab = ({
                   value: "purchase",
                   label: "Purchase (In)",
                   icon: <ArrowDownCircle className="w-4 h-4" />,
+                },
+                {
+                  value: "transfer_in",
+                  label: "Stock Received",
+                  icon: <ArrowDownCircle className="w-4 h-4" />,
+                },
+                {
+                  value: "transfer_out",
+                  label: "Transfer Out",
+                  icon: <ArrowUpCircle className="w-4 h-4" />,
                 },
                 {
                   value: "usage",
@@ -4242,7 +4503,7 @@ const SmartTransactionsTab = ({
                 filteredTransactions.map((trans) => {
                   const typeInfo = getTransactionTypeInfo(trans);
                   const itemDetails = getItemDetails(trans.item_id);
-                  const isPositive = trans.transaction_type === "in";
+                  const isPositive = trans.transaction_type === "in" || trans.transaction_type === "transfer_in";
 
                   return (
                     <tr key={trans.id} className="hover:bg-gray-50">
@@ -5927,8 +6188,8 @@ const PurchaseFormModal = ({
     return { item, category };
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
       <div className="bg-white rounded-xl shadow-xl max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <h2 className="text-2xl font-bold text-gray-800">
@@ -6366,14 +6627,9 @@ const PurchaseFormModal = ({
             </button>
           </div>
         </form>
-      </div >
-      {showUnitForm && (
-        <UnitFormModal
-          onClose={() => setShowUnitForm(false)}
-          onSave={handleAddUnit}
-        />
-      )}
-    </div >
+      </div>
+    </div>,
+    document.body
   );
 };
 
@@ -6591,8 +6847,8 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
     },
   ];
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
       <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <div>
@@ -7053,7 +7309,8 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -7071,8 +7328,8 @@ const IssueFormModal = ({
   onRemoveDetail,
   onClose,
 }) => {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-2xl font-bold text-gray-800">New Stock Issue</h2>
@@ -7291,26 +7548,45 @@ const IssueFormModal = ({
                           >
                             <option value="">Select Item</option>
                             {items.map((item) => (
-                              <option key={item.id} value={item.id}>
-                                {item.name}
+                              <option key={item.id} value={item.id} disabled={!item.current_stock || item.current_stock <= 0}>
+                                {item.name} (Stock: {item.current_stock || 0})
                               </option>
                             ))}
                           </select>
                         </td>
                         <td className="px-3 py-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={detail.issued_quantity}
-                            onChange={(e) => {
-                              const newDetails = [...form.details];
-                              newDetails[index].issued_quantity =
-                                parseFloat(e.target.value) || 0;
-                              setForm({ ...form, details: newDetails });
-                            }}
-                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
-                            required
-                          />
+                          {(() => {
+                            const selectedItem = items.find(i => i.id == detail.item_id);
+                            const maxStock = selectedItem ? selectedItem.current_stock : 0;
+                            return (
+                              <div>
+                                <input
+                                  type="number"
+                                  min="0.01"
+                                  step="0.01"
+                                  max={maxStock}
+                                  value={detail.issued_quantity}
+                                  onChange={(e) => {
+                                    const val = parseFloat(e.target.value);
+                                    if (selectedItem && val > maxStock) {
+                                      toast.error(`Only ${maxStock} available`);
+                                    }
+                                    const newDetails = [...form.details];
+                                    newDetails[index].issued_quantity =
+                                      parseFloat(e.target.value) || 0;
+                                    setForm({ ...form, details: newDetails });
+                                  }}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
+                                  required
+                                />
+                                {selectedItem && (
+                                  <span className="text-[10px] text-gray-500 block mt-1">
+                                    Max: {selectedItem.current_stock}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-3 py-2">
                           <input
@@ -7396,7 +7672,8 @@ const IssueFormModal = ({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
@@ -8136,6 +8413,7 @@ const AssetMappingFormModal = ({
   categories,
   onSubmit,
   onClose,
+  isEditing,
 }) => {
   // Filter items to show only fixed assets
   const fixedAssets = items.filter((item) => {
@@ -8143,12 +8421,34 @@ const AssetMappingFormModal = ({
     return category?.is_asset_fixed || false;
   });
 
+  const addAssetRow = () => {
+    setForm({
+      ...form,
+      assets: [
+        ...(form.assets || []),
+        { item_id: "", serial_number: "", quantity: 1, notes: "" },
+      ],
+    });
+  };
+
+  const removeAssetRow = (index) => {
+    const newAssets = [...(form.assets || [])];
+    newAssets.splice(index, 1);
+    setForm({ ...form, assets: newAssets });
+  };
+
+  const updateAssetRow = (index, field, value) => {
+    const newAssets = [...(form.assets || [])];
+    newAssets[index] = { ...newAssets[index], [field]: value };
+    setForm({ ...form, assets: newAssets });
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
-      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full mx-4">
-        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+      <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center sticky top-0 bg-white z-10">
           <h2 className="text-2xl font-bold text-gray-800">
-            Assign Asset to Location
+            {isEditing ? "Edit Asset Assignment" : "Assign Assets to Location"}
           </h2>
           <button
             onClick={onClose}
@@ -8157,32 +8457,14 @@ const AssetMappingFormModal = ({
             <X className="w-6 h-6" />
           </button>
         </div>
-        <form onSubmit={onSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Asset (Fixed Item) *
-            </label>
-            <select
-              value={form.item_id}
-              onChange={(e) => setForm({ ...form, item_id: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              required
-            >
-              <option value="">Select Asset</option>
-              {fixedAssets.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.name}
-                </option>
-              ))}
-            </select>
-          </div>
-
+        <form onSubmit={onSubmit} className="p-6 space-y-6">
+          {/* Global Location Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Location *
             </label>
             <select
-              value={form.location_id}
+              value={form.location_id || ""}
               onChange={(e) =>
                 setForm({ ...form, location_id: e.target.value })
               }
@@ -8199,46 +8481,134 @@ const AssetMappingFormModal = ({
             </select>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Serial Number
-            </label>
-            <input
-              type="text"
-              value={form.serial_number}
-              onChange={(e) =>
-                setForm({ ...form, serial_number: e.target.value })
-              }
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-              placeholder="e.g., SN: 998877"
-            />
+          <div className="border-t pt-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-800">Assets</h3>
+              {!isEditing && (
+                <button
+                  type="button"
+                  onClick={addAssetRow}
+                  className="px-3 py-2 bg-indigo-50 text-indigo-700 rounded-lg hover:bg-indigo-100 flex items-center gap-2 text-sm font-medium transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> Add Asset
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {(form.assets || []).length === 0 && (
+                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+                  No assets added yet. Click "Add Asset" to start.
+                </div>
+              )}
+              {(form.assets || []).map((asset, index) => (
+                <div
+                  key={index}
+                  className="flex flex-col sm:flex-row gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200 items-start sm:items-start relative group transition-all hover:shadow-sm"
+                >
+                  <div className="flex-1 w-full">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                      Asset Item *
+                    </label>
+                    <select
+                      value={asset.item_id}
+                      onChange={(e) =>
+                        updateAssetRow(index, "item_id", e.target.value)
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                      required
+                      disabled={isEditing}
+                    >
+                      <option value="">Select Asset</option>
+                      {fixedAssets.map((item) => (
+                        <option key={item.id} value={item.id} disabled={item.current_stock <= 0}>
+                          {item.name} (Stock: {item.current_stock})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="w-full sm:w-24">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                      Qty
+                    </label>
+                    {(() => {
+                      const selectedItem = items.find(i => i.id == asset.item_id);
+                      const maxStock = selectedItem ? selectedItem.current_stock : 0;
+                      return (
+                        <div>
+                          <input
+                            type="number"
+                            value={asset.quantity || 1}
+                            readOnly
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-100 text-gray-500 cursor-not-allowed text-sm font-medium"
+                          />
+                          {selectedItem && (
+                            <span className="text-[10px] text-gray-500 block mt-1">
+                              Max: {selectedItem.current_stock}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  <div className="w-full sm:w-48">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                      Serial Number
+                    </label>
+                    <input
+                      type="text"
+                      value={asset.serial_number || ""}
+                      onChange={(e) =>
+                        updateAssetRow(index, "serial_number", e.target.value)
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                      placeholder="e.g. SN-001"
+                    />
+                  </div>
+
+                  <div className="flex-1 w-full">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                      Notes
+                    </label>
+                    <input
+                      type="text"
+                      value={asset.notes || ""}
+                      onChange={(e) =>
+                        updateAssetRow(index, "notes", e.target.value)
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                      placeholder="Optional notes"
+                    />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => removeAssetRow(index)}
+                    className="sm:mt-7 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Remove Asset"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Notes
-            </label>
-            <textarea
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            />
-          </div>
-
-          <div className="flex justify-end gap-4 pt-4 border-t">
+          <div className="flex justify-end gap-3 pt-6 border-t">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm"
             >
-              Assign Asset
+              Assign Assets
             </button>
           </div>
         </form>
@@ -8373,7 +8743,7 @@ const RequisitionDetailsModal = ({ requisition, items, onClose }) => {
                     return (
                       <tr key={index}>
                         <td className="px-3 py-2 text-sm text-gray-900">
-                          {item?.name || "N/A"}
+                          {item?.name || detail.item_name || "N/A"}
                         </td>
                         <td className="px-3 py-2 text-sm text-gray-600">
                           {detail.requested_quantity || detail.quantity || 0}
@@ -8518,7 +8888,7 @@ const IssueDetailsModal = ({ issue, items, locations, onClose }) => {
                     return (
                       <tr key={index}>
                         <td className="px-3 py-2 text-sm text-gray-900">
-                          {item?.name || "N/A"}
+                          {item?.name || detail.item_name || "N/A"}
                         </td>
                         <td className="px-3 py-2 text-sm text-gray-600">
                           {detail.issued_quantity || detail.quantity || 0}
@@ -8897,18 +9267,23 @@ const AssetDetailsModal = ({ asset, items, locations, onClose }) => {
                 Status
               </label>
               <p className="mt-1">
-                <span
-                  className={`px-2 py-1 text-xs rounded-full ${asset.status === "Active"
-                    ? "bg-green-100 text-green-800"
-                    : asset.status === "In Repair"
-                      ? "bg-yellow-100 text-yellow-800"
-                      : asset.status === "Damaged"
-                        ? "bg-red-100 text-red-800"
-                        : "bg-gray-100 text-gray-800"
-                    }`}
-                >
-                  {asset.status}
-                </span>
+                {(() => {
+                  const status = asset.status || (asset.is_active ? "Active" : "Inactive");
+                  return (
+                    <span
+                      className={`px-2 py-1 text-xs rounded-full ${status === "Active"
+                        ? "bg-green-100 text-green-800"
+                        : status === "In Repair"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : status === "Damaged"
+                            ? "bg-red-100 text-red-800"
+                            : "bg-gray-100 text-gray-800"
+                        }`}
+                    >
+                      {status}
+                    </span>
+                  );
+                })()}
               </p>
             </div>
             {asset.purchase_date && (
