@@ -8206,6 +8206,7 @@ const LocationFormModal = ({ form, setForm, locations, onSubmit, onClose }) => {
   const locationTypes = [
     { value: "GUEST_ROOM", label: "Guest Room" },
     { value: "WAREHOUSE", label: "Warehouse" },
+    { value: "LAUNDRY", label: "Laundry" },
     { value: "DEPARTMENT", label: "Department" },
     { value: "PUBLIC_AREA", label: "Public Area" },
     { value: "CENTRAL_WAREHOUSE", label: "Central Warehouse" },

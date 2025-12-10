@@ -383,6 +383,27 @@ const ItemFormModal = ({
                                     (For Security & Facility assets)
                                 </span>
                             </div>
+                            <div className="flex items-center pt-6">
+                                <label className="flex items-center cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.track_laundry_cycle}
+                                        onChange={(e) =>
+                                            setForm({
+                                                ...form,
+                                                track_laundry_cycle: e.target.checked,
+                                            })
+                                        }
+                                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                                    />
+                                    <span className="ml-2 text-sm font-medium text-gray-700">
+                                        Track Laundry Cycle?
+                                    </span>
+                                </label>
+                                <span className="ml-2 text-xs text-gray-500">
+                                    (For Linens: Towels, Sheets, etc.)
+                                </span>
+                            </div>
                         </div>
                     </div>
 
