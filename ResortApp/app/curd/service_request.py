@@ -115,6 +115,77 @@ def create_refill_service_request(db: Session, room_id: int, room_number: str, g
     db.refresh(request)
     return request
 
+def create_return_items_service_request(db: Session, room_id: int, room_number: str, guest_name: str = None, checkout_id: int = None):
+    """
+    Create a return items service request after checkout.
+    This tells staff to collect unused items from the room and return them to warehouse.
+    """
+    import json
+    return_items = []
+    
+    # Get items that need to be returned from checkout verification
+    if checkout_id:
+        from app.models.checkout import CheckoutVerification
+        from app.models.inventory import InventoryItem, LocationStock
+        
+        # Get the checkout verification for this room
+        verification = db.query(CheckoutVerification).filter(
+            CheckoutVerification.checkout_id == checkout_id,
+            CheckoutVerification.room_number == room_number
+        ).first()
+        
+        if verification and verification.consumables_audit_data:
+            # Extract consumables data and find unused items
+            consumables_data = verification.consumables_audit_data
+            
+            for item_id_str, item_data in consumables_data.items():
+                try:
+                    item_id = int(item_id_str)
+                    issued_qty = item_data.get("issued", 0)
+                    actual_consumed = item_data.get("actual", 0)
+                    returned_qty = issued_qty - actual_consumed  # Items not consumed = returned
+                    
+                    if returned_qty > 0:
+                        # Get inventory item details
+                        inv_item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+                        if inv_item:
+                            return_items.append({
+                                "item_id": item_id,
+                                "item_name": inv_item.name,
+                                "item_code": inv_item.item_code,
+                                "quantity_to_return": returned_qty,
+                                "unit": inv_item.unit or "pcs"
+                            })
+                except (ValueError, KeyError):
+                    continue
+    
+    # Only create service request if there are items to return
+    if not return_items:
+        return None
+    
+    # Build description with return requirements
+    description_parts = [f"Collect and return unused items to warehouse - Room {room_number}"]
+    if guest_name:
+        description_parts.append(f"Previous Guest: {guest_name}")
+    
+    description_parts.append("Items to Return:")
+    for item in return_items:
+        description_parts.append(f"- {item['item_name']}: {item['quantity_to_return']} {item['unit']}")
+    
+    request = ServiceRequest(
+        food_order_id=None,
+        room_id=room_id,
+        employee_id=None,  # Will be assigned later
+        request_type="return_items",
+        description=" | ".join(description_parts),
+        refill_data=json.dumps(return_items),  # Store return items as JSON
+        status="pending"
+    )
+    db.add(request)
+    db.commit()
+    db.refresh(request)
+    return request
+
 def get_service_requests(db: Session, skip: int = 0, limit: int = 100, status: Optional[str] = None):
     query = db.query(ServiceRequest).options(
         joinedload(ServiceRequest.food_order),

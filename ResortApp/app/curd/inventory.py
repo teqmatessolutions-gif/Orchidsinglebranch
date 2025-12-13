@@ -587,7 +587,8 @@ def create_stock_issue(db: Session, data: dict, issued_by: int):
         # Create Journal Entry for Consumption (COGS)
         # ONLY if this is actual consumption (no destination location)
         # If there's a destination, it's just a transfer - inventory still exists
-        if cost and cost > 0 and not dest_location:
+        # We also check data.get("destination_location_id") to be safe in case object lookup failed
+        if cost and cost > 0 and not dest_location and not data.get("destination_location_id"):
             try:
                 from app.utils.accounting_helpers import create_consumption_journal_entry
                 create_consumption_journal_entry(
@@ -799,6 +800,20 @@ def create_waste_log(db: Session, data: dict, reported_by: int):
             notes=f"Waste/Spoilage: {data['reason_code']} - {data.get('notes', '')}",
             created_by=reported_by
         )
+        if transaction.total_amount and transaction.total_amount > 0:
+            try:
+                from app.utils.accounting_helpers import create_consumption_journal_entry
+                create_consumption_journal_entry(
+                    db=db,
+                    consumption_id=waste_log.id,
+                    cogs_amount=float(transaction.total_amount),
+                    inventory_item_name=item.name,
+                    created_by=reported_by,
+                    reference_type="waste"
+                )
+            except Exception as e:
+                print(f"Failed to create accounting entry for waste: {e}")
+        
         db.add(transaction)
     
     db.commit()
@@ -821,21 +836,39 @@ def generate_location_code(db: Session, location_type: str, room_area: str):
     """Generate location code like LOC-RM-101"""
     prefix_map = {
         "GUEST_ROOM": "RM",
-        "Guest Room": "RM",  # Backward compatibility
+        "Guest Room": "RM",
         "WAREHOUSE": "WH",
         "CENTRAL_WAREHOUSE": "WH",
         "BRANCH_STORE": "BS",
         "SUB_STORE": "SS",
         "DEPARTMENT": "DEPT",
         "PUBLIC_AREA": "PA",
-        "Public Area": "PA"  # Backward compatibility
+        "Public Area": "PA",
+        "LAUNDRY": "LNDRY",
+        "Laundry": "LNDRY"
     }
     prefix = prefix_map.get(location_type, "LOC")
+    
     # Extract numbers from room_area if available
     import re
     numbers = re.findall(r'\d+', room_area)
-    suffix = numbers[0] if numbers else str(db.query(Location).count() + 1)
-    return f"LOC-{prefix}-{suffix}"
+    
+    if numbers:
+        base_suffix = numbers[0]
+        code = f"LOC-{prefix}-{base_suffix}"
+        # Check existence
+        if not db.query(Location).filter(Location.location_code == code).first():
+            return code
+        # If exists with number, append 'A', 'B' etc? Or just fallback to count.
+        # Let's fallback to incremental if specific number logic fails or is taken.
+    
+    # Generic incremental fallback
+    count = db.query(Location).count() + 1
+    while True:
+        code = f"LOC-{prefix}-{count}"
+        if not db.query(Location).filter(Location.location_code == code).first():
+            return code
+        count += 1
 
 
 def create_location(db: Session, data: dict):
@@ -907,11 +940,24 @@ def create_asset_mapping(db: Session, data: dict, assigned_by: Optional[int] = N
     # Only deduct from the specific LocationStock where the item is physically moving from.
     
     # Assume source is Central Warehouse (ID 1) strictly for now as per current flow
-    # Assume source is Central Warehouse (ID 1) strictly for now as per current flow
     # Future improvement: Pass source_location_id in data
-    source_loc_id = 1 
-    
+    # FIX: Find warehouse dynamically instead of hardcoding ID 1
     from app.models.inventory import LocationStock, InventoryTransaction, Location
+    
+    warehouse = db.query(Location).filter(
+        Location.location_type.in_(["WAREHOUSE", "CENTRAL_WAREHOUSE"])
+    ).first()
+    
+    if not warehouse:
+        warehouse = db.query(Location).filter(
+            Location.location_type.ilike("%warehouse%")
+        ).first()
+    
+    if not warehouse:
+        raise ValueError("No warehouse location found. Please create a warehouse location first.")
+    
+    source_loc_id = warehouse.id
+    
 
     source_stock = db.query(LocationStock).filter(
         LocationStock.location_id == source_loc_id,
@@ -1144,12 +1190,20 @@ def create_asset_registry(db: Session, data: dict, created_by: int = None):
              if loc:
                  source_loc_id = loc.id
     
-    # Strategy C: Default to Central Warehouse (ID 1) if nothing else found
+    # Strategy C: Default to Central Warehouse if nothing else found
     if not source_loc_id:
-        # Check if ID 1 exists and is a warehouse
-        central = db.query(Location).filter(Location.id == 1).first()
-        if central:
-            source_loc_id = 1
+        # Find warehouse dynamically instead of hardcoding ID 1
+        warehouse = db.query(Location).filter(
+            Location.location_type.in_(["WAREHOUSE", "CENTRAL_WAREHOUSE"])
+        ).first()
+        
+        if not warehouse:
+            warehouse = db.query(Location).filter(
+                Location.location_type.ilike("%warehouse%")
+            ).first()
+        
+        if warehouse:
+            source_loc_id = warehouse.id
             
     # 2. Deduct from Source Stock
     if source_loc_id:

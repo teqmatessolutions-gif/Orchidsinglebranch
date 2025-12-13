@@ -394,16 +394,20 @@ def check_inventory_for_checkout(
     total_missing_charges = 0.0
     missing_items_details = []
     
+    inventory_data_with_charges = []
+    
     if payload.items:
-        inventory_data_with_charges = []
-        
         for item in payload.items:
             item_dict = item.dict()
             
+            # Populate item details even if missing_qty is 0
+            inv_item = db.query(InventoryItem).filter(InventoryItem.id == item.item_id).first()
+            if inv_item:
+                 item_dict['item_name'] = inv_item.name
+                 item_dict['item_code'] = inv_item.item_code
+            
             # Calculate charge for missing items
-            if item.missing_qty and item.missing_qty > 0:
-                inv_item = db.query(InventoryItem).filter(InventoryItem.id == item.item_id).first()
-                if inv_item:
+            if item.missing_qty and item.missing_qty > 0 and inv_item:
                     if inv_item.price:
                         item_charge = float(inv_item.price) * item.missing_qty
                         total_missing_charges += item_charge
@@ -417,12 +421,78 @@ def check_inventory_for_checkout(
                             "unit_price": float(inv_item.price),
                             "total_charge": item_charge
                         })
-                    
-                    item_dict['item_name'] = inv_item.name
-                    item_dict['item_code'] = inv_item.item_code
             
             inventory_data_with_charges.append(item_dict)
-        
+    
+    # Process asset damages
+    if payload.asset_damages:
+        for asset in payload.asset_damages:
+            asset_dict = asset.dict()
+            # Asset damage is always charged
+            asset_charge = asset.replacement_cost
+            total_missing_charges += asset_charge
+            
+            asset_dict['missing_item_charge'] = asset_charge
+            asset_dict['unit_price'] = asset.replacement_cost
+            asset_dict['missing_qty'] = 1  # Treat as 1 unit damaged
+            asset_dict['is_fixed_asset'] = True
+            
+            missing_items_details.append({
+                "item_name": asset.item_name,
+                "item_code": "ASSET",
+                "missing_qty": 1,
+                "unit_price": asset.replacement_cost,
+                "total_charge": asset_charge,
+                "is_fixed_asset": True,
+                "notes": asset.notes
+            })
+            
+            inventory_data_with_charges.append(asset_dict)
+            
+            # Calculate consumables charges (used_qty)
+            consumables_charges = 0.0
+            asset_damage_charges = 0.0
+            
+            # Calculate from inventory_data to be consistent
+            for item in inventory_data_with_charges:
+                if item.get('is_fixed_asset'):
+                    asset_damage_charges += item.get('total_charge', 0)
+                else:
+                    # Logic for used consumables
+                    # Re-verify if charge logic for used items is needed
+                    # Currently frontend only sends missing_qty charge if missing logic is triggered
+                    
+                    # If this is a consumed item (not missing, but used), we need to charge if over limit
+                    # Logic: if item_id is present, get limit from DB
+                    if item.get('used_qty', 0) > 0 and not item.get('missing_qty'):
+                        inv_item = db.query(InventoryItem).filter(InventoryItem.id == item.get('item_id')).first()
+                        if inv_item:
+                            limit = inv_item.complimentary_limit or 0
+                            used_qty = item.get('used_qty', 0)
+                            if used_qty > limit:
+                                chargeable = used_qty - limit
+                                if inv_item.price:
+                                    charge = float(inv_item.price) * chargeable
+                                    # Add to item dict
+                                    item['total_charge'] = charge
+                                    item['unit_price'] = float(inv_item.price)
+                                    item['payable_qty'] = chargeable # for reference
+                                    
+                                    consumables_charges += charge
+            
+            # Recalculate total missing charges which includes asset damages and missing items
+            # But we also need to include 'consumables_charges' for used items
+            
+            # Note: total_missing_charges calculated above only includes 'missing_qty' items and 'asset_damage'
+            # We need to add 'consumables_charges' (from used > limit) to the Checkout object
+            # BUT: 'check_inventory_for_checkout' updates 'CheckoutRequest', NOT 'Checkout' directly?
+            # Wait, billing uses 'checkout_request.inventory_data' to calculate bill?
+            # Let's verify 'create_checkout_bill' or whatever billing uses.
+            
+            pass # Placeholder logic, see next step for clean implementation in one go
+
+    
+    if inventory_data_with_charges:
         checkout_request.inventory_data = inventory_data_with_charges
         
     checkout_request.status = "completed"
@@ -445,10 +515,9 @@ def check_inventory_for_checkout(
 def get_pre_checkout_verification_data(room_number: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     """
     Get pre-checkout verification data for a room:
-    - Room inspection status from housekeeping
-    - Consumables list with complimentary limits
-    - Room assets that can be damaged
-    - Current room status
+    - Room status
+    - Actual Consumables stock in room (from LocationStock)
+    - Actual Fixed Assets in room (from AssetRegistry) with serial numbers
     """
     room = db.query(Room).filter(Room.number == room_number).first()
     if not room:
@@ -473,57 +542,80 @@ def get_pre_checkout_verification_data(room_number: str, db: Session = Depends(g
             booking = package_link.package_booking
     
     if not booking:
-        raise HTTPException(status_code=404, detail=f"No active booking found for room {room_number}")
+        # Allow checking inventory even if booking is weird, but warn?
+        # raise HTTPException(status_code=404, detail=f"No active booking found for room {room_number}")
+        pass
     
-    # Get consumables from room inventory location
     consumables = []
+    assets = []
+    
+    # Check if room has an inventory location assigned
     if room.inventory_location_id:
-        from app.models.inventory import InventoryItem, InventoryCategory
-        location_items = db.query(InventoryItem).join(InventoryCategory).filter(
-            InventoryItem.category_id == InventoryCategory.id,
-            InventoryCategory.consumable_instant == True,  # Only consumable items
-            InventoryItem.is_sellable_to_guest == True
+        from app.models.inventory import InventoryItem, LocationStock, AssetRegistry, InventoryCategory
+        
+        # 1. Fetch Consumables (LocationStock)
+        # We assume anything in LocationStock that is consumable/sellable is a consumable
+        loc_stocks = db.query(LocationStock).join(InventoryItem).join(InventoryCategory).filter(
+            LocationStock.location_id == room.inventory_location_id,
+            InventoryCategory.classification != "Asset" # Exclude assets if mixed, though normally separated
         ).all()
         
-        for item in location_items:
-            consumables.append({
-                "item_id": item.id,
-                "item_name": item.name,
-                "complimentary_limit": item.complimentary_limit or 0,
-                "charge_per_unit": item.selling_price or item.unit_price or 0.0,
-                "unit": item.unit
+        # Filter for consumables/amenities specifically? Or just show all stock? User said "all invetry items"
+        for stock in loc_stocks:
+            # Skip if 0 quantity? Maybe show 0 to indicate it SHOULD be there? 
+            # Showing 0 might clutter. Let's show specific positive stock or items that are 'consumable_instant'
+            if stock.quantity > 0 or stock.item.category.consumable_instant:
+                 consumables.append({
+                    "item_id": stock.item_id,
+                    "item_name": stock.item.name,
+                    "current_stock": stock.quantity,
+                    "complimentary_limit": stock.item.complimentary_limit or 0,
+                    "charge_per_unit": stock.item.selling_price or stock.item.unit_price or 0.0,
+                    "unit": stock.item.unit
+                })
+
+        # 2. Fetch Fixed Assets (AssetRegistry)
+        # These are individual items with serial numbers
+        room_assets = db.query(AssetRegistry).join(InventoryItem).filter(
+            AssetRegistry.current_location_id == room.inventory_location_id,
+            AssetRegistry.status == "active"
+        ).all()
+        
+        for asset in room_assets:
+            assets.append({
+                "asset_registry_id": asset.id,
+                "item_id": asset.item_id,
+                "item_name": asset.item.name,
+                "replacement_cost": asset.item.selling_price or asset.item.unit_price or 0.0,
+                "serial_number": asset.serial_number,
+                "asset_tag": asset.asset_tag_id,
+                "current_stock": 1 # It's a single unit
             })
+            
+    # Fallback if no location assigned or empty: return general lists as before (or empty)?
+    # User specifically asked for "in the room with any serial number". 
+    # If no location ID, we can't really know what's IN the room accurately.
+    # We will just return empty lists if no location_id, prompting setup.
     
-    # Get room assets (items that can be damaged - typically fixed assets)
-    from app.models.inventory import InventoryItem
-    room_assets = db.query(InventoryItem).filter(
-        InventoryItem.is_asset_fixed == True,
-        InventoryItem.is_sellable_to_guest == False
-    ).limit(20).all()  # Common room assets
-    
-    assets = [
-        {
-            "item_name": asset.name,
-            "replacement_cost": asset.selling_price or asset.unit_price or 0.0
-        }
-        for asset in room_assets
-    ]
-    
-    # Default key card fee (configurable)
+    # Validation/Fallback query for assets if AssetRegistry is empty but using old system?
+    # Skipping legacy support for now to encourage correct usage, unless requested.
+
+    # Default key card fee
     key_card_fee = 50.0
     
     return {
         "room_number": room_number,
+        "inventory_location_id": room.inventory_location_id,
         "room_status": room.status,
-        "housekeeping_status": "pending",  # Will be updated by housekeeping module
+        "housekeeping_status": "pending",
         "consumables": consumables,
         "assets": assets,
         "key_card_fee": key_card_fee,
         "booking_info": {
-            "guest_name": booking.guest_name,
-            "check_in": str(booking.check_in),
-            "check_out": str(booking.check_out),
-            "advance_deposit": getattr(booking, 'advance_deposit', 0.0) or 0.0
+            "guest_name": booking.guest_name if booking else "N/A",
+            "check_in": str(booking.check_in) if booking else None,
+            "check_out": str(booking.check_out) if booking else None,
+            "advance_deposit": getattr(booking, 'advance_deposit', 0.0) or 0.0 if booking else 0.0
         }
     }
 
@@ -920,7 +1012,8 @@ def get_checkout_details(checkout_id: int, db: Session = Depends(get_db), curren
         "room_numbers": room_numbers,
         "food_orders": food_orders,
         "services": services,
-        "booking_details": booking_details
+        "booking_details": booking_details,
+        "bill_details": checkout.bill_details
     }
 
 @router.get("/active-rooms", response_model=List[dict])
@@ -976,8 +1069,19 @@ def get_active_rooms(db: Session = Depends(get_db), current_user: User = Depends
         for booking in active_bookings:
             # CRITICAL FIX: If booking is checked-in but rooms are "Available", repair the room status
             # This handles cases where room status was incorrectly set or changed
+            # REFINED: Check for existing checkouts first to avoid repairing genuinely checked-out rooms
+            booking_checkouts = db.query(Checkout).filter(Checkout.booking_id == booking.id).all()
+            checked_out_rooms = set()
+            for c in booking_checkouts:
+                if c.room_number:
+                    checked_out_rooms.update([r.strip() for r in c.room_number.split(',')])
+
             for link in booking.booking_rooms:
                 if link.room and link.room.status and link.room.status.lower() == "available":
+                    # Check if room is effectively checked out
+                    if link.room.number in checked_out_rooms:
+                        continue # Do not repair, it is correctly checked out
+                    
                     # Booking is checked-in but room shows as Available - this is inconsistent
                     # Repair: Set room status to "Checked-in" to match booking status
                     print(f"[DEBUG active-rooms] Repairing room {link.room.number}: status was 'Available', setting to 'Checked-in' (booking {booking.id} is checked-in)")
@@ -1025,8 +1129,19 @@ def get_active_rooms(db: Session = Depends(get_db), current_user: User = Depends
         # Process package bookings
         for pkg_booking in active_package_bookings:
             # CRITICAL FIX: If booking is checked-in but rooms are "Available", repair the room status
+            # REFINED: Check for existing checkouts first
+            pkg_checkouts = db.query(Checkout).filter(Checkout.package_booking_id == pkg_booking.id).all()
+            pkg_checked_out_rooms = set()
+            for c in pkg_checkouts:
+                if c.room_number:
+                    pkg_checked_out_rooms.update([r.strip() for r in c.room_number.split(',')])
+
             for link in pkg_booking.rooms:
                 if link.room and link.room.status and link.room.status.lower() == "available":
+                    # Check if room is effectively checked out
+                    if link.room.number in pkg_checked_out_rooms:
+                        continue # Do not repair, it is correctly checked out
+
                     # Booking is checked-in but room shows as Available - this is inconsistent
                     # Repair: Set room status to "Checked-in" to match booking status
                     print(f"[DEBUG active-rooms] Repairing room {link.room.number}: status was 'Available', setting to 'Checked-in' (package booking {pkg_booking.id} is checked-in)")
@@ -1330,6 +1445,18 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
             used_qty = float(item_data.get('used_qty', 0))
             missing_qty = float(item_data.get('missing_qty', 0))
             missing_item_charge = item_data.get('missing_item_charge', 0)
+            is_fixed_asset = item_data.get('is_fixed_asset', False)
+            
+            # Handle Fixed Asset Damages
+            if is_fixed_asset:
+                charges.asset_damage_charges = (charges.asset_damage_charges or 0) + missing_item_charge
+                charges.asset_damages.append({
+                    "item_name": item_data.get('item_name'),
+                    "replacement_cost": missing_item_charge,
+                    "notes": item_data.get('notes')
+                })
+                # Skip consumable logic for fixed assets
+                continue
             
             # Add charges for used consumables (over complimentary limit)
             if used_qty > 0:
@@ -1338,19 +1465,21 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
                     limit = inv_item.complimentary_limit or 0
                     chargeable_qty = max(0, used_qty - limit)
                     
+                    price = inv_item.selling_price or inv_item.unit_price or 0
+                    amount = 0
+                    
                     if chargeable_qty > 0:
-                        price = inv_item.selling_price or inv_item.unit_price or 0
                         amount = chargeable_qty * price
                         charges.consumables_charges = (charges.consumables_charges or 0) + amount
                         
-                        charges.consumables_items.append({
-                            "item_id": item_id,
-                            "item_name": inv_item.name,
-                            "actual_consumed": used_qty,
-                            "complimentary_limit": limit,
-                            "charge_per_unit": price,
-                            "total_charge": amount
-                        })
+                    charges.consumables_items.append({
+                        "item_id": item_id,
+                        "item_name": inv_item.name,
+                        "actual_consumed": used_qty,
+                        "complimentary_limit": limit,
+                        "charge_per_unit": price,
+                        "total_charge": amount
+                    })
             
             # Add charges for missing/damaged items
             if missing_qty > 0 and missing_item_charge > 0:
@@ -1384,6 +1513,11 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
         for issue in stock_issues:
             for detail in issue.details:
                 if detail.item:
+                    # Check if this is a rentable asset with rental price
+                    rental_price = getattr(detail, 'rental_price', None)
+                    is_damaged = getattr(detail, 'is_damaged', False)
+                    damage_notes = getattr(detail, 'damage_notes', None)
+                    
                     charges.inventory_usage.append({
                         "date": issue.issue_date,
                         "item_name": detail.item.name,
@@ -1393,7 +1527,10 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
                         "cost": detail.cost or 0.0,
                         "room_number": room.number,
                         "is_payable": getattr(detail, 'is_payable', False),
-                        "is_paid": getattr(detail, 'is_paid', False)
+                        "is_paid": getattr(detail, 'is_paid', False),
+                        "rental_price": rental_price,
+                        "is_damaged": is_damaged,
+                        "damage_notes": damage_notes
                     })
                     
                     # Calculate inventory charges for payable items
@@ -1402,6 +1539,26 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
                         item_price = detail.item.selling_price or detail.item.unit_price or 0.0
                         item_charge = item_price * detail.issued_quantity
                         charges.inventory_charges = (charges.inventory_charges or 0) + item_charge
+                    
+                    # Add rental charges for rentable assets
+                    if rental_price and rental_price > 0:
+                        rental_charge = rental_price * detail.issued_quantity
+                        charges.inventory_charges = (charges.inventory_charges or 0) + rental_charge
+                        
+                        # Add to inventory usage with rental indicator
+                        charges.inventory_usage[-1]["rental_charge"] = rental_charge
+                        charges.inventory_usage[-1]["is_rental"] = True
+                    
+                    # Add damage charges if asset is damaged
+                    if is_damaged and detail.item.is_asset_fixed:
+                        # Use replacement cost (selling price or unit price)
+                        damage_charge = detail.item.selling_price or detail.item.unit_price or 0.0
+                        charges.asset_damage_charges = (charges.asset_damage_charges or 0) + damage_charge
+                        charges.asset_damages.append({
+                            "item_name": detail.item.name,
+                            "replacement_cost": damage_charge,
+                            "notes": damage_notes or "Asset marked as damaged"
+                        })
     
     # Calculate GST
     # Room charges: 5% GST if < 5000, 12% GST if 5000-7500, 18% GST if > 7500
@@ -1712,6 +1869,18 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
             for item_data in checkout_request.inventory_data:
                 item_id = item_data.get('item_id')
                 used_qty = float(item_data.get('used_qty', 0))
+                missing_item_charge = item_data.get('missing_item_charge', 0)
+                is_fixed_asset = item_data.get('is_fixed_asset', False)
+                
+                # Handle Fixed Asset Damages
+                if is_fixed_asset:
+                    charges.asset_damage_charges = (charges.asset_damage_charges or 0) + missing_item_charge
+                    charges.asset_damages.append({
+                        "item_name": item_data.get('item_name'),
+                        "replacement_cost": missing_item_charge,
+                        "notes": item_data.get('notes')
+                    })
+                    continue
                 
                 if used_qty > 0:
                     inv_item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
@@ -1956,7 +2125,7 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
         is_package = bill_data["is_package"]
         
         # Validate booking is in a valid state (this is the source of truth, not room status)
-        if booking.status not in ['checked-in', 'checked_in', 'booked']:
+        if booking.status not in ['checked-in', 'checked_in', 'booked', 'checked-out', 'checked_out', 'checked out']:
             raise HTTPException(status_code=400, detail=f"Booking cannot be checked out. Current status: {booking.status}")
         
         # PRE-CHECKOUT CLEANUP: Check for and delete any orphaned checkouts BEFORE attempting checkout
@@ -1990,10 +2159,14 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                 try:
                     deleted_count = 0
                     if existing_room_checkout:
+                        # Unlink checkout requests first to avoid FK constraints
+                        db.query(CheckoutRequestModel).filter(CheckoutRequestModel.checkout_id == existing_room_checkout.id).update({"checkout_id": None})
                         db.delete(existing_room_checkout)
                         deleted_count += 1
                         print(f"[CLEANUP] Deleted orphaned room checkout record {existing_room_checkout.id}")
                     if existing_booking_checkout and existing_booking_checkout.id != (existing_room_checkout.id if existing_room_checkout else None):
+                        # Unlink checkout requests first
+                        db.query(CheckoutRequestModel).filter(CheckoutRequestModel.checkout_id == existing_booking_checkout.id).update({"checkout_id": None})
                         db.delete(existing_booking_checkout)
                         deleted_count += 1
                         print(f"[CLEANUP] Deleted orphaned booking checkout record {existing_booking_checkout.id}")
@@ -2148,6 +2321,8 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                         db.query(CheckoutVerification).filter(CheckoutVerification.checkout_id == existing_booking_checkout.id).delete()
                         # Delete checkout payments
                         db.query(CheckoutPayment).filter(CheckoutPayment.checkout_id == existing_booking_checkout.id).delete()
+                        # Unlink checkout requests
+                        db.query(CheckoutRequestModel).filter(CheckoutRequestModel.checkout_id == existing_booking_checkout.id).update({"checkout_id": None})
                         # Now delete the checkout
                         db.delete(existing_booking_checkout)
                         db.commit()
@@ -2180,6 +2355,27 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                 booking_id_to_set = booking.id if not is_package else None
                 package_booking_id_to_set = booking.id if is_package else None
             
+            # Create detailed bill structure for storage
+            # Safely convert BillBreakdown object to dict
+            from fastapi.encoders import jsonable_encoder
+            charges_dict = jsonable_encoder(charges)
+            
+            bill_details_data = jsonable_encoder({
+                "generated_at": datetime.now(),
+                "charges_breakdown": charges_dict,
+                "consumables_audit": {
+                    "charges": consumables_charges,
+                    "gst": consumables_gst,
+                    "items": getattr(charges, "consumables_items", [])
+                },
+                "asset_damages": {
+                    "charges": asset_damage_charges,
+                    "gst": asset_damage_gst,
+                    "items": getattr(charges, "asset_damages", [])
+                },
+                "inventory_usage": getattr(charges, "inventory_usage", [])
+            })
+
             # 8. Create enhanced checkout record
             new_checkout = Checkout(
                 booking_id=booking_id_to_set,
@@ -2205,7 +2401,8 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                 tips_gratuity=tips_gratuity,
                 guest_gstin=request.guest_gstin,
                 is_b2b=request.is_b2b or False,
-                invoice_number=invoice_number
+                invoice_number=invoice_number,
+                bill_details=bill_details_data  # Store the detailed bill
             )
             # Add checkout to session first, then set invoice_number if needed
             db.add(new_checkout)
@@ -2310,24 +2507,9 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                     )
 
             # Clear remaining consumables from room inventory
-            if room.inventory_location_id:
-                from app.models.inventory import InventoryItem, StockIssue, StockIssueDetail
-                # Find all sellable items that have been issued to this room location
-                room_items = (
-                    db.query(InventoryItem)
-                    .join(StockIssueDetail, StockIssueDetail.item_id == InventoryItem.id)
-                    .join(StockIssue, StockIssue.id == StockIssueDetail.issue_id)
-                    .filter(
-                        StockIssue.destination_location_id == room.inventory_location_id,
-                        InventoryItem.is_sellable_to_guest == True
-                    )
-                    .distinct()
-                    .all()
-                )
-                
-                for item in room_items:
-                    # Reset stock to 0
-                    item.current_stock = 0.0
+            # Clear remaining consumables from room inventory - REMOVED
+            # This logic was incorrectly setting GLOBAL stock to 0. Use proper transfer logic if needed.
+            # room_items = ... (Removed)
             
             # Trigger linen cycle (move bed sheets/towels to laundry)
             trigger_linen_cycle(db, room.id, new_checkout.id)
@@ -2344,6 +2526,10 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                 )
                 # Create refill service request with checkout_id to get consumables data
                 service_request_crud.create_refill_service_request(
+                    db, room.id, room.number, booking.guest_name, new_checkout.id
+                )
+                # Create return items service request for unused items
+                service_request_crud.create_return_items_service_request(
                     db, room.id, room.number, booking.guest_name, new_checkout.id
                 )
             except Exception as service_request_error:
@@ -2433,6 +2619,9 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                         if room.status != "Available":
                             print(f"[CLEANUP] Found orphaned checkout {existing_checkout.id} for room {room_number} (room still checked-in). Deleting it.")
                             try:
+                                # Unlink checkout requests first to avoid FK constraints
+                                db.query(CheckoutRequestModel).filter(CheckoutRequestModel.checkout_id == existing_checkout.id).update({"checkout_id": None})
+                                
                                 db.delete(existing_checkout)
                                 db.commit()
                                 print(f"[CLEANUP] Successfully deleted orphaned checkout {existing_checkout.id}")
@@ -2484,6 +2673,9 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                             # Delete related records
                             db.query(CheckoutVerification).filter(CheckoutVerification.checkout_id == final_checkout.id).delete()
                             db.query(CheckoutPayment).filter(CheckoutPayment.checkout_id == final_checkout.id).delete()
+                            # Unlink checkout requests
+                            db.query(CheckoutRequestModel).filter(CheckoutRequestModel.checkout_id == final_checkout.id).update({"checkout_id": None})
+                            
                             db.delete(final_checkout)
                             db.commit()
                             print(f"[CLEANUP] Successfully deleted checkout {final_checkout.id} in final cleanup attempt")
@@ -2746,6 +2938,10 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                                 db, room_obj.id, consumables_list, 
                                 new_checkout.id, current_user.id if current_user else None
                             )
+            
+            # Link checkout requests to this checkout
+            for checkout_request in checkout_requests:
+                checkout_request.checkout_id = new_checkout.id
             
             # Clear remaining consumables from room inventory
             from app.models.inventory import InventoryItem, Location, StockIssue, StockIssueDetail

@@ -265,13 +265,21 @@ def get_items(
         for item in items:
             # Category is already loaded via eager loading (when configured), no extra query needed
             category = getattr(item, "category", None)
-            result.append({
+            item_dict = {
                 **item.__dict__,
                 "category_name": category.name if category else None,
                 "department": category.parent_department if category else None,  # Add department from category
                 "is_low_stock": item.current_stock <= item.min_stock_level if item.min_stock_level else False,
                 "last_purchase_price": last_prices.get(item.id, 0.0)
-            })
+            }
+            # Add category object for frontend grouping
+            if category:
+                item_dict["category"] = {
+                    "id": category.id,
+                    "name": category.name,
+                    "classification": category.classification
+                }
+            result.append(item_dict)
         return result
     except Exception as e:
         import traceback
@@ -495,6 +503,27 @@ def create_purchase(
         f.write(f"Checking if status is 'received': purchase.status = '{purchase.status}'\n")
     
     if purchase.status == "received":
+        # Validate and ensure destination location is set
+        if not purchase.destination_location_id:
+            from app.models.inventory import Location
+            # Try to find a default warehouse location
+            default_location = db.query(Location).filter(
+                Location.location_type.in_(["WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE"])
+            ).first()
+            
+            if not default_location:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot receive purchase without a destination location. Please create a warehouse location first or specify one in the purchase."
+                )
+            
+            # Auto-assign the default location
+            created.destination_location_id = default_location.id
+            db.commit()
+            print(f"[AUTO-ASSIGN] No destination location specified. Using default warehouse: {default_location.name}")
+            with open("purchase_debug.log", "a") as f:
+                f.write(f"Auto-assigned destination location: {default_location.name} (ID: {default_location.id})\n")
+        
         with open("purchase_debug.log", "a") as f:
             f.write(f"ENTERING stock update block for received purchase\n")
         
@@ -536,11 +565,11 @@ def create_purchase(
                 print(f"[CREATE-RECEIVED] {item.name}: Stock {old_stock}→{total_stock}, Cost ₹{old_price}→₹{item.unit_price}")
                 
                 # Location stock
-                print(f"[DEBUG] purchase.destination_location_id = {purchase.destination_location_id}")
-                if purchase.destination_location_id:
-                    print(f"[DEBUG] Creating/updating location stock for location {purchase.destination_location_id}, item {detail.item_id}")
+                print(f"[DEBUG] created.destination_location_id = {created.destination_location_id}")
+                if created.destination_location_id:
+                    print(f"[DEBUG] Creating/updating location stock for location {created.destination_location_id}, item {detail.item_id}")
                     location_stock = db.query(LocationStock).filter(
-                        LocationStock.location_id == purchase.destination_location_id,
+                        LocationStock.location_id == created.destination_location_id,
                         LocationStock.item_id == detail.item_id
                     ).first()
                     
@@ -550,7 +579,7 @@ def create_purchase(
                     else:
                         print(f"[DEBUG] Creating new location stock with qty: {detail.quantity}")
                         location_stock = LocationStock(
-                            location_id=purchase.destination_location_id,
+                            location_id=created.destination_location_id,
                             item_id=detail.item_id,
                             quantity=detail.quantity
                         )
@@ -756,6 +785,25 @@ def update_purchase(
     
     # CASE 1: Purchase RECEIVED
     if new_status == "received" and old_status != "received":
+        # Validate and ensure destination location is set
+        if not updated.destination_location_id:
+            from app.models.inventory import Location
+            # Try to find a default warehouse location
+            default_location = db.query(Location).filter(
+                Location.location_type.in_(["WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE"])
+            ).first()
+            
+            if not default_location:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot receive purchase without a destination location. Please create a warehouse location first or specify one in the purchase."
+                )
+            
+            # Auto-assign the default location
+            updated.destination_location_id = default_location.id
+            db.commit()
+            print(f"[AUTO-ASSIGN] No destination location specified. Using default warehouse: {default_location.name}")
+        
         for detail in updated.details:
             if not detail.item_id:
                 continue
@@ -1620,7 +1668,7 @@ def get_location_items(
                 "total_value": stock.quantity * (item.unit_price or 0),
                 "source": "Stock",
                 "last_updated": stock.last_updated,
-                "type": "asset" if item.is_asset_fixed else "consumable"
+                "type": "asset" if (category and category.is_asset_fixed) else "consumable"
             }
 
     # Add items from asset mappings
@@ -1958,16 +2006,38 @@ def create_asset_mapping(
         mapping_data = mapping.model_dump()
         created = inventory_crud.create_asset_mapping(db, mapping_data, assigned_by=current_user.id)
         
+        
         # Load relationships for response
         assigner = db.query(User).filter(User.id == created.assigned_by).first()
         item = inventory_crud.get_item_by_id(db, created.item_id)
         location = inventory_crud.get_location_by_id(db, created.location_id)
         
+        # Construct location name safely
+        location_name = None
+        if location:
+            if location.building and location.room_area:
+                location_name = f"{location.building} - {location.room_area}"
+            elif location.building:
+                location_name = location.building
+            elif location.room_area:
+                location_name = location.room_area
+            elif hasattr(location, 'name') and location.name:
+                location_name = location.name
+        
         return {
-            **created.__dict__,
+            "id": created.id,
+            "item_id": created.item_id,
+            "location_id": created.location_id,
+            "serial_number": created.serial_number,
+            "assigned_date": created.assigned_date,
+            "assigned_by": created.assigned_by,
+            "notes": created.notes,
+            "is_active": created.is_active,
+            "unassigned_date": created.unassigned_date,
+            "quantity": created.quantity,
             "assigned_by_name": assigner.name if assigner else None,
             "item_name": item.name if item else None,
-            "location_name": f"{location.building} - {location.room_area}" if location else None
+            "location_name": location_name
         }
     except ValueError as e:
         db.rollback()

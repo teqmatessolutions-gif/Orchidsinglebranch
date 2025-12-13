@@ -1103,7 +1103,168 @@ def get_hsn_sac_summary(
         raise HTTPException(status_code=500, detail=f"Error generating HSN/SAC Summary: {str(e)}")
 
 
-@router.get("/credit-debit-notes")
+
+@router.get("/itc-register")
+def get_itc_register(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Get ITC Register (Input Tax Credit) from Purchases
+    Required for GSTR-3B Table 4(A) - ITC Available
+    """
+    try:
+        # Parse dates
+        start_dt = None
+        end_dt = None
+        if start_date:
+            try:
+                if len(start_date) == 10:
+                    start_dt = date_type.fromisoformat(start_date)
+                else:
+                    dt = datetime.fromisoformat(start_date.replace('Z', '+00:00'))
+                    start_dt = dt.date() if isinstance(dt, datetime) else dt
+            except:
+                start_dt = None
+        if end_dt:
+            try:
+                if len(end_date) == 10:
+                    end_dt = date_type.fromisoformat(end_date)
+                else:
+                    dt = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+                    end_dt = dt.date() if isinstance(dt, datetime) else dt
+            except:
+                end_dt = None
+        
+        # Query Purchases
+        query = db.query(PurchaseMaster).options(
+            joinedload(PurchaseMaster.vendor),
+            joinedload(PurchaseMaster.details).joinedload(PurchaseDetail.item).joinedload(InventoryItem.category)
+        )
+        
+        if start_dt:
+            query = query.filter(PurchaseMaster.purchase_date >= start_dt)
+        if end_dt:
+            query = query.filter(PurchaseMaster.purchase_date <= end_dt)
+            
+        purchases = query.order_by(PurchaseMaster.purchase_date.desc()).all()
+        
+        all_eligible_data = []
+        input_goods_data = []
+        capital_goods_data = []
+        input_services_data = []
+        ineligible_data = []
+        
+        total_eligible_igst = 0.0
+        total_eligible_cgst = 0.0
+        total_eligible_sgst = 0.0
+        total_ineligible_tax = 0.0
+        
+        for p in purchases:
+            vendor = p.vendor
+            gstin = vendor.gst_number if vendor and vendor.gst_number else (p.gst_number or "")
+            supplier_name = vendor.name if vendor else "Unknown Vendor"
+            
+            place_of_supply = "Unknown"
+            if gstin and len(gstin) >= 2:
+                state_code = gstin[:2]
+                state_name = STATE_CODES.get(state_code, "Unknown")
+                place_of_supply = f"{state_code}-{state_name}"
+            elif vendor and vendor.state:
+                place_of_supply = vendor.state
+            
+            # Determine Eligibility and Type
+            # Default to Input Goods
+            itc_type = "Input Goods"
+            eligibility = "Eligible"
+            
+            # Check if ineligible (e.g., blocked credits like food for staff, personal use)
+            # This logic can be enhanced with flags on Category or Item
+            # For now, assume all business purchases are eligible "Input Goods"
+            
+            item = {
+                "gstin": gstin,
+                "supplier_name": supplier_name,
+                "invoice_no": p.invoice_number or p.purchase_number,
+                "invoice_date": p.invoice_date.isoformat() if p.invoice_date else (p.purchase_date.isoformat() if p.purchase_date else ""),
+                "invoice_value": float(p.total_amount or 0),
+                "place_of_supply": place_of_supply,
+                "hsn_code": "", # Can aggregate from details if needed
+                "description": p.notes or f"Purchase from {supplier_name}",
+                "taxable_value": float(p.sub_total or 0),
+                "igst": float(p.igst or 0),
+                "cgst": float(p.cgst or 0),
+                "sgst": float(p.sgst or 0),
+                "cess": 0.0,
+                "eligibility": eligibility,
+                "type": itc_type
+            }
+            
+            total_tax = item["igst"] + item["cgst"] + item["sgst"]
+            
+            if eligibility == "Eligible":
+                all_eligible_data.append(item)
+                total_eligible_igst += item["igst"]
+                total_eligible_cgst += item["cgst"]
+                total_eligible_sgst += item["sgst"]
+                
+                if itc_type == "Input Goods":
+                    input_goods_data.append(item)
+                elif itc_type == "Capital Goods":
+                    capital_goods_data.append(item)
+                elif itc_type == "Input Services":
+                    input_services_data.append(item)
+            else:
+                ineligible_data.append(item)
+                total_ineligible_tax += total_tax
+
+        summary = {
+            "total_purchases": len(purchases),
+            "total_eligible_itc": total_eligible_igst + total_eligible_cgst + total_eligible_sgst,
+            "total_ineligible_itc": total_ineligible_tax,
+            "net_claimable_itc": total_eligible_igst + total_eligible_cgst + total_eligible_sgst,
+            "total_taxable_value": sum(d["taxable_value"] for d in all_eligible_data),
+            "total_integrated_tax": total_eligible_igst,
+            "total_central_tax": total_eligible_cgst,
+            "total_state_ut_tax": total_eligible_sgst,
+            "total_cess": 0.0
+        }
+        
+        return {
+            "period": {"start_date": start_date, "end_date": end_date},
+            "summary": summary,
+            "input_goods": {
+                "total_records": len(input_goods_data),
+                "total_tax": sum(d["igst"] + d["cgst"] + d["sgst"] for d in input_goods_data),
+                "data": input_goods_data
+            },
+            "capital_goods": {
+                "total_records": len(capital_goods_data),
+                "total_tax": sum(d["igst"] + d["cgst"] + d["sgst"] for d in capital_goods_data),
+                "data": capital_goods_data
+            },
+            "input_services": {
+                "total_records": len(input_services_data),
+                "total_tax": sum(d["igst"] + d["cgst"] + d["sgst"] for d in input_services_data),
+                "data": input_services_data
+            },
+            "ineligible": {
+                "total_records": len(ineligible_data),
+                "total_tax": total_ineligible_tax,
+                "data": ineligible_data
+            },
+            "all_eligible": {
+                "data": all_eligible_data
+            }
+        }
+    except Exception as e:
+        import traceback
+        print(f"Error in ITC Register: {str(e)}\n{traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Error generating ITC Register: {str(e)}")
+
+
 def get_credit_debit_notes(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),

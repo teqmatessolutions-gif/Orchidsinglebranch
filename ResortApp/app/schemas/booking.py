@@ -7,8 +7,8 @@ from .user import UserOut
 class RoomOut(BaseModel):
     id: int
     number: str
-    type: str
-    price: float
+    type: Optional[str] = None
+    price: Optional[float] = None
     adults: int
     children: int
     status: str
@@ -52,8 +52,8 @@ class BookingOut(BaseModel):
     id: int
     display_id: Optional[str] = None  # Format: BK-000001
     guest_name: str
-    guest_mobile: str
-    guest_email: str
+    guest_mobile: Optional[str] = None
+    guest_email: Optional[str] = None
     status: str
     check_in: date
     check_out: date

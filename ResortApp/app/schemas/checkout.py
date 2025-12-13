@@ -161,3 +161,4 @@ class InventoryCheckItem(BaseModel):
 class InventoryCheckRequest(BaseModel):
     inventory_notes: Optional[str] = None
     items: List[InventoryCheckItem] = []
+    asset_damages: List[AssetDamageItem] = []

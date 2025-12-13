@@ -162,6 +162,7 @@ def update_service(
     images_to_remove: Optional[List[int]] = None,
     inventory_items: Optional[List[ServiceInventoryItemBase]] = None,
     is_visible_to_guest: bool = False,
+    average_completion_time: Optional[str] = None
 ):
     """
     Update an existing service. Supports adding new images, removing selected images,

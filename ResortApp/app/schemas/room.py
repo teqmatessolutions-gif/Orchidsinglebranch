@@ -1,9 +1,10 @@
 from pydantic import BaseModel
+from typing import Optional
 
 class RoomBase(BaseModel):
     number: str
-    type: str
-    price: float
+    type: Optional[str] = None
+    price: Optional[float] = None
     adults: int = 2      # new field
     children: int = 0    # new field
     # Room features/amenities

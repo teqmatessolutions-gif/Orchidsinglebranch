@@ -49,18 +49,21 @@ def process_consumables_audit(db: Session, room_id: int, consumables: List[Consu
         
         # Calculate charge for items consumed beyond complimentary limit
         excess_quantity = max(0, item.actual_consumed - item.complimentary_limit)
+        charge = 0.0
+        
         if excess_quantity > 0:
             charge = excess_quantity * item.charge_per_unit
             total_charge += charge
-            items_charged.append({
-                "item_id": item.item_id,
-                "item_name": item.item_name,
-                "complimentary_limit": item.complimentary_limit,
-                "actual_consumed": item.actual_consumed,
-                "excess_quantity": excess_quantity,
-                "charge_per_unit": item.charge_per_unit,
-                "total_charge": charge
-            })
+            
+        items_charged.append({
+            "item_id": item.item_id,
+            "item_name": item.item_name,
+            "complimentary_limit": item.complimentary_limit,
+            "actual_consumed": item.actual_consumed,
+            "excess_quantity": excess_quantity,
+            "charge_per_unit": item.charge_per_unit,
+            "total_charge": charge
+        })
     
     return {
         "total_charge": total_charge,
@@ -107,12 +110,32 @@ def deduct_room_consumables(db: Session, room_id: int, consumables: List[Consuma
         if not inv_item:
             continue
         
-        # Deduct actual consumed quantity from inventory
+        # Deduct actual consumed quantity from ROOM inventory (LocationStock)
+        # NOT from global/warehouse stock (InventoryItem.current_stock) which was already deducted during StockIssue
         quantity_to_deduct = item.actual_consumed
-        if inv_item.current_stock >= quantity_to_deduct:
-            inv_item.current_stock -= quantity_to_deduct
+        
+        if quantity_to_deduct > 0:
+            from app.models.inventory import LocationStock
+            
+            loc_stock = db.query(LocationStock).filter(
+                LocationStock.location_id == room.inventory_location_id,
+                LocationStock.item_id == item.item_id
+            ).first()
+            
+            if loc_stock:
+                if loc_stock.quantity >= quantity_to_deduct:
+                    loc_stock.quantity -= quantity_to_deduct
+                    loc_stock.last_updated = datetime.utcnow()
+                else:
+                    # Logic if consumed more than stock (possible if stock tracking was off)
+                    # Force update or just set to 0? Let's allow negative or just zero out?
+                    # Safer to just deduct and let it go negative if needed to track discrepancy, 
+                    # but for now let's just deduct.
+                    loc_stock.quantity -= quantity_to_deduct
+                    loc_stock.last_updated = datetime.utcnow()
             
             # Create inventory transaction
+            # Transaction type "out" implies consumption/removal from asset list
             transaction = InventoryTransaction(
                 item_id=item.item_id,
                 transaction_type="out",

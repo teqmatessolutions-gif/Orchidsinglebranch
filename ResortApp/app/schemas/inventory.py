@@ -433,6 +433,9 @@ class StockIssueDetailBase(BaseModel):
     batch_lot_number: Optional[str] = None  # Critical for Restaurant (FIFO)
     unit: str
     notes: Optional[str] = None
+    rental_price: Optional[float] = None  # For rentable assets like laundry
+    is_damaged: Optional[bool] = False  # Track if asset is damaged
+    damage_notes: Optional[str] = None  # Damage description
 
 
 class StockIssueDetailCreate(StockIssueDetailBase):

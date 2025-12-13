@@ -575,6 +575,7 @@ def get_comprehensive_report(
             result["data"]["expenses"] = []
         
         # 7. All Inventory Purchases
+        # 7. All Inventory Purchases
         try:
             purchase_filters = []
             if start_dt:
@@ -583,30 +584,51 @@ def get_comprehensive_report(
             if end_dt:
                 purchase_date = end_dt.date() if isinstance(end_dt, datetime) else end_dt
                 purchase_filters.append(PurchaseMaster.purchase_date <= purchase_date)
+            
+            # Simplified query first to debug
             purchase_query = db.query(PurchaseMaster).options(
-                joinedload(PurchaseMaster.vendor),
-                joinedload(PurchaseMaster.details).joinedload(PurchaseDetail.item)
+                joinedload(PurchaseMaster.vendor)
             )
+            
             if purchase_filters:
                 purchase_query = purchase_query.filter(and_(*purchase_filters))
+                
             purchases = purchase_query.order_by(PurchaseMaster.purchase_date.desc()).limit(limit).all()
-            result["data"]["purchases"] = [{
-                "id": p.id,
-                "purchase_number": p.purchase_number,
-                "vendor_id": p.vendor_id,
-                "vendor_name": p.vendor.name if p.vendor else None,
-                "purchase_date": p.purchase_date.isoformat() if p.purchase_date else None,
-                "total_amount": float(p.total_amount or 0),
-                "status": p.status,
-                "details": [{
-                    "item_id": d.item_id,
-                    "item_name": d.item.name if d.item else None,
-                    "quantity": float(d.quantity or 0),
-                    "unit_price": float(d.unit_price or 0),
-                    "total": float(d.total or 0)
-                } for d in p.details] if p.details else []
-            } for p in purchases]
+            
+            purchases_data = []
+            for p in purchases:
+                # Safe serialization
+                p_data = {
+                    "id": p.id,
+                    "purchase_number": p.purchase_number,
+                    "vendor_id": p.vendor_id,
+                    "vendor_name": p.vendor.name if p.vendor else "Unknown",
+                    "purchase_date": p.purchase_date.isoformat() if p.purchase_date else None,
+                    "total_amount": float(p.total_amount or 0),
+                    "status": p.status,
+                    "details": [] # Temporarily empty to rule out details error
+                }
+                
+                # Try to load details safely
+                try:
+                    if p.details:
+                        for d in p.details:
+                            p_data["details"].append({
+                                "item_id": d.item_id,
+                                "item_name": d.item.name if (d.item) else "Unknown Item",
+                                "quantity": float(d.quantity or 0),
+                                "unit_price": float(d.unit_price or 0),
+                                "total": float(d.total or 0)
+                            })
+                except Exception as ex:
+                    print(f"Error loading details for purchase {p.id}: {ex}")
+                
+                purchases_data.append(p_data)
+
+            result["data"]["purchases"] = purchases_data
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             print(f"Error fetching purchases: {str(e)}")
             result["data"]["purchases"] = []
         

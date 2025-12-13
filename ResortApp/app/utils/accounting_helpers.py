@@ -228,7 +228,8 @@ def create_consumption_journal_entry(
     consumption_id: int,
     cogs_amount: float,
     inventory_item_name: str,
-    created_by: Optional[int] = None
+    created_by: Optional[int] = None,
+    reference_type: str = "consumption"
 ) -> int:
     """
     Create journal entry for inventory consumption (COGS)
@@ -273,7 +274,7 @@ def create_consumption_journal_entry(
     
     entry = JournalEntryCreate(
         entry_date=datetime.utcnow(),
-        reference_type="consumption",
+        reference_type=reference_type,
         reference_id=consumption_id,
         description=f"Inventory consumption - {inventory_item_name}",
         notes=f"COGS: ₹{cogs_amount}",

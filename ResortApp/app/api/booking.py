@@ -1,7 +1,7 @@
 # booking.py
-from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query
+from fastapi import APIRouter, Depends, HTTPException, File, UploadFile, Query, Form
 from sqlalchemy.orm import Session, joinedload, load_only
-from sqlalchemy import or_, and_
+from sqlalchemy import func, or_, and_
 from typing import List, Union, Optional
 from app.utils.auth import get_db, get_current_user
 from app.utils.api_optimization import optimize_limit, MAX_LIMIT_LOW_NETWORK
@@ -382,7 +382,18 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db), curren
         # Check if room is already booked by regular bookings for overlapping dates (only check active bookings, not cancelled or checked-out)
         conflicting_regular_booking = db.query(BookingRoom).join(Booking).filter(
             BookingRoom.room_id == room_id,
-            Booking.status.in_(['booked', 'checked-in']),  # Only check for active bookings
+            BookingRoom.room_id == room_id,
+            # Case-insensitive check for active statuses
+            and_(
+                Booking.status.ilike('booked'),
+                Booking.status.ilike('checked-in')
+            ) == False, # Logic fix: we want to MATCH these
+            # Actually, using in_ with ilike is hard in one go.
+            # Simplified:
+            or_(
+                Booking.status.ilike('booked'),
+                Booking.status.ilike('checked-in')
+            ),
             Booking.check_in < booking.check_out,
             Booking.check_out > booking.check_in
         ).first()
@@ -610,7 +621,11 @@ def create_guest_booking(booking: BookingCreate, db: Session = Depends(get_db)):
             # Check if room is already booked by regular bookings for overlapping dates (only check active bookings, not cancelled or checked-out)
             conflicting_regular_booking = db.query(BookingRoom).join(Booking).filter(
                 BookingRoom.room_id == room_id,
-                Booking.status.in_(['booked', 'checked-in']),  # Only check for active bookings
+                BookingRoom.room_id == room_id,
+                or_(
+                    Booking.status.ilike('booked'),
+                    Booking.status.ilike('checked-in')
+                ),
                 Booking.check_in < booking.check_out,
                 Booking.check_out > booking.check_in
             ).first()
@@ -739,6 +754,7 @@ def check_in_booking(
     booking_id: Union[str, int],
     id_card_image: UploadFile = File(...),
     guest_photo: UploadFile = File(...),
+    amenityAllocation: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -757,6 +773,29 @@ def check_in_booking(
     normalized_status = (booking.status or "").strip().lower().replace("_", "-").replace(" ", "-")
     if normalized_status != "booked":
         raise HTTPException(status_code=400, detail=f"Booking is not in 'booked' state. Current status: {booking.status}")
+
+    # CRITICAL: Check if any of the rooms are ALREADY occupied (Checked-in) by another booking
+    # This prevents double check-ins for the same room
+    if booking.booking_rooms:
+        room_ids = [br.room_id for br in booking.booking_rooms]
+        occupied_rooms = db.query(Room).filter(
+            Room.id.in_(room_ids),
+            # Check for strings indicating occupancy, case-insensitive
+            or_(
+                func.lower(Room.status) == 'checked-in',
+                func.lower(Room.status) == 'occupied'
+            )
+        ).all()
+        
+        if occupied_rooms:
+            # Check if the occupied room is actually occupied by THIS booking (unlikely if status was 'booked', but safe check)
+            # Actually, we just verified booking.status == 'booked'. So it can't be occupied by this booking.
+            if len(occupied_rooms) > 0:
+                 occupied_numbers = ", ".join([str(r.number) for r in occupied_rooms])
+                 raise HTTPException(
+                     status_code=400, 
+                     detail=f"Cannot check-in. The following room(s) are currently marked as Checked-in/Occupied: {occupied_numbers}. Please check-out the previous guest first."
+                 )
 
     # Save ID card image
     id_card_filename = f"id_{booking_id}_{uuid.uuid4().hex}.jpg"
@@ -807,6 +846,99 @@ def check_in_booking(
         # Log error but don't fail the check-in
         print(f"Warning: Failed to create check-in notification: {str(e)}")
 
+    # Process Amenity Allocation (Stock Issue)
+    if amenityAllocation:
+        try:
+            import json
+            amenity_data = json.loads(amenityAllocation)
+            
+            # If items exist
+            if amenity_data and "items" in amenity_data and len(amenity_data["items"]) > 0:
+                # We need to issue stock to the room(s)
+                
+                for br in booking.booking_rooms:
+                    room = br.room
+                    if not room or not room.inventory_location_id:
+                        continue # Skip if no inventory location
+                        
+                    # Create Stock Issue Header
+                    from app.models.inventory import StockIssue, StockIssueDetail, LocationStock
+                    
+                    # Find Warehouse (Source) - assuming ID 1 or first warehouse
+                    warehouse = db.query(Location).filter(Location.location_type == "Warehouse").first()
+                    source_id = warehouse.id if warehouse else None
+                    
+                    if not source_id:
+                        print("Warning: No Warehouse found for amenity stock issue.")
+                        continue
+
+                    # Create Issue Record
+                    stock_issue = StockIssue(
+                        source_location_id=source_id,
+                        destination_location_id=room.inventory_location_id,
+                        issue_date=datetime.utcnow(),
+                        status="approved", # Auto-approve system issues
+                        issued_by_id=current_user.id,
+                        reference_number=f"CHK-IN-{booking_id}-{room.number}",
+                        notes=f"Automatic Amenity Issue for Check-in {formatted_booking_id}"
+                    )
+                    db.add(stock_issue)
+                    db.flush() # Get ID
+                    
+                    # Process Items
+                    for item in amenity_data["items"]:
+                        item_id = item.get("item_id")
+                        if not item_id: continue
+                        
+                        # Calculate Total Quantity to Issue
+                        qty_per_night = float(item.get("complimentaryPerNight", 0))
+                        qty_per_stay = float(item.get("complimentaryPerStay", 0))
+                        
+                        # Stay duration
+                        check_in_dt = booking.check_in if isinstance(booking.check_in, date) else datetime.strptime(str(booking.check_in), '%Y-%m-%d').date()
+                        check_out_dt = booking.check_out if isinstance(booking.check_out, date) else datetime.strptime(str(booking.check_out), '%Y-%m-%d').date()
+                        nights = max(1, (check_out_dt - check_in_dt).days)
+                        
+                        total_qty = (qty_per_night * nights) + qty_per_stay
+                        
+                        if total_qty > 0:
+                            # Add Detail
+                            detail = StockIssueDetail(
+                                issue_id=stock_issue.id,
+                                item_id=item_id,
+                                quantity=total_qty,
+                                notes=f"{item.get('frequency')} allocation"
+                            )
+                            db.add(detail)
+                            
+                            # Move Stock (Warehouse -> Room)
+                            # 1. Deduct Warehouse
+                            inv_item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+                            if inv_item:
+                                inv_item.current_stock = max(0, (inv_item.current_stock or 0) - total_qty)
+                                
+                            # 2. Add Room Stock
+                            loc_stock = db.query(LocationStock).filter(
+                                LocationStock.location_id == room.inventory_location_id,
+                                LocationStock.item_id == item_id
+                            ).first()
+                            
+                            if loc_stock:
+                                loc_stock.quantity = (loc_stock.quantity or 0) + total_qty
+                                loc_stock.last_updated = datetime.utcnow()
+                            else:
+                                loc_stock = LocationStock(
+                                    location_id=room.inventory_location_id,
+                                    item_id=item_id,
+                                    quantity=total_qty,
+                                    last_updated=datetime.utcnow()
+                                )
+                                db.add(loc_stock)
+                                
+        except Exception as e:
+            print(f"Error processing amenity allocation: {e}")
+            # Non-blocking error, log and continue check-in
+    
     db.commit()
     db.refresh(booking)
     return booking

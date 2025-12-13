@@ -917,78 +917,339 @@ const AddExtraAllocationModal = ({
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total Qty</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Complimentary</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Payable</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Paid</th>
-                      <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {currentRoomItems.map((item, index) => {
-                      const paidStatus = item.is_paid || paidStatusMap[item.item_id] || false;
-                      const totalQty = parseFloat(item.location_stock || 0);
-                      const inventoryItem = inventoryItems.find((it) => it.id === item.item_id);
-                      const complimentaryLimit = inventoryItem?.complimentary_limit || 0;
-                      const complimentaryQty = parseFloat(item.complimentary_qty || 0);
-                      const payableQty = parseFloat(item.payable_qty || 0);
+              <div className="flex flex-col gap-8">
+                {currentRoomItems.filter(i => i.type !== 'asset').length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3 ml-1">Consumables / Minibar</h4>
+                    <div className="overflow-x-auto border rounded-lg bg-white">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total Qty</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Complimentary</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Payable</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit Price</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Paid</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {currentRoomItems.filter(i => i.type !== 'asset').map((item, index) => {
+                            const paidStatus = item.is_paid || paidStatusMap[item.item_id] || false;
+                            const totalQty = parseFloat(item.location_stock || 0);
+                            const inventoryItem = inventoryItems.find((it) => it.id === item.item_id);
+                            const complimentaryLimit = inventoryItem?.complimentary_limit || 0;
+                            const complimentaryQty = parseFloat(item.complimentary_qty || 0);
+                            const payableQty = parseFloat(item.payable_qty || 0);
 
-                      let calculatedComplimentaryQty = complimentaryQty;
-                      let calculatedPayableQty = payableQty;
+                            let calculatedComplimentaryQty = complimentaryQty;
+                            let calculatedPayableQty = payableQty;
 
-                      if (complimentaryQty === 0 && payableQty === 0 && totalQty > 0) {
-                        calculatedComplimentaryQty = Math.min(totalQty, complimentaryLimit);
-                        calculatedPayableQty = Math.max(0, totalQty - complimentaryLimit);
-                      }
+                            if (complimentaryQty === 0 && payableQty === 0 && totalQty > 0) {
+                              calculatedComplimentaryQty = Math.min(totalQty, complimentaryLimit);
+                              calculatedPayableQty = Math.max(0, totalQty - complimentaryLimit);
+                            }
 
-                      return (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-3 py-2 text-sm">
-                            <div className="font-medium text-gray-900">{item.item_name}</div>
-                            {complimentaryLimit > 0 && (
-                              <div className="text-xs text-blue-600 mt-1">Limit: {complimentaryLimit} free</div>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-sm text-gray-600 font-medium">{totalQty} {item.unit}</td>
-                          <td className="px-3 py-2 text-sm text-green-700 font-medium">{calculatedComplimentaryQty} {item.unit}</td>
-                          <td className="px-3 py-2 text-sm text-orange-700 font-medium">{calculatedPayableQty} {item.unit}</td>
-                          <td className="px-3 py-2 text-sm text-gray-600">{formatCurrency(item.unit_price || 0)}</td>
-                          <td className="px-3 py-2 text-sm font-semibold text-gray-900">
-                            {formatCurrency((item.unit_price || 0) * calculatedPayableQty)}
-                          </td>
-                          <td className="px-3 py-2">
-                            {calculatedPayableQty > 0 ? (
-                              <label className="flex items-center gap-2 cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={paidStatus}
-                                  onChange={(e) => {
-                                    setPaidStatusMap({ ...paidStatusMap, [item.item_id]: e.target.checked });
-                                    updateItemPaidStatus(item, e.target.checked);
-                                  }}
-                                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
-                                />
-                                <span className={`text-xs ${paidStatus ? "text-green-600 font-medium" : "text-gray-500"}`}>{paidStatus ? "Paid" : "Unpaid"}</span>
-                              </label>
-                            ) : <span className="text-gray-400 text-xs">-</span>}
-                          </td>
-                          <td className="px-3 py-2">
-                            {calculatedPayableQty > 0 ? (
-                              paidStatus ? <span className="text-xs text-green-600 font-medium">✓ Paid</span> : <span className="text-xs text-orange-600 font-medium">Payment Pending</span>
-                            ) : <span className="text-xs text-gray-400">Complimentary</span>}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                            return (
+                              <tr key={index} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 text-sm">
+                                  <div className="font-medium text-gray-900">{item.item_name}</div>
+                                  {complimentaryLimit > 0 && (
+                                    <div className="text-xs text-blue-600 mt-1">Limit: {complimentaryLimit} free</div>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-600 font-medium">{totalQty} {item.unit}</td>
+                                <td className="px-3 py-2 text-sm text-green-700 font-medium">{calculatedComplimentaryQty} {item.unit}</td>
+                                <td className="px-3 py-2 text-sm text-orange-700 font-medium">{calculatedPayableQty} {item.unit}</td>
+                                <td className="px-3 py-2 text-sm text-gray-600">{formatCurrency(item.unit_price || 0)}</td>
+                                <td className="px-3 py-2 text-sm font-semibold text-gray-900">
+                                  {formatCurrency((item.unit_price || 0) * calculatedPayableQty)}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {calculatedPayableQty > 0 ? (
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={paidStatus}
+                                        onChange={(e) => {
+                                          setPaidStatusMap({ ...paidStatusMap, [item.item_id]: e.target.checked });
+                                          updateItemPaidStatus(item, e.target.checked);
+                                        }}
+                                        className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                                      />
+                                      <span className={`text-xs ${paidStatus ? "text-green-600 font-medium" : "text-gray-500"}`}>{paidStatus ? "Paid" : "Unpaid"}</span>
+                                    </label>
+                                  ) : <span className="text-gray-400 text-xs">-</span>}
+                                </td>
+                                <td className="px-3 py-2">
+                                  {calculatedPayableQty > 0 ? (
+                                    paidStatus ? <span className="text-xs text-green-600 font-medium">✓ Paid</span> : <span className="text-xs text-orange-600 font-medium">Payment Pending</span>
+                                  ) : <span className="text-xs text-gray-400">Complimentary</span>}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Fixed Assets Section - Always Visible */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-semibold text-gray-700 ml-1">Fixed Assets / Room Inventory</h4>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Add a new rentable asset row
+                        const newAsset = {
+                          item_id: null,
+                          item_name: '',
+                          type: 'asset',
+                          location_stock: 1,
+                          is_rentable: true,
+                          rental_price: 0,
+                          is_present: true,
+                          is_damaged: false,
+                          damage_notes: ''
+                        };
+                        setCurrentRoomItems([...currentRoomItems, newAsset]);
+                      }}
+                      className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 flex items-center gap-1.5"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                      Add Rentable Asset
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto border rounded-lg bg-white">
+                    {currentRoomItems.filter(i => i.type === 'asset').length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <p className="text-sm">No fixed assets or rentable items assigned yet.</p>
+                        <p className="text-xs mt-1">Click "Add Rentable Asset" to add chargeable items like laundry.</p>
+                      </div>
+                    ) : (
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-blue-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">Asset Name</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">Serial / Tag</th>
+                            <th className="px-3 py-2 text-center text-xs font-medium text-blue-800 uppercase">Qty</th>
+                            <th className="px-3 py-2 text-center text-xs font-medium text-blue-800 uppercase">Present</th>
+                            <th className="px-3 py-2 text-center text-xs font-medium text-blue-800 uppercase">Damaged</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">Condition</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">Rental Price</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {currentRoomItems.filter(i => i.type === 'asset').map((item, index) => {
+                            const actualIndex = currentRoomItems.findIndex(i => i === item);
+                            return (
+                              <tr key={index} className={`hover:bg-blue-50 ${item.is_damaged ? 'bg-red-50' : ''}`}>
+                                <td className="px-3 py-2 text-sm">
+                                  {item.is_rentable ? (
+                                    <select
+                                      value={item.item_id || ''}
+                                      onChange={(e) => {
+                                        const selectedId = parseInt(e.target.value);
+                                        const selectedItem = inventoryItems.find(inv => inv.id === selectedId);
+                                        if (selectedItem) {
+                                          const updated = [...currentRoomItems];
+                                          updated[actualIndex] = {
+                                            ...updated[actualIndex],
+                                            item_id: selectedId,
+                                            item_name: selectedItem.name,
+                                            rental_price: selectedItem.selling_price || 0
+                                          };
+                                          setCurrentRoomItems(updated);
+                                        }
+                                      }}
+                                      className="w-full px-2 py-1 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    >
+                                      <option value="">Select Rentable Asset...</option>
+                                      {inventoryItems.filter(inv => inv.is_asset_fixed).map(inv => (
+                                        <option key={inv.id} value={inv.id}>{inv.name}</option>
+                                      ))}
+                                    </select>
+                                  ) : (
+                                    <span className="font-medium text-gray-900">{item.item_name}</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-600 font-mono">
+                                  {item.serial_number || item.asset_tag || '-'}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-medium text-center">
+                                  {item.location_stock || 1}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={item.is_present !== false}
+                                    onChange={(e) => {
+                                      const updated = [...currentRoomItems];
+                                      updated[actualIndex] = { ...updated[actualIndex], is_present: e.target.checked };
+                                      setCurrentRoomItems(updated);
+                                    }}
+                                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={item.is_damaged || false}
+                                    onChange={(e) => {
+                                      const updated = [...currentRoomItems];
+                                      updated[actualIndex] = { ...updated[actualIndex], is_damaged: e.target.checked };
+                                      setCurrentRoomItems(updated);
+                                    }}
+                                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  {item.is_damaged ? (
+                                    <input
+                                      type="text"
+                                      placeholder="Damage notes..."
+                                      value={item.damage_notes || ''}
+                                      onChange={(e) => {
+                                        const updated = [...currentRoomItems];
+                                        updated[actualIndex] = { ...updated[actualIndex], damage_notes: e.target.value };
+                                        setCurrentRoomItems(updated);
+                                      }}
+                                      className="w-full px-2 py-1 text-xs border border-red-300 rounded bg-red-50 focus:ring-2 focus:ring-red-500 outline-none"
+                                    />
+                                  ) : (
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${(item.status || 'active').toLowerCase() === 'active'
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-yellow-100 text-yellow-800'
+                                      }`}>
+                                      {item.status || 'Active'}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  {item.is_rentable ? (
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      value={item.rental_price || 0}
+                                      onChange={(e) => {
+                                        const updated = [...currentRoomItems];
+                                        updated[actualIndex] = { ...updated[actualIndex], rental_price: parseFloat(e.target.value) || 0 };
+                                        setCurrentRoomItems(updated);
+                                      }}
+                                      className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    />
+                                  ) : (
+                                    <span className="text-gray-400 text-xs">-</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  {item.is_rentable ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setCurrentRoomItems(currentRoomItems.filter((_, i) => i !== actualIndex));
+                                      }}
+                                      className="text-red-600 hover:text-red-800 text-xs underline"
+                                    >
+                                      Remove
+                                    </button>
+                                  ) : (
+                                    <span className="text-gray-400 text-xs">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+
+                  {/* Save Assets Button */}
+                  {currentRoomItems.some(i => i.type === 'asset' && i.is_rentable && i.item_id) && (
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            const roomForFetch = (booking.rooms && booking.rooms[0]) || null;
+                            const roomNumber = roomForFetch?.number || roomForFetch?.room?.number || null;
+
+                            if (!roomNumber) {
+                              alert("Room number not found");
+                              return;
+                            }
+
+                            // Find room location
+                            const normalize = (str) => String(str || "").trim().toLowerCase().replace(/^0+/, "");
+                            const targetNum = normalize(roomNumber);
+                            const destinationLocation = inventoryLocations.find((loc) => {
+                              const type = String(loc.location_type || "").toUpperCase();
+                              if (type !== "GUEST_ROOM") return false;
+                              const roomArea = normalize(loc.room_area);
+                              const roomName = normalize(loc.name);
+                              return roomArea === targetNum || roomName === targetNum || roomName.includes(targetNum) || roomArea.includes(targetNum);
+                            });
+
+                            if (!destinationLocation) {
+                              alert(`Room location not found for room ${roomNumber}`);
+                              return;
+                            }
+
+                            // Get rentable assets that have been selected
+                            const rentableAssets = currentRoomItems.filter(i => i.type === 'asset' && i.is_rentable && i.item_id);
+
+                            if (rentableAssets.length === 0) {
+                              alert("No rentable assets to save");
+                              return;
+                            }
+
+                            // Save each rentable asset
+                            for (const asset of rentableAssets) {
+                              const issueData = {
+                                item_id: asset.item_id,
+                                from_location_id: 1, // Main store - adjust as needed
+                                to_location_id: destinationLocation.id,
+                                quantity: asset.location_stock || 1,
+                                issue_type: "rental",
+                                notes: `Rentable asset: ${asset.item_name} - Rental price: ₹${asset.rental_price}`,
+                                rental_price: asset.rental_price,
+                                is_damaged: asset.is_damaged || false,
+                                damage_notes: asset.damage_notes || null
+                              };
+
+                              await API.post('/inventory/issues', issueData, authHeader());
+                            }
+
+                            alert(`Successfully saved ${rentableAssets.length} rentable asset(s)`);
+
+                            // Refresh the room items
+                            const res = await API.get(`/inventory/locations/${destinationLocation.id}/items`, authHeader());
+                            setCurrentRoomItems(res.data?.items || []);
+
+                          } catch (error) {
+                            console.error("Error saving rentable assets:", error);
+                            alert(`Failed to save assets: ${error.response?.data?.detail || error.message}`);
+                          }
+                        }}
+                        className="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-2"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Save Rentable Assets
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>
@@ -1397,35 +1658,14 @@ const ExtendBookingModal = ({
 // These are editable by the user at check-in (quantities, payable toggle, etc.).
 const DEFAULT_AMENITIES = [
   {
-    id: "water_500",
-    item_id: null,
-    name: "Mineral Water 500ml",
-    frequency: "PER_NIGHT",
-    complimentaryPerNight: 2,
-    complimentaryPerStay: 0,
-    extraPrice: 0,
-    is_payable: true,
-  },
-  {
-    id: "tea_coffee",
-    item_id: null,
-    name: "Tea / Coffee Sachets",
+    id: "custom_1",
+    name: "",
     frequency: "PER_STAY",
     complimentaryPerNight: 0,
-    complimentaryPerStay: 4,
+    complimentaryPerStay: 0,
     extraPrice: 0,
     is_payable: false,
-  },
-  {
-    id: "minibar_coke",
-    item_id: null,
-    name: "Coke (Minibar)",
-    frequency: "PER_STAY",
-    complimentaryPerNight: 0,
-    complimentaryPerStay: 0,
-    extraPrice: 0,
-    is_payable: true,
-  },
+  }
 ];
 
 const CheckInModal = ({
@@ -1445,6 +1685,7 @@ const CheckInModal = ({
   const [amenityConfig, setAmenityConfig] = useState(DEFAULT_AMENITIES);
   const [packageInclusions, setPackageInclusions] = useState([]);
 
+  // Load package inclusions when booking changes
   // Load package inclusions when booking changes
   useEffect(() => {
     if (booking && booking.is_package && booking.package) {
@@ -1492,15 +1733,49 @@ const CheckInModal = ({
               complimentaryPerStay: inc.schedule_type === 'Daily' ? 0 : 1,
               extraPrice: 0,
               is_payable: false,
+              is_package: true,
             };
           });
 
         if (amenitiesFromPackage.length > 0) {
           setAmenityConfig(amenitiesFromPackage);
+        } else {
+          // Fallback unique ID
+          setAmenityConfig([{
+            id: `custom_${Date.now()}`,
+            name: "",
+            frequency: "PER_STAY",
+            complimentaryPerNight: 0,
+            complimentaryPerStay: 0,
+            extraPrice: 0,
+            is_payable: false,
+          }]);
         }
+      } else {
+        setAmenityConfig([{
+          id: `custom_${Date.now()}`,
+          name: "",
+          frequency: "PER_STAY",
+          complimentaryPerNight: 0,
+          complimentaryPerStay: 0,
+          extraPrice: 0,
+          is_payable: false,
+        }]);
       }
+
+    } else {
+      // For non-package bookings or resets
+      setAmenityConfig([{
+        id: `custom_${Date.now()}`,
+        name: "",
+        frequency: "PER_STAY",
+        complimentaryPerNight: 0,
+        complimentaryPerStay: 0,
+        extraPrice: 0,
+        is_payable: false,
+      }]);
     }
-  }, [booking]);
+  }, [booking, inventoryItems]);
 
   // Retry matching when inventory items load (in case they loaded after booking)
   useEffect(() => {
@@ -1633,14 +1908,16 @@ const CheckInModal = ({
     const amenityAllocation = amenitySummary
       ? {
         nights: amenitySummary.nights,
-        items: amenityConfig.map((a) => ({
-          item_id: a.item_id || null,
-          name: a.name,
-          frequency: a.frequency,
-          complimentaryPerNight: a.complimentaryPerNight || 0,
-          complimentaryPerStay: a.complimentaryPerStay || 0,
-          is_payable: Boolean(a.is_payable),
-        })),
+        items: amenityConfig
+          .filter(a => a.item_id || a.name) // Only include items that have an ID or Name
+          .map((a) => ({
+            item_id: a.item_id ? Number(a.item_id) : null,
+            name: a.name || "Custom Item",
+            frequency: a.frequency,
+            complimentaryPerNight: Number(a.complimentaryPerNight) || 0,
+            complimentaryPerStay: Number(a.complimentaryPerStay) || 0,
+            is_payable: Boolean(a.is_payable),
+          })),
       }
       : null;
 
@@ -1873,28 +2150,91 @@ const CheckInModal = ({
                         <tr key={item.id} className="group hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-2">
                             <div className="flex flex-col">
-                              <select
-                                value={item.item_id || ""}
-                                onChange={(e) => {
-                                  const selectedId = e.target.value ? Number(e.target.value) : null;
-                                  const selectedItem = inventoryItems.find((inv) => inv.id === selectedId);
-                                  handleAmenityChange(index, "item_id", selectedId);
-                                  if (selectedItem) {
-                                    handleAmenityChange(index, "name", selectedItem.name || item.name);
-                                    // Only set price if it's payable
-                                    if (item.is_payable) {
-                                      handleAmenityChange(index, "extraPrice", Number(selectedItem.selling_price) || 0);
+                              {item.is_package ? (
+                                <div className="flex flex-col gap-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className="bg-orange-100 text-orange-800 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">Package</span>
+                                    <span className="text-sm font-medium text-gray-900">{item.name}</span>
+                                  </div>
+                                  <div className="relative">
+                                    <select
+                                      value={item.item_id || ""}
+                                      onChange={(e) => {
+                                        const selectedId = e.target.value ? Number(e.target.value) : null;
+                                        const selectedItem = inventoryItems.find((inv) => inv.id === selectedId);
+                                        handleAmenityChange(index, "item_id", selectedId);
+
+                                        if (selectedItem) {
+                                          // Do NOT update name for package items, keep the description
+
+                                          // Only set price if it's payable
+                                          if (item.is_payable) {
+                                            handleAmenityChange(index, "extraPrice", Number(selectedItem.selling_price) || 0);
+                                          }
+                                        }
+                                      }}
+                                      className={`w-full text-xs py-1.5 pl-2 pr-8 border rounded-lg bg-gray-50 text-gray-600 hover:bg-white hover:border-gray-400 focus:ring-1 focus:ring-orange-500 outline-none transition-all cursor-pointer ${!item.item_id ? "border-orange-300 bg-orange-50 text-orange-800 font-medium" : "border-gray-200"}`}
+                                    >
+                                      <option value="">{item.item_id ? "Change Inventory Link" : "Link Inventory Item (Required)"}</option>
+                                      {(() => {
+                                        // Group items by category
+                                        const grouped = inventoryItems.reduce((acc, inv) => {
+                                          const categoryName = inv.category?.name || 'Uncategorized';
+                                          if (!acc[categoryName]) acc[categoryName] = [];
+                                          acc[categoryName].push(inv);
+                                          return acc;
+                                        }, {});
+
+                                        return Object.entries(grouped).map(([categoryName, items]) => (
+                                          <optgroup key={categoryName} label={categoryName}>
+                                            {items.map((inv) => (
+                                              <option key={inv.id} value={inv.id}>{inv.name}</option>
+                                            ))}
+                                          </optgroup>
+                                        ));
+                                      })()}
+                                    </select>
+                                  </div>
+                                </div>
+                              ) : (
+                                <select
+                                  value={item.item_id || ""}
+                                  onChange={(e) => {
+                                    const selectedId = e.target.value ? Number(e.target.value) : null;
+                                    const selectedItem = inventoryItems.find((inv) => inv.id === selectedId);
+                                    handleAmenityChange(index, "item_id", selectedId);
+                                    if (selectedItem) {
+                                      handleAmenityChange(index, "name", selectedItem.name || item.name);
+                                      // Only set price if it's payable
+                                      if (item.is_payable) {
+                                        handleAmenityChange(index, "extraPrice", Number(selectedItem.selling_price) || 0);
+                                      }
                                     }
-                                  }
-                                }}
-                                className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none ${!item.item_id ? "border-orange-300 bg-orange-50" : ""}`}
-                              >
-                                <option value="">Select item from inventory</option>
-                                {inventoryItems.map((inv) => (
-                                  <option key={inv.id} value={inv.id}>{inv.name}</option>
-                                ))}
-                              </select>
-                              {!item.item_id && item.name && (
+                                  }}
+                                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none ${!item.item_id ? "border-indigo-300 bg-indigo-50" : ""}`}
+                                >
+                                  <option value="">Select item from inventory</option>
+                                  {(() => {
+                                    // Group items by category
+                                    const grouped = inventoryItems.reduce((acc, inv) => {
+                                      const categoryName = inv.category?.name || 'Uncategorized';
+                                      if (!acc[categoryName]) acc[categoryName] = [];
+                                      acc[categoryName].push(inv);
+                                      return acc;
+                                    }, {});
+
+                                    return Object.entries(grouped).map(([categoryName, items]) => (
+                                      <optgroup key={categoryName} label={categoryName}>
+                                        {items.map((inv) => (
+                                          <option key={inv.id} value={inv.id}>{inv.name}</option>
+                                        ))}
+                                      </optgroup>
+                                    ));
+                                  })()}
+                                </select>
+                              )}
+
+                              {!item.item_id && item.name && !item.is_package && (
                                 <span className="text-xs text-orange-600 mt-1 font-medium flex items-center gap-1">
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
@@ -2192,12 +2532,7 @@ const Bookings = () => {
       console.log("[Bookings fetchData] Inventory items fetched:", rawItems?.length || 0);
       console.log("[Bookings fetchData] Inventory locations fetched:", allLocations?.length || 0);
 
-      // Show all inventory items as per user request to "Suggest all inventory items"
-      // const sellableItems = (rawItems || []).filter(
-      //   (item) =>
-      //     item &&
-      //     (item.is_sellable_to_guest === true || item.is_sellable === true),
-      // );
+      // Show all inventory items (both consumables and fixed assets)
       setInventoryItems(rawItems);
       setInventoryLocations(allLocations);
 

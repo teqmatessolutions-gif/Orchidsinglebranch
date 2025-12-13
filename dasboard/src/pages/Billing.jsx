@@ -225,6 +225,100 @@ const CheckoutDetailModal = React.memo(({ checkout, onClose }) => {
               </div>
             )}
 
+            {/* Consumables (from bill_details) */}
+            {details.bill_details?.consumables_audit?.items?.length > 0 && (
+              <div className="border-t pt-4">
+                <h3 className="text-lg font-semibold mb-3">Consumables</h3>
+                <div className="space-y-2">
+                  {details.bill_details.consumables_audit.items.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
+                      <div className="flex-1">
+                        <p className="font-semibold">{item.item_name}</p>
+                        <p className="text-sm text-gray-500">
+                          Qty: {item.actual_consumed}
+                          {item.complimentary_limit > 0 && <span className="text-xs text-green-600 ml-2">(Limit: {item.complimentary_limit})</span>}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold text-indigo-600">{formatCurrency(item.total_charge)}</p>
+                        <p className="text-xs text-gray-400">@ {formatCurrency(item.charge_per_unit)}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-end pt-2 text-sm font-medium">
+                    <span>Subtotal: {formatCurrency(details.bill_details.consumables_audit.charges)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Inventory Usage (from bill_details) */}
+            {details.bill_details?.inventory_usage?.length > 0 && (
+              <div className="border-t pt-4">
+                <h3 className="text-lg font-semibold mb-3">Inventory Usage</h3>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-3 py-2 text-left">Item</th>
+                        <th className="px-3 py-2 text-center">Qty</th>
+                        <th className="px-3 py-2 text-left">Type</th>
+                        <th className="px-3 py-2 text-right">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {details.bill_details.inventory_usage.map((item, idx) => (
+                        <tr key={idx} className="border-b">
+                          <td className="px-3 py-2">
+                            <div className="font-medium">{item.item_name}</div>
+                            <div className="text-xs text-gray-500">{new Date(item.date).toLocaleDateString()}</div>
+                          </td>
+                          <td className="px-3 py-2 text-center">{item.quantity} {item.unit}</td>
+                          <td className="px-3 py-2">
+                            {item.is_rental ? <span className="text-blue-600">Rental</span> :
+                              item.is_payable ? <span className="text-orange-600">Chargeable</span> :
+                                "Complimentary"}
+                          </td>
+                          <td className="px-3 py-2 text-right">
+                            {(item.rental_charge > 0 || item.is_payable) ? (
+                              <span className="font-semibold text-indigo-600">
+                                {formatCurrency(item.rental_charge || (item.is_payable && item.cost ? (item.quantity * item.cost) : 0))}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Asset Damages (from bill_details) */}
+            {details.bill_details?.asset_damages?.items?.length > 0 && (
+              <div className="border-t pt-4">
+                <h3 className="text-lg font-semibold mb-3 text-red-600">Asset Damages</h3>
+                <div className="space-y-2">
+                  {details.bill_details.asset_damages.items.map((item, idx) => (
+                    <div key={idx} className="flex justify-between items-center bg-red-50 p-3 rounded-lg border border-red-100">
+                      <div>
+                        <p className="font-semibold text-red-700">{item.item_name}</p>
+                        {item.notes && <p className="text-sm text-red-500 italic">"{item.notes}"</p>}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-red-700">{formatCurrency(item.replacement_cost)}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex justify-end pt-2 text-sm font-bold text-red-700">
+                    <span>Total Damages: {formatCurrency(details.bill_details.asset_damages.charges)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Bill Summary */}
             <div className="border-t pt-4">
               <h3 className="text-lg font-semibold mb-3">Bill Summary</h3>
@@ -251,6 +345,24 @@ const CheckoutDetailModal = React.memo(({ checkout, onClose }) => {
                   <div className="flex justify-between">
                     <span>Service Charges:</span>
                     <span className="font-medium">{formatCurrency(details.service_total)}</span>
+                  </div>
+                )}
+                {details.bill_details?.consumables_audit?.charges > 0 && (
+                  <div className="flex justify-between">
+                    <span>Consumables:</span>
+                    <span className="font-medium">{formatCurrency(details.bill_details.consumables_audit.charges)}</span>
+                  </div>
+                )}
+                {details.bill_details?.charges_breakdown?.inventory_charges > 0 && (
+                  <div className="flex justify-between">
+                    <span>Inventory Charges:</span>
+                    <span className="font-medium">{formatCurrency(details.bill_details.charges_breakdown.inventory_charges)}</span>
+                  </div>
+                )}
+                {details.bill_details?.asset_damages?.charges > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span>Asset Damages:</span>
+                    <span className="font-medium">{formatCurrency(details.bill_details.asset_damages.charges)}</span>
                   </div>
                 )}
                 {details.tax_amount > 0 && (
@@ -300,6 +412,10 @@ const Billing = () => {
   const [isFetchingMore, setIsFetchingMore] = useState(false);
   const [checkoutRequest, setCheckoutRequest] = useState(null);
   const [checkingInventory, setCheckingInventory] = useState(false);
+
+  // New State for Inventory Verification Modal
+  const [checkoutInventoryModal, setCheckoutInventoryModal] = useState(null); // Request ID
+  const [checkoutInventoryDetails, setCheckoutInventoryDetails] = useState(null);
 
   // Filter and search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -607,19 +723,122 @@ const Billing = () => {
 
     setCheckingInventory(true);
     try {
-      const res = await api.post(`/bill/checkout-request/${checkoutRequest.request_id}/check-inventory`);
+      // 1. Fetch current inventory details (consumables)
+      const res = await api.get(`/bill/checkout-request/${checkoutRequest.request_id}/inventory-details`);
+      const details = res.data;
+
+      // 2. Fetch inventory verification data
+      if (details.room_number) {
+        try {
+          const verificationRes = await api.get(`/bill/pre-checkout/${details.room_number}/verification-data`);
+          if (verificationRes.data) {
+            if (verificationRes.data.consumables) {
+              details.items = verificationRes.data.consumables.map(item => ({
+                ...item,
+                total_assigned: item.current_stock,
+                current_stock: item.current_stock,
+                available_stock: item.current_stock, // Default assumption: all present
+                used_qty: 0,
+                missing_qty: 0
+              }));
+            }
+            if (verificationRes.data.assets) {
+              details.fixed_assets = verificationRes.data.assets.map(asset => ({
+                ...asset,
+                is_damaged: false,
+                damage_notes: "",
+                current_stock: 1,
+                available_stock: 1 // Default assumption: present
+              }));
+            }
+          }
+        } catch (e) {
+          console.error("Failed to fetch inventory verification data:", e);
+        }
+      }
+
+      setCheckoutInventoryDetails(details);
+      setCheckoutInventoryModal(checkoutRequest.request_id);
+
+    } catch (error) {
+      const errorMsg = error.response?.data?.detail;
+      const message = typeof errorMsg === 'string' ? errorMsg : (error.message || 'Unknown error');
+      showBannerMessage("error", `Error fetching inventory details: ${message}`);
+      console.error("Error checking inventory:", error);
+    } finally {
+      setCheckingInventory(false);
+    }
+  };
+
+  const handleUpdateInventoryVerification = (index, field, value) => {
+    const newItems = [...checkoutInventoryDetails.items];
+    const val = parseFloat(value) || 0;
+    newItems[index][field] = val;
+
+    // Auto-calculate used/missing based on Available Stock
+    if (field === 'available_stock') {
+      const current = newItems[index].current_stock || 0;
+      const diff = current - val;
+      // Assumption: Difference is "Used" for consumables
+      newItems[index].used_qty = Math.max(0, diff);
+      newItems[index].missing_qty = 0;
+    }
+
+    setCheckoutInventoryDetails({
+      ...checkoutInventoryDetails,
+      items: newItems
+    });
+  };
+
+  const handleUpdateAssetDamage = (index, field, value) => {
+    const newAssets = [...(checkoutInventoryDetails.fixed_assets || [])];
+    newAssets[index][field] = value;
+    setCheckoutInventoryDetails({
+      ...checkoutInventoryDetails,
+      fixed_assets: newAssets
+    });
+  };
+
+  const handleSubmitInventoryCheck = async (notes) => {
+    if (!checkoutInventoryModal) return;
+
+    setCheckingInventory(true);
+    try {
+      const items = checkoutInventoryDetails.items.map(item => ({
+        item_id: item.id,
+        used_qty: item.used_qty || 0,
+        missing_qty: item.missing_qty || 0
+      }));
+
+      // Collect asset damages
+      const assetDamages = (checkoutInventoryDetails.fixed_assets || [])
+        .filter(asset => asset.is_damaged)
+        .map(asset => ({
+          item_name: asset.item_name,
+          replacement_cost: asset.replacement_cost,
+          notes: asset.damage_notes || ""
+        }));
+
+      const res = await api.post(`/bill/checkout-request/${checkoutInventoryModal}/check-inventory`, {
+        inventory_notes: notes || "",
+        items: items,
+        asset_damages: assetDamages
+      });
+
       showBannerMessage("success", res.data.message || "Inventory checked successfully.");
+      setCheckoutInventoryModal(null);
+      setCheckoutInventoryDetails(null);
+
       // Refresh checkout request status
       const actualRoomNumber = roomNumber.includes('-') ? roomNumber.split('-')[1] : roomNumber;
       const requestRes = await api.get(`/bill/checkout-request/${actualRoomNumber}`);
       if (requestRes.data && requestRes.data.exists) {
         setCheckoutRequest(requestRes.data);
       }
+
     } catch (error) {
-      const errorMsg = error.response?.data?.detail;
-      const message = typeof errorMsg === 'string' ? errorMsg : (error.message || 'Unknown error');
-      showBannerMessage("error", `Error: ${message}`);
-      console.error("Error checking inventory:", error);
+      console.error("Failed to submit inventory check:", error);
+      alert(`Failed to submit inventory check: ${error.response?.data?.detail || error.message}`);
     } finally {
       setCheckingInventory(false);
     }
@@ -1554,6 +1773,263 @@ const Billing = () => {
         </div>
 
         <CheckoutDetailModal checkout={selectedCheckout} onClose={() => setSelectedCheckout(null)} />
+
+        {/* Inventory Verification Modal */}
+        {checkoutInventoryModal && checkoutInventoryDetails && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">Verify Room Inventory</h2>
+                  <button
+                    onClick={() => {
+                      setCheckoutInventoryModal(null);
+                      setCheckoutInventoryDetails(null);
+                    }}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="mb-4 bg-orange-50 border border-orange-200 p-4 rounded-lg">
+                  <p className="text-sm text-orange-800">
+                    Please check both consumables and fixed assets. Mark any damaged assets below.
+                  </p>
+                </div>
+
+                {/* Fixed Assets Section */}
+                {checkoutInventoryDetails.fixed_assets && checkoutInventoryDetails.fixed_assets.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-3 text-red-700">Fixed Assets Check</h3>
+                    <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b border-red-200">
+                            <th className="text-left py-2 font-medium text-red-800">Asset Name</th>
+                            <th className="text-left py-2 font-medium text-red-800">Serial No.</th>
+                            <th className="text-center py-2 font-medium text-red-800">Current</th>
+                            <th className="text-center py-2 font-medium text-red-800">Available</th>
+                            <th className="text-right py-2 font-medium text-red-800">Cost</th>
+                            <th className="text-center py-2 font-medium text-red-800">Damaged?</th>
+                            <th className="text-left py-2 font-medium text-red-800">Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {checkoutInventoryDetails.fixed_assets.map((asset, idx) => (
+                            <tr key={idx} className="border-b border-red-100 last:border-0 hover:bg-red-50 transition-colors">
+                              <td className="py-2 text-gray-800 font-medium">
+                                {asset.item_name}
+                                <div className="text-xs text-gray-500">{asset.asset_tag}</div>
+                              </td>
+                              <td className="py-2 text-gray-600 border-l border-r border-red-100 px-2 font-mono text-xs">
+                                {asset.serial_number || '-'}
+                              </td>
+                              <td className="py-2 text-center text-gray-600">{asset.current_stock}</td>
+                              <td className="py-2 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max="1"
+                                  className={`w-12 border rounded p-1 text-center font-bold ${asset.available_stock < asset.current_stock ? 'text-red-600 bg-red-50 border-red-300' : 'text-green-600 border-gray-300'}`}
+                                  value={asset.available_stock}
+                                  onChange={(e) => handleUpdateAssetDamage(idx, 'available_stock', e.target.value)}
+                                />
+                              </td>
+                              <td className="py-2 text-gray-600 text-right">₹{asset.replacement_cost}</td>
+                              <td className="py-2 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={asset.is_damaged || false}
+                                  onChange={(e) => handleUpdateAssetDamage(idx, 'is_damaged', e.target.checked)}
+                                  className="w-5 h-5 text-red-600 rounded focus:ring-red-500 border-gray-300"
+                                />
+                              </td>
+                              <td className="py-2 px-2">
+                                {(asset.is_damaged || asset.available_stock < asset.current_stock) && (
+                                  <input
+                                    type="text"
+                                    placeholder="Describe damage..."
+                                    value={asset.damage_notes || ""}
+                                    onChange={(e) => handleUpdateAssetDamage(idx, 'damage_notes', e.target.value)}
+                                    className="w-full border p-1 rounded text-sm focus:ring-1 focus:ring-red-500 outline-none"
+                                  />
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-3 text-gray-800">Consumables Inventory Check</h3>
+                  <div className="overflow-x-auto border rounded-lg">
+                    <table className="min-w-full text-sm">
+                      <thead className="bg-gray-100 uppercase tracking-wider text-gray-700">
+                        <tr>
+                          <th className="py-3 px-4 text-left">Item Name</th>
+                          <th className="py-3 px-4 text-center">Current Stock</th>
+                          <th className="py-3 px-4 text-center">Available Stock</th>
+                          <th className="py-3 px-4 text-center">Used/Consumed</th>
+                          <th className="py-3 px-4 text-right">Potential Charge</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {checkoutInventoryDetails.items && checkoutInventoryDetails.items.map((item, idx) => {
+                          const charge = (item.used_qty || 0) * (item.charge_per_unit || item.unit_price || 0);
+                          // Determine actual charge based on complimentary limit
+                          const isChargeable = (item.used_qty || 0) > (item.complimentary_limit || 0);
+                          const chargeAmount = isChargeable ? ((item.used_qty - item.complimentary_limit) * (item.charge_per_unit || 0)) : 0;
+
+                          return (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="py-3 px-4 font-medium">{item.item_name}</td>
+                              <td className="py-3 px-4 text-center text-gray-600 font-semibold">{item.current_stock || 0}</td>
+                              <td className="py-3 px-4 text-center">
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={item.current_stock}
+                                  className={`w-20 border rounded p-1 text-center font-bold ${(item.available_stock < item.current_stock) ? 'text-orange-600 border-orange-300 bg-orange-50' : 'text-green-600 border-gray-300'}`}
+                                  value={item.available_stock}
+                                  onChange={(e) => handleUpdateInventoryVerification(idx, 'available_stock', e.target.value)}
+                                />
+                              </td>
+                              <td className="py-3 px-4 text-center text-gray-700">
+                                {item.used_qty || 0}
+                                {item.complimentary_limit > 0 && <span className="text-xs text-green-600 block">(Free: {item.complimentary_limit})</span>}
+                              </td>
+                              <td className="py-3 px-4 text-right font-medium text-red-600">
+                                {chargeAmount > 0 ? `+${formatCurrency(chargeAmount)}` : '-'}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {(!checkoutInventoryDetails.items || checkoutInventoryDetails.items.length === 0) && (
+                          <tr>
+                            <td colSpan="5" className="py-4 text-center text-gray-500">No consumable items found.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Fixed Assets Verification Section */}
+                {checkoutInventoryDetails.assets && checkoutInventoryDetails.assets.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="text-lg font-semibold mb-3 text-gray-800">Fixed Assets / Room Inventory</h3>
+                    <div className="overflow-x-auto border rounded-lg">
+                      <table className="min-w-full text-sm">
+                        <thead className="bg-blue-50 uppercase tracking-wider text-blue-800">
+                          <tr>
+                            <th className="py-3 px-4 text-left">Asset Name</th>
+                            <th className="py-3 px-4 text-center">Serial / Tag</th>
+                            <th className="py-3 px-4 text-center">Quantity</th>
+                            <th className="py-3 px-4 text-center">Present</th>
+                            <th className="py-3 px-4 text-center">Damaged</th>
+                            <th className="py-3 px-4 text-left">Condition / Notes</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {checkoutInventoryDetails.assets.map((asset, idx) => (
+                            <tr key={idx} className={`hover:bg-blue-50 ${asset.is_damaged ? 'bg-red-50' : ''}`}>
+                              <td className="py-3 px-4 font-medium">{asset.item_name || asset.name}</td>
+                              <td className="py-3 px-4 text-center text-gray-600 font-mono text-xs">
+                                {asset.serial_number || asset.asset_tag || '-'}
+                              </td>
+                              <td className="py-3 px-4 text-center font-semibold">{asset.quantity || 1}</td>
+                              <td className="py-3 px-4 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={asset.is_present !== false}
+                                  onChange={(e) => {
+                                    const updated = [...checkoutInventoryDetails.assets];
+                                    updated[idx] = { ...updated[idx], is_present: e.target.checked };
+                                    setCheckoutInventoryDetails({ ...checkoutInventoryDetails, assets: updated });
+                                  }}
+                                  className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                                />
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <input
+                                  type="checkbox"
+                                  checked={asset.is_damaged || false}
+                                  onChange={(e) => {
+                                    const updated = [...checkoutInventoryDetails.assets];
+                                    updated[idx] = { ...updated[idx], is_damaged: e.target.checked };
+                                    setCheckoutInventoryDetails({ ...checkoutInventoryDetails, assets: updated });
+                                  }}
+                                  className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                />
+                              </td>
+                              <td className="py-3 px-4">
+                                {asset.is_damaged ? (
+                                  <input
+                                    type="text"
+                                    placeholder="Describe damage..."
+                                    value={asset.damage_notes || ''}
+                                    onChange={(e) => {
+                                      const updated = [...checkoutInventoryDetails.assets];
+                                      updated[idx] = { ...updated[idx], damage_notes: e.target.value };
+                                      setCheckoutInventoryDetails({ ...checkoutInventoryDetails, assets: updated });
+                                    }}
+                                    className="w-full px-2 py-1 text-xs border border-red-300 rounded bg-red-50 focus:ring-2 focus:ring-red-500 outline-none"
+                                  />
+                                ) : (
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${(asset.status || 'active').toLowerCase() === 'active'
+                                    ? 'bg-green-100 text-green-800'
+                                    : 'bg-yellow-100 text-yellow-800'
+                                    }`}>
+                                    {asset.status || 'Active'}
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Additional Notes</label>
+                  <textarea
+                    id="inventory-notes"
+                    className="w-full border p-3 rounded-lg focus:ring-2 focus:ring-indigo-500"
+                    rows="3"
+                    placeholder="Any additional observations..."
+                  ></textarea>
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    onClick={() => {
+                      setCheckoutInventoryModal(null);
+                      setCheckoutInventoryDetails(null);
+                    }}
+                    className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      const notes = document.getElementById('inventory-notes')?.value;
+                      handleSubmitInventoryCheck(notes);
+                    }}
+                    className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium shadow-md transition-all"
+                  >
+                    Confirm Verification
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

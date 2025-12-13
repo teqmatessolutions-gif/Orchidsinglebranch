@@ -1,117 +1,64 @@
 """
-Script to clear all assigned services and all services from the database.
+Clear All Services
+This script removes all services and their related data.
 """
-import os
-import sys
-from pathlib import Path
-from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from app.database import SessionLocal
+from sqlalchemy import text
 
-# Load environment variables
-env_path = Path(__file__).parent / ".env"
-if env_path.exists():
-    load_dotenv(dotenv_path=env_path, override=True)
-    print(f"Loaded .env from: {env_path.absolute()}")
-else:
-    print(f"Warning: .env file not found at {env_path.absolute()}")
-
-load_dotenv(override=True)
-
-# Get database URL
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-# Convert postgresql:// to postgresql+psycopg2:// if needed
-if DATABASE_URL and DATABASE_URL.startswith("postgresql://"):
-    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg2://", 1)
-    print(f"Converted DATABASE_URL to use psycopg2 driver")
-
-if not DATABASE_URL:
-    print("ERROR: DATABASE_URL not set")
-    sys.exit(1)
-
-print(f"Connecting to database...")
-engine = create_engine(DATABASE_URL)
-conn = engine.connect()
+db = SessionLocal()
 
 try:
-    # Start transaction
-    trans = conn.begin()
+    print("=" * 80)
+    print("CLEARING ALL SERVICES")
+    print("=" * 80)
+    print("\nThis will delete:")
+    print("  - All services")
+    print("  - All service images")
+    print("  - All service inventory items")
+    print("  - All laundry services")
+    print("=" * 80)
     
-    print("\n1. Counting current records...")
+    # Confirm
+    response = input("\nAre you sure you want to proceed? (type 'YES' to confirm): ")
+    if response != "YES":
+        print("Operation cancelled.")
+        db.close()
+        exit()
     
-    # Count assigned services
-    result = conn.execute(text("SELECT COUNT(*) FROM assigned_services"))
-    assigned_count = result.scalar()
-    print(f"   Assigned Services: {assigned_count}")
+    print("\nStarting cleanup...")
     
-    # Count services
-    result = conn.execute(text("SELECT COUNT(*) FROM services"))
-    services_count = result.scalar()
-    print(f"   Services: {services_count}")
+    # 1. Clear service images
+    print("\n[1/4] Clearing service images...")
+    db.execute(text("DELETE FROM service_images"))
+    print("  ✓ Service images cleared")
     
-    # Count service images
-    result = conn.execute(text("SELECT COUNT(*) FROM service_images"))
-    images_count = result.scalar()
-    print(f"   Service Images: {images_count}")
+    # 2. Clear service inventory items
+    print("[2/4] Clearing service inventory items...")
+    db.execute(text("DELETE FROM service_inventory_items"))
+    print("  ✓ Service inventory items cleared")
     
-    # Count service inventory items
-    result = conn.execute(text("SELECT COUNT(*) FROM service_inventory_items"))
-    inventory_count = result.scalar()
-    print(f"   Service Inventory Items: {inventory_count}")
+    # 3. Clear laundry services
+    print("[3/4] Clearing laundry services...")
+    db.execute(text("DELETE FROM laundry_services"))
+    print("  ✓ Laundry services cleared")
     
-    # Confirm deletion
-    print(f"\n⚠️  WARNING: This will delete:")
-    print(f"   - {assigned_count} assigned services")
-    print(f"   - {services_count} services")
-    print(f"   - {images_count} service images")
-    print(f"   - {inventory_count} service inventory item links")
-    print(f"\nThis action cannot be undone!")
+    # 4. Clear services
+    print("[4/4] Clearing services...")
+    db.execute(text("DELETE FROM services"))
+    print("  ✓ Services cleared")
     
-    confirm = input("\nType 'DELETE ALL' to confirm: ")
+    # Commit all changes
+    db.commit()
     
-    if confirm != "DELETE ALL":
-        print("❌ Deletion cancelled.")
-        trans.rollback()
-        sys.exit(0)
-    
-    print("\n2. Deleting assigned services...")
-    result = conn.execute(text("DELETE FROM assigned_services"))
-    deleted_assigned = result.rowcount
-    print(f"   ✓ Deleted {deleted_assigned} assigned services")
-    
-    print("\n3. Deleting service inventory item links...")
-    result = conn.execute(text("DELETE FROM service_inventory_items"))
-    deleted_inventory = result.rowcount
-    print(f"   ✓ Deleted {deleted_inventory} service inventory item links")
-    
-    print("\n4. Deleting service images...")
-    result = conn.execute(text("DELETE FROM service_images"))
-    deleted_images = result.rowcount
-    print(f"   ✓ Deleted {deleted_images} service images")
-    
-    print("\n5. Deleting services...")
-    result = conn.execute(text("DELETE FROM services"))
-    deleted_services = result.rowcount
-    print(f"   ✓ Deleted {deleted_services} services")
-    
-    # Commit transaction
-    trans.commit()
-    
-    print("\n✅ Successfully cleared all services and assigned services!")
-    print(f"\nSummary:")
-    print(f"   - Deleted {deleted_assigned} assigned services")
-    print(f"   - Deleted {deleted_services} services")
-    print(f"   - Deleted {deleted_images} service images")
-    print(f"   - Deleted {deleted_inventory} service inventory item links")
+    print("\n" + "=" * 80)
+    print("✓ ALL SERVICES CLEARED SUCCESSFULLY!")
+    print("=" * 80)
+    print("\nAll services and related data have been removed.")
+    print("You can now create new services from scratch.")
     
 except Exception as e:
-    trans.rollback()
-    print(f"\n❌ ERROR: {e}")
-    import traceback
-    traceback.print_exc()
-    sys.exit(1)
+    print(f"\n✗ Error: {e}")
+    db.rollback()
+    print("Changes rolled back. Database unchanged.")
 finally:
-    conn.close()
-
-
-
+    db.close()

@@ -143,7 +143,7 @@ const ItemFormModal = ({
                                 </label>
                                 <input
                                     type="text"
-                                    value={form.item_code}
+                                    value={form.item_code || ""}
                                     onChange={(e) =>
                                         setForm({ ...form, item_code: e.target.value })
                                     }
@@ -202,7 +202,7 @@ const ItemFormModal = ({
                                 </label>
                                 <input
                                     type="text"
-                                    value={form.hsn_code}
+                                    value={form.hsn_code || ""}
                                     onChange={(e) =>
                                         setForm({ ...form, hsn_code: e.target.value })
                                     }
@@ -245,7 +245,7 @@ const ItemFormModal = ({
                                     Description
                                 </label>
                                 <textarea
-                                    value={form.description}
+                                    value={form.description || ""}
                                     onChange={(e) =>
                                         setForm({ ...form, description: e.target.value })
                                     }
@@ -292,14 +292,14 @@ const ItemFormModal = ({
                                     type="number"
                                     step="0.01"
                                     min="0"
-                                    value={form.initial_stock}
+                                    value={form.initial_stock || ""}
                                     onChange={(e) =>
                                         setForm({
                                             ...form,
-                                            initial_stock: parseFloat(e.target.value) || 0,
+                                            initial_stock: e.target.value ? parseFloat(e.target.value) : "",
                                         })
                                     }
-                                    placeholder="0.00"
+                                    placeholder="Leave empty for 0 stock"
                                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                 />
                             </div>
@@ -330,7 +330,7 @@ const ItemFormModal = ({
                                     Storage Location
                                 </label>
                                 <select
-                                    value={form.location}
+                                    value={form.location || ""}
                                     onChange={(e) =>
                                         setForm({ ...form, location: e.target.value })
                                     }
@@ -550,7 +550,7 @@ const ItemFormModal = ({
                                 </label>
                                 <input
                                     type="text"
-                                    value={form.vendor_item_code}
+                                    value={form.vendor_item_code || ""}
                                     onChange={(e) =>
                                         setForm({ ...form, vendor_item_code: e.target.value })
                                     }

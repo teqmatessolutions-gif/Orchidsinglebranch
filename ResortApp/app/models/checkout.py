@@ -115,6 +115,9 @@ class Checkout(Base):
     key_card_fee = Column(Float, default=0.0)
     advance_deposit = Column(Float, default=0.0)  # Advance paid during booking
     tips_gratuity = Column(Float, default=0.0)
+
+    # Detailed Bill Breakdown
+    bill_details = Column(JSON, nullable=True)  # Snapshot of all line items (Room, Food, Service, Inventory, Assets)
     
     # B2B/GSTIN
     guest_gstin = Column(String, nullable=True)  # For B2B invoices

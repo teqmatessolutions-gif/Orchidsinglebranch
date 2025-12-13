@@ -5,7 +5,7 @@ import {
   PieChart, Pie, Cell, Tooltip, Legend,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer
 } from "recharts";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { getMediaBaseUrl } from "../utils/env";
 
 // Reusable card component for a consistent look
@@ -85,6 +85,7 @@ const Services = () => {
   const [activeTab, setActiveTab] = useState("dashboard"); // "dashboard", "create", "assign", "assigned", "requests", "report"
   const [serviceRequests, setServiceRequests] = useState([]);
   const [paymentModal, setPaymentModal] = useState(null); // { orderId, amount }
+  const [selectedActivity, setSelectedActivity] = useState(null);
 
   // Fetch service requests
   const fetchServiceRequests = async () => {
@@ -1076,7 +1077,40 @@ const Services = () => {
   const handleViewCheckoutInventory = async (checkoutRequestId) => {
     try {
       const res = await api.get(`/bill/checkout-request/${checkoutRequestId}/inventory-details`);
-      setCheckoutInventoryDetails(res.data);
+      const details = res.data;
+
+      // Fetch inventory verification data
+      if (details.room_number) {
+        try {
+          const verificationRes = await api.get(`/bill/pre-checkout/${details.room_number}/verification-data`);
+          if (verificationRes.data) {
+            if (verificationRes.data.consumables) {
+              details.items = verificationRes.data.consumables.map(item => ({
+                ...item,
+                total_assigned: item.current_stock,
+                current_stock: item.current_stock,
+                available_stock: item.current_stock, // Default assumption: all present
+                used_qty: 0,
+                missing_qty: 0
+              }));
+            }
+            if (verificationRes.data.assets) {
+              // Map assets to include local state fields
+              details.fixed_assets = verificationRes.data.assets.map(asset => ({
+                ...asset,
+                is_damaged: false,
+                damage_notes: "",
+                current_stock: 1,
+                available_stock: 1
+              }));
+            }
+          }
+        } catch (e) {
+          console.error("Failed to fetch inventory verification data:", e);
+        }
+      }
+
+      setCheckoutInventoryDetails(details);
       setCheckoutInventoryModal(checkoutRequestId);
     } catch (error) {
       console.error("Failed to fetch inventory details:", error);
@@ -1086,24 +1120,54 @@ const Services = () => {
 
   const handleUpdateInventoryVerification = (index, field, value) => {
     const newItems = [...checkoutInventoryDetails.items];
-    newItems[index][field] = parseFloat(value) || 0;
+    const val = parseFloat(value) || 0;
+    newItems[index][field] = val;
+
+    // Auto-calculate used/missing based on Available Stock
+    if (field === 'available_stock') {
+      const current = newItems[index].current_stock || 0;
+      const diff = current - val;
+      // Assumption: Difference is "Used" for consumables
+      newItems[index].used_qty = Math.max(0, diff);
+      newItems[index].missing_qty = 0;
+    }
+
     setCheckoutInventoryDetails({
       ...checkoutInventoryDetails,
       items: newItems
     });
   };
 
+  const handleUpdateAssetDamage = (index, field, value) => {
+    const newAssets = [...(checkoutInventoryDetails.fixed_assets || [])];
+    newAssets[index][field] = value;
+    setCheckoutInventoryDetails({
+      ...checkoutInventoryDetails,
+      fixed_assets: newAssets
+    });
+  };
+
   const handleCompleteCheckoutRequest = async (checkoutRequestId, notes) => {
     try {
       const items = checkoutInventoryDetails.items.map(item => ({
-        item_id: item.id,
-        used_qty: item.used_qty || 0,
-        missing_qty: item.missing_qty || 0
+        item_id: item.item_id || item.id,
+        used_qty: Number(item.used_qty || 0),
+        missing_qty: Number(item.missing_qty || 0)
       }));
+
+      // Collect asset damages
+      const assetDamages = (checkoutInventoryDetails.fixed_assets || [])
+        .filter(asset => asset.is_damaged)
+        .map(asset => ({
+          item_name: asset.item_name,
+          replacement_cost: Number(asset.replacement_cost || 0),
+          notes: asset.damage_notes || ""
+        }));
 
       await api.post(`/bill/checkout-request/${checkoutRequestId}/check-inventory`, {
         inventory_notes: notes || "",
-        items: items
+        items: items,
+        asset_damages: assetDamages
       });
       alert("Checkout request completed successfully!");
       setCheckoutInventoryModal(null);
@@ -1149,23 +1213,12 @@ const Services = () => {
   };
 
   const handleQuickAssignFromRequest = async (request) => {
-    if (services.length === 0) {
-      alert("No services available. Please create a service first.");
-      setActiveTab("create");
-      return;
-    }
-
     if (employees.length === 0) {
       alert("No employees available. Please add employees first.");
       return;
     }
 
-    // Automatically find and select "delivery" service
-    const deliveryService = services.find(s =>
-      s.name.toLowerCase().includes("delivery") || s.name.toLowerCase() === "delivery"
-    );
-
-    // Open modal with only employee selection (delivery service is auto-selected)
+    // Open modal with employee selection
     setQuickAssignModal({
       request: request,
       employeeId: request.employee_id ? request.employee_id.toString() : "",
@@ -1200,36 +1253,35 @@ const Services = () => {
         return;
       }
 
-      // Otherwise, this is a new service assignment from a request
-      // Automatically find delivery service
-      const deliveryService = services.find(s =>
-        s.name.toLowerCase().includes("delivery") || s.name.toLowerCase() === "delivery"
+      // Check if this is a checkout request
+      const isCheckoutRequest = quickAssignModal.request && (
+        quickAssignModal.request.is_checkout_request ||
+        quickAssignModal.request.id > 1000000 ||
+        quickAssignModal.request.request_type === 'checkout_verification' ||
+        quickAssignModal.request.request_type === 'checkout_settlement'
       );
 
-      if (!deliveryService) {
-        alert("Delivery service not found. Please create a delivery service first.");
+      if (isCheckoutRequest) {
+        // For checkout requests, only assign employee (no service needed)
+        if (quickAssignModal.request.id) {
+          await handleAssignEmployeeToRequest(quickAssignModal.request.id, parseInt(quickAssignModal.employeeId));
+        }
+
+        alert("Employee assigned to checkout verification successfully!");
+        setQuickAssignModal(null);
+        fetchServiceRequests();
+        fetchAll(false);
         return;
       }
 
-      const payload = {
-        service_id: deliveryService.id,
-        employee_id: parseInt(quickAssignModal.employeeId),
-        room_id: parseInt(quickAssignModal.request.room_id),
-      };
-
-      const response = await api.post("/services/assign", payload);
-
-      // Also update the service request with the employee assignment
+      // Otherwise, this is a regular service assignment from a request
+      // For service requests, just assign the employee to the request
+      // The service type is already defined in the request
       if (quickAssignModal.request.id) {
         await handleAssignEmployeeToRequest(quickAssignModal.request.id, parseInt(quickAssignModal.employeeId));
       }
 
-      alert("Service assigned successfully!");
-
-      if (response.data) {
-        setAssignedServices(prev => [response.data, ...prev]);
-      }
-
+      alert("Employee assigned successfully!");
       setQuickAssignModal(null);
       fetchServiceRequests();
       fetchAll(false);
@@ -1684,7 +1736,8 @@ const Services = () => {
                         employee: s.employee?.name || s.employee_name || '-',
                         status: s.status,
                         date: s.assigned_at,
-                        isRequest: false
+                        isRequest: false,
+                        original: s
                       })),
                       ...serviceRequests.map(r => ({
                         id: `req-${r.id}`,
@@ -1694,13 +1747,18 @@ const Services = () => {
                         employee: r.employee_name || '-',
                         status: r.status,
                         date: r.created_at,
-                        isRequest: true
+                        isRequest: true,
+                        original: r
                       }))
                     ]
                       .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
-                      .slice(0, 15)
+                      .slice(0, 50) // Increased limit for better visibility
                       .map((item, idx) => (
-                        <tr key={item.id} className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors`}>
+                        <tr
+                          key={item.id}
+                          className={`${idx % 2 === 0 ? "bg-white" : "bg-gray-50"} hover:bg-gray-100 transition-colors cursor-pointer`}
+                          onClick={() => setSelectedActivity(item)}
+                        >
                           <td className="py-3 px-4">
                             <span className={`px-2 py-1 rounded text-xs font-medium ${item.type === 'Assigned' ? 'bg-blue-100 text-blue-800' :
                               item.type === 'Cleaning' ? 'bg-orange-100 text-orange-800' :
@@ -1919,6 +1977,15 @@ const Services = () => {
                               <div className="flex gap-2">
                                 {isCheckoutRequest ? (
                                   <>
+                                    {!request.employee_id && !request.employee_name && request.status === "pending" && (
+                                      <button
+                                        onClick={() => handleQuickAssignFromRequest(request)}
+                                        className="px-3 py-1 rounded text-sm font-medium bg-green-500 hover:bg-green-600 text-white"
+                                        title="Assign employee to checkout verification"
+                                      >
+                                        Assign Employee
+                                      </button>
+                                    )}
                                     {(request.status === "pending" || request.status === "in_progress" || request.status === "inventory_checked") ? (
                                       <button
                                         onClick={() => handleViewCheckoutInventory(checkoutRequestId)}
@@ -3278,7 +3345,11 @@ const Services = () => {
               <div className="p-6">
                 <div className="flex justify-between items-center mb-6">
                   <h2 className="text-2xl font-bold text-gray-800">
-                    {quickAssignModal.isReassignment ? "Reassign Employee" : "Assign Service"}
+                    {quickAssignModal.isReassignment
+                      ? "Reassign Employee"
+                      : (quickAssignModal.request && (quickAssignModal.request.is_checkout_request || quickAssignModal.request.id > 1000000 || quickAssignModal.request.request_type === 'checkout_verification' || quickAssignModal.request.request_type === 'checkout_settlement'))
+                        ? "Assign Employee to Checkout Verification"
+                        : "Assign Employee"}
                   </h2>
                   <button
                     onClick={() => setQuickAssignModal(null)}
@@ -3340,18 +3411,6 @@ const Services = () => {
                           className="w-full border p-3 rounded-lg bg-gray-100 text-gray-600"
                         />
                       </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Service
-                        </label>
-                        <input
-                          type="text"
-                          value="Delivery"
-                          disabled
-                          className="w-full border p-3 rounded-lg bg-gray-100 text-gray-600"
-                        />
-                      </div>
                     </>
                   )}
 
@@ -3385,7 +3444,7 @@ const Services = () => {
                     onClick={handleQuickAssignSubmit}
                     className="px-6 py-2 rounded-lg text-sm font-medium bg-indigo-600 hover:bg-indigo-700 text-white"
                   >
-                    {quickAssignModal.isReassignment ? "Reassign Employee" : "Assign Service"}
+                    {quickAssignModal.isReassignment ? "Reassign Employee" : "Assign Employee"}
                   </button>
                 </div>
               </div>
@@ -3806,50 +3865,63 @@ const Services = () => {
               )}
             </div>
 
-            {checkoutInventoryDetails.items && checkoutInventoryDetails.items.length > 0 ? (
-              <div className="mb-4">
-                <h3 className="text-lg font-semibold mb-2">Current Inventory Items:</h3>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full border border-gray-200">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-4 py-2 text-left">Item Name</th>
-                        <th className="px-4 py-2 text-center">Complimentary</th>
-                        <th className="px-4 py-2 text-center">Payable</th>
-                        <th className="px-4 py-2 text-center">Total Stock</th>
-                        <th className="px-4 py-2 text-center">Used Qty</th>
-                        <th className="px-4 py-2 text-center">Missing Qty</th>
+            {/* Fixed Assets Section */}
+            {checkoutInventoryDetails.fixed_assets && checkoutInventoryDetails.fixed_assets.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3 text-red-700">Fixed Assets Check</h3>
+                <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-red-200">
+                        <th className="text-left py-2 font-medium text-red-800">Asset Name</th>
+                        <th className="text-left py-2 font-medium text-red-800">Serial No.</th>
+                        <th className="text-center py-2 font-medium text-red-800">Current</th>
+                        <th className="text-center py-2 font-medium text-red-800">Available</th>
+                        <th className="text-right py-2 font-medium text-red-800">Cost</th>
+                        <th className="text-center py-2 font-medium text-red-800">Damaged?</th>
+                        <th className="text-left py-2 font-medium text-red-800">Notes</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {checkoutInventoryDetails.items.map((item, idx) => (
-                        <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="px-4 py-2">
-                            <div className="font-medium">{item.name}</div>
-                            {item.item_code && <div className="text-xs text-gray-500">{item.item_code}</div>}
+                      {checkoutInventoryDetails.fixed_assets.map((asset, idx) => (
+                        <tr key={idx} className="border-b border-red-100 last:border-0 hover:bg-red-50 transition-colors">
+                          <td className="py-2 text-gray-800 font-medium">
+                            {asset.item_name}
+                            <div className="text-xs text-gray-500">{asset.asset_tag}</div>
                           </td>
-                          <td className="px-4 py-2 text-center text-green-600">{item.complimentary_qty || 0}</td>
-                          <td className="px-4 py-2 text-center text-red-600">{item.payable_qty || 0}</td>
-                          <td className="px-4 py-2 text-center">{item.current_stock || 0}</td>
-                          <td className="px-4 py-2 text-center">
+                          <td className="py-2 text-gray-600 border-l border-r border-red-100 px-2 font-mono text-xs">
+                            {asset.serial_number || '-'}
+                          </td>
+                          <td className="py-2 text-center text-gray-600">{asset.current_stock}</td>
+                          <td className="py-2 text-center">
                             <input
                               type="number"
                               min="0"
-                              className="w-20 border rounded p-1 text-center focus:ring-2 focus:ring-blue-500 outline-none"
-                              value={item.used_qty || ''}
-                              onChange={(e) => handleUpdateInventoryVerification(idx, 'used_qty', e.target.value)}
-                              placeholder="0"
+                              max="1"
+                              className={`w-12 border rounded p-1 text-center font-bold ${asset.available_stock < asset.current_stock ? 'text-red-600 bg-red-50 border-red-300' : 'text-green-600 border-gray-300'}`}
+                              value={asset.available_stock}
+                              onChange={(e) => handleUpdateAssetDamage(idx, 'available_stock', e.target.value)}
                             />
                           </td>
-                          <td className="px-4 py-2 text-center">
+                          <td className="py-2 text-gray-600 text-right">₹{asset.replacement_cost}</td>
+                          <td className="py-2 text-center">
                             <input
-                              type="number"
-                              min="0"
-                              className="w-20 border rounded p-1 text-center focus:ring-2 focus:ring-red-500 outline-none"
-                              value={item.missing_qty || ''}
-                              onChange={(e) => handleUpdateInventoryVerification(idx, 'missing_qty', e.target.value)}
-                              placeholder="0"
+                              type="checkbox"
+                              checked={asset.is_damaged || false}
+                              onChange={(e) => handleUpdateAssetDamage(idx, 'is_damaged', e.target.checked)}
+                              className="w-5 h-5 text-red-600 rounded focus:ring-red-500 border-gray-300"
                             />
+                          </td>
+                          <td className="py-2 px-2">
+                            {(asset.is_damaged || asset.available_stock < asset.current_stock) && (
+                              <input
+                                type="text"
+                                placeholder="Describe damage..."
+                                value={asset.damage_notes || ""}
+                                onChange={(e) => handleUpdateAssetDamage(idx, 'damage_notes', e.target.value)}
+                                className="w-full border p-1 rounded text-sm focus:ring-1 focus:ring-red-500 outline-none"
+                              />
+                            )}
                           </td>
                         </tr>
                       ))}
@@ -3857,9 +3929,138 @@ const Services = () => {
                   </table>
                 </div>
               </div>
+            )}
+
+            {checkoutInventoryDetails.items && checkoutInventoryDetails.items.length > 0 ? (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3 text-gray-800">Consumables Inventory Check</h3>
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-gray-100 uppercase tracking-wider text-gray-700">
+                      <tr>
+                        <th className="py-3 px-4 text-left">Item Name</th>
+                        <th className="py-3 px-4 text-center">Current Stock</th>
+                        <th className="py-3 px-4 text-center">Available Stock</th>
+                        <th className="py-3 px-4 text-center">Used/Consumed</th>
+                        <th className="py-3 px-4 text-right">Potential Charge</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {checkoutInventoryDetails.items.map((item, idx) => {
+                        const charge = (item.used_qty || 0) * (item.charge_per_unit || item.unit_price || 0);
+                        // Determine actual charge based on complimentary limit
+                        const isChargeable = (item.used_qty || 0) > (item.complimentary_limit || 0);
+                        const chargeAmount = isChargeable ? ((item.used_qty - item.complimentary_limit) * (item.charge_per_unit || 0)) : 0;
+
+                        return (
+                          <tr key={idx} className="hover:bg-gray-50">
+                            <td className="py-3 px-4 font-medium">{item.item_name}</td>
+                            <td className="py-3 px-4 text-center text-gray-600 font-semibold">{item.current_stock || 0}</td>
+                            <td className="py-3 px-4 text-center">
+                              <input
+                                type="number"
+                                min="0"
+                                max={item.current_stock}
+                                className={`w-20 border rounded p-1 text-center font-bold ${(item.available_stock < item.current_stock) ? 'text-orange-600 border-orange-300 bg-orange-50' : 'text-green-600 border-gray-300'}`}
+                                value={item.available_stock}
+                                onChange={(e) => handleUpdateInventoryVerification(idx, 'available_stock', e.target.value)}
+                              />
+                            </td>
+                            <td className="py-3 px-4 text-center text-gray-700">
+                              {item.used_qty || 0}
+                              {item.complimentary_limit > 0 && <span className="text-xs text-green-600 block">(Free: {item.complimentary_limit})</span>}
+                            </td>
+                            <td className="py-3 px-4 text-right font-medium text-red-600">
+                              {chargeAmount > 0 ? `+${(chargeAmount).toFixed(2)}` : '-'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             ) : (
               <div className="mb-4 text-gray-500">
                 {checkoutInventoryDetails.message || "No inventory items found"}
+              </div>
+            )}
+
+            {/* Fixed Assets Verification Section */}
+            {checkoutInventoryDetails.assets && checkoutInventoryDetails.assets.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-3 text-gray-800">Fixed Assets / Room Inventory</h3>
+                <div className="overflow-x-auto border rounded-lg">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-blue-50 uppercase tracking-wider text-blue-800">
+                      <tr>
+                        <th className="py-3 px-4 text-left">Asset Name</th>
+                        <th className="py-3 px-4 text-center">Serial / Tag</th>
+                        <th className="py-3 px-4 text-center">Quantity</th>
+                        <th className="py-3 px-4 text-center">Present</th>
+                        <th className="py-3 px-4 text-center">Damaged</th>
+                        <th className="py-3 px-4 text-left">Condition / Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {checkoutInventoryDetails.assets.map((asset, idx) => (
+                        <tr key={idx} className={`hover:bg-blue-50 ${asset.is_damaged ? 'bg-red-50' : ''}`}>
+                          <td className="py-3 px-4 font-medium">{asset.item_name || asset.name}</td>
+                          <td className="py-3 px-4 text-center text-gray-600 font-mono text-xs">
+                            {asset.serial_number || asset.asset_tag || '-'}
+                          </td>
+                          <td className="py-3 px-4 text-center font-semibold">{asset.quantity || 1}</td>
+                          <td className="py-3 px-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={asset.is_present !== false}
+                              onChange={(e) => {
+                                const updated = [...checkoutInventoryDetails.assets];
+                                updated[idx] = { ...updated[idx], is_present: e.target.checked };
+                                setCheckoutInventoryDetails({ ...checkoutInventoryDetails, assets: updated });
+                              }}
+                              className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                            />
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={asset.is_damaged || false}
+                              onChange={(e) => {
+                                const updated = [...checkoutInventoryDetails.assets];
+                                updated[idx] = { ...updated[idx], is_damaged: e.target.checked };
+                                setCheckoutInventoryDetails({ ...checkoutInventoryDetails, assets: updated });
+                              }}
+                              className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                            />
+                          </td>
+                          <td className="py-3 px-4">
+                            {asset.is_damaged ? (
+                              <input
+                                type="text"
+                                placeholder="Describe damage..."
+                                value={asset.damage_notes || ''}
+                                onChange={(e) => {
+                                  const updated = [...checkoutInventoryDetails.assets];
+                                  updated[idx] = { ...updated[idx], damage_notes: e.target.value };
+                                  setCheckoutInventoryDetails({ ...checkoutInventoryDetails, assets: updated });
+                                }}
+                                className="w-full px-2 py-1 text-xs border border-red-300 rounded bg-red-50 focus:ring-2 focus:ring-red-500 outline-none"
+                              />
+                            ) : (
+                              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${(asset.status || 'active').toLowerCase() === 'active'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                {asset.status || 'Active'}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
@@ -3938,6 +4139,142 @@ const Services = () => {
                 <strong>Note:</strong> The food order will be marked as completed.
                 If marked as unpaid, you can collect payment later from the billing section.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Activity Details Modal */}
+      {selectedActivity && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up">
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-6 border-b pb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    {selectedActivity.type === 'Assigned' ? 'Service Assigment Details' : 'Service Request Details'}
+                    <span className={`px-2 py-1 text-sm rounded-full ${selectedActivity.status === 'completed' ? 'bg-green-100 text-green-800' :
+                      selectedActivity.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                        'bg-yellow-100 text-yellow-800'
+                      }`}>
+                      {selectedActivity.status}
+                    </span>
+                  </h2>
+                  <p className="text-gray-500 mt-1">ID: {selectedActivity.id}</p>
+                </div>
+                <button
+                  onClick={() => setSelectedActivity(null)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Core Info */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-1">Service / Description</p>
+                    <p className="font-semibold text-lg text-gray-900">{selectedActivity.name}</p>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-1">Room</p>
+                    <p className="font-semibold text-lg text-gray-900">{selectedActivity.room}</p>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-1">Assigned / Checked By</p>
+                    <p className="font-semibold text-lg text-gray-900">
+                      {selectedActivity.employee !== '-'
+                        ? selectedActivity.employee
+                        : (selectedActivity.original?.inventory_checked_by || 'System')}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-500 mb-1">Timestamp</p>
+                    <p className="font-semibold text-gray-900">
+                      {new Date(selectedActivity.date).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+
+
+                {/* Inventory Consumption & Asset Damage Details */}
+                {selectedActivity.type !== 'Assigned' && selectedActivity.original && (
+                  <div className="space-y-4">
+                    {/* Asset Damages */}
+                    {selectedActivity.original.asset_damages && selectedActivity.original.asset_damages.length > 0 && (
+                      <div className="bg-red-50 p-4 rounded-lg border border-red-100">
+                        <h3 className="text-md font-semibold text-red-800 mb-2">Asset Damages Reported</h3>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-sm">
+                            <thead className="bg-red-100 text-red-900">
+                              <tr>
+                                <th className="px-3 py-2 text-left">Item Name</th>
+                                <th className="px-3 py-2 text-center">Cost</th>
+                                <th className="px-3 py-2 text-left">Notes</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedActivity.original.asset_damages.map((asset, idx) => (
+                                <tr key={idx} className="border-t border-red-200">
+                                  <td className="px-3 py-2 font-medium">{asset.item_name}</td>
+                                  <td className="px-3 py-2 text-center">₹{asset.replacement_cost}</td>
+                                  <td className="px-3 py-2 text-gray-700">{asset.notes || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Inventory Items Used */}
+                    {selectedActivity.original.inventory_data_with_charges && selectedActivity.original.inventory_data_with_charges.length > 0 && (
+                      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        <h3 className="text-md font-semibold text-gray-800 mb-2">Inventory Items Consumed</h3>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full text-sm">
+                            <thead className="bg-gray-200 text-gray-700">
+                              <tr>
+                                <th className="px-3 py-2 text-left">Item Name</th>
+                                <th className="px-3 py-2 text-center">Used</th>
+                                <th className="px-3 py-2 text-center">Missing</th>
+                                <th className="px-3 py-2 text-center">Charge</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedActivity.original.inventory_data_with_charges.map((item, idx) => {
+                                // Safely fallback if missing_item_charge is missing
+                                const itemCharge = item.missing_item_charge || 0;
+                                return (
+                                  <tr key={idx} className="border-t border-gray-200">
+                                    <td className="px-3 py-2 font-medium">{item.item_name}</td>
+                                    <td className="px-3 py-2 text-center">{item.used_qty}</td>
+                                    <td className="px-3 py-2 text-center text-red-600">{item.missing_qty > 0 ? item.missing_qty : '-'}</td>
+                                    <td className="px-3 py-2 text-center font-medium">
+                                      {itemCharge > 0 ? <span className="text-red-600">₹{itemCharge}</span> : <span className="text-green-600">Free</span>}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Cancel/Close Actions */}
+                <div className="flex justify-end pt-4 border-t">
+                  <button
+                    onClick={() => setSelectedActivity(null)}
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

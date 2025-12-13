@@ -67,31 +67,62 @@ def get_service_requests(
     if include_checkout_requests:
         from app.models.checkout import CheckoutRequest as CheckoutRequestModel
         from app.models.room import Room
+        from app.models.inventory import InventoryItem
         from sqlalchemy.orm import joinedload
         
         checkout_query = db.query(CheckoutRequestModel).options(
             joinedload(CheckoutRequestModel.employee)
         )
         
-        # Show all checkout requests except cancelled ones
-        # If status filter is provided, apply it; otherwise show all active statuses
+        # Show all checkout requests except cancelled and completed ones
         if status:
             checkout_query = checkout_query.filter(CheckoutRequestModel.status == status)
         else:
-            # Show all non-cancelled checkout requests
             checkout_query = checkout_query.filter(
-                CheckoutRequestModel.status.notin_(["cancelled"])
+                CheckoutRequestModel.status.notin_(["cancelled", "completed"])
             )
         
-        checkout_requests = checkout_query.order_by(CheckoutRequestModel.created_at.desc()).limit(limit * 2).offset(skip).all()
+        checkout_requests = checkout_query.order_by(CheckoutRequestModel.created_at.desc()).limit(limit).offset(skip).all()
+        
+        # Optimization: Pre-fetch all rooms to avoid N+1 queries
+        room_numbers = [cr.room_number for cr in checkout_requests if cr.room_number]
+        rooms = db.query(Room).filter(Room.number.in_(room_numbers)).all()
+        room_map = {r.number: r for r in rooms}
+        
+        # Optimization: Pre-fetch all inventory items needed for hydration
+        item_ids = set()
+        for cr in checkout_requests:
+            if cr.inventory_data:
+                for item in cr.inventory_data:
+                    if item.get('item_id'):
+                        item_ids.add(item.get('item_id'))
+        
+        inventory_items = {}
+        if item_ids:
+            items = db.query(InventoryItem).filter(InventoryItem.id.in_(list(item_ids))).all()
+            inventory_items = {i.id: i for i in items}
         
         # Convert checkout requests to service request-like format
         for cr in checkout_requests:
-            room = db.query(Room).filter(Room.number == cr.room_number).first()
+            room = room_map.get(str(cr.room_number))
             if room:
                 try:
+                    # Hydrate missing item names in inventory_data using pre-fetched map
+                    enriched_inventory_data = []
+                    if cr.inventory_data:
+                        for item in cr.inventory_data:
+                            enriched_item = item.copy()
+                            # Hydrate name if missing
+                            if ('item_name' not in enriched_item or not enriched_item['item_name']) and enriched_item.get('item_id'):
+                                inv_item = inventory_items.get(enriched_item.get('item_id'))
+                                if inv_item:
+                                    enriched_item['item_name'] = inv_item.name
+                                    if 'item_code' not in enriched_item:
+                                        enriched_item['item_code'] = inv_item.item_code
+                            enriched_inventory_data.append(enriched_item)
+
                     result.append({
-                        "id": cr.id + 1000000,  # Offset to avoid conflicts with regular service requests
+                        "id": cr.id + 1000000, 
                         "food_order_id": None,
                         "room_id": room.id,
                         "employee_id": cr.employee_id,
@@ -104,7 +135,11 @@ def get_service_requests(
                         "checkout_request_id": cr.id,
                         "room_number": str(cr.room_number) if cr.room_number else None,
                         "guest_name": str(cr.guest_name) if cr.guest_name else None,
-                        "employee_name": str(cr.employee.name) if cr.employee and cr.employee.name else None
+                        "employee_name": str(cr.employee.name) if cr.employee and cr.employee.name else None,
+                        "inventory_notes": cr.inventory_notes,
+                        # Process enriched inventory data
+                        "asset_damages": [item for item in enriched_inventory_data if item.get('is_fixed_asset')],
+                        "inventory_data_with_charges": [item for item in enriched_inventory_data if not item.get('is_fixed_asset')]
                     })
                 except Exception as e:
                     print(f"[ERROR] Error converting checkout request {cr.id}: {e}")
@@ -130,6 +165,50 @@ def update_service_request(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Check if this is a checkout request (ID > 1000000)
+    if request_id > 1000000:
+        # This is a checkout request, not a regular service request
+        actual_checkout_id = request_id - 1000000
+        
+        from app.models.checkout import CheckoutRequest as CheckoutRequestModel
+        checkout_request = db.query(CheckoutRequestModel).filter(
+            CheckoutRequestModel.id == actual_checkout_id
+        ).first()
+        
+        if not checkout_request:
+            raise HTTPException(status_code=404, detail="Checkout request not found")
+        
+        # Update employee assignment
+        if update.employee_id is not None:
+            checkout_request.employee_id = update.employee_id
+        
+        # Update status if provided
+        if update.status is not None:
+            checkout_request.status = update.status
+            if update.status == "completed":
+                from datetime import datetime
+                checkout_request.completed_at = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(checkout_request)
+        
+        # Return in ServiceRequestOut format for compatibility
+        from app.models.room import Room
+        room = db.query(Room).filter(Room.number == checkout_request.room_number).first()
+        
+        return {
+            "id": request_id,  # Keep the offset ID
+            "food_order_id": None,
+            "room_id": room.id if room else None,
+            "employee_id": checkout_request.employee_id,
+            "request_type": "checkout_verification",
+            "description": f"Checkout inventory verification for Room {checkout_request.room_number}",
+            "status": checkout_request.status,
+            "created_at": checkout_request.created_at,
+            "completed_at": checkout_request.completed_at
+        }
+    
+    # Regular service request
     updated = crud.update_service_request(db, request_id, update)
     if not updated:
         raise HTTPException(status_code=404, detail="Service request not found")

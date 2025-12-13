@@ -175,7 +175,14 @@ def generate_entry_number(db: Session) -> str:
         func.extract('month', JournalEntry.entry_date) == month
     ).count()
     
-    entry_number = f"JE-{year}-{str(month).zfill(2)}-{str(count + 1).zfill(4)}"
+    # Handle gaps from deletions: Ensure uniqueness
+    while True:
+        entry_number = f"JE-{year}-{str(month).zfill(2)}-{str(count + 1).zfill(4)}"
+        exists = db.query(JournalEntry).filter(JournalEntry.entry_number == entry_number).first()
+        if not exists:
+            break
+        count += 1
+    
     return entry_number
 
 

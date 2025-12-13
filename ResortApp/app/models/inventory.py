@@ -301,6 +301,9 @@ class StockIssueDetail(Base):
     notes = Column(Text, nullable=True)
     is_payable = Column(Boolean, default=False, nullable=True)  # Is this item chargeable to guest?
     is_paid = Column(Boolean, default=False, nullable=True)     # Has the guest paid for it?
+    rental_price = Column(Float, nullable=True)  # Rental price for rentable assets like laundry
+    is_damaged = Column(Boolean, default=False, nullable=True)  # Track if asset is damaged
+    damage_notes = Column(Text, nullable=True)  # Damage description
     
     issue = relationship("StockIssue", back_populates="details")
     item = relationship("InventoryItem")
