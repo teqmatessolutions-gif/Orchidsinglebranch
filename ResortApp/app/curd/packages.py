@@ -200,10 +200,8 @@ def book_package(db: Session, booking: PackageBookingCreate):
         
         existing_booking = existing_query.order_by(PackageBooking.id.desc()).first()
 
+    # Logic Removed: Do not overwrite guest name with old data.
     guest_name_to_use = booking.guest_name or "Guest User"
-    if existing_booking:
-        # If a guest with the same email and mobile exists, use their established name
-        guest_name_to_use = existing_booking.guest_name
 
     # Validate room capacity for adults and children separately (skip for whole_property packages)
     selected_package = db.query(Package).filter(Package.id == booking.package_id).first()

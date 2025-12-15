@@ -3,6 +3,7 @@ from sqlalchemy import func
 from decimal import Decimal
 from datetime import datetime
 from typing import Optional, List
+from fastapi import HTTPException
 from app.models.inventory import (
     InventoryCategory, InventoryItem, Vendor, PurchaseMaster, PurchaseDetail, InventoryTransaction,
     StockRequisition, StockRequisitionDetail, StockIssue, StockIssueDetail, WasteLog, Location, AssetMapping
@@ -220,24 +221,8 @@ def create_purchase_master(db: Session, data: PurchaseMasterCreate, created_by: 
     purchase_master.discount = total_discount
     purchase_master.total_amount = sub_total + total_cgst + total_sgst + total_igst - total_discount
     
-    # If status is confirmed/received, update inventory
-    if data.status in ["confirmed", "received"]:
-        for detail_data in data.details:
-            update_item_stock(db, detail_data.item_id, detail_data.quantity, "in")
-            # Create transaction record
-            item = get_item_by_id(db, detail_data.item_id)
-            transaction = InventoryTransaction(
-                item_id=detail_data.item_id,
-                transaction_type="in",
-                quantity=detail_data.quantity,
-                unit_price=float(detail_data.unit_price),
-                total_amount=float(detail_data.unit_price * Decimal(str(detail_data.quantity))),
-                reference_number=data.purchase_number,
-                purchase_master_id=purchase_master.id,
-                notes=f"Purchase: {data.purchase_number}",
-                created_by=created_by
-            )
-            db.add(transaction)
+    # Logic for inventory update is handled in API layer to support LocationStock and Weighted Average Cost
+    # calling simple update_item_stock here would miss LocationStock and cause double counting if API also runs.
     
     db.commit()
     db.refresh(purchase_master)
@@ -257,6 +242,27 @@ def get_all_purchases(db: Session, skip: int = 0, limit: int = 100, status: Opti
 
 def get_purchase_by_id(db: Session, purchase_id: int):
     return db.query(PurchaseMaster).filter(PurchaseMaster.id == purchase_id).first()
+
+
+
+def get_item_stocks(db: Session, item_id: int):
+    """Fetch all location stocks for a specific item"""
+    from app.models.inventory import LocationStock, Location
+    
+    stocks = db.query(LocationStock).join(Location).filter(
+        LocationStock.item_id == item_id,
+        LocationStock.quantity > 0
+    ).all()
+    
+    result = []
+    for s in stocks:
+        result.append({
+            "location_id": s.location.id,
+            "location_name": s.location.name,
+            "location_type": s.location.location_type,
+            "quantity": float(s.quantity)
+        })
+    return result
 
 
 def update_purchase_master(db: Session, purchase_id: int, data: PurchaseMasterUpdate):
@@ -355,10 +361,35 @@ def update_purchase_status(db: Session, purchase_id: int, status: str):
     old_status = purchase.status
     purchase.status = status
     
+    
     # If changing to received, update inventory
-    if old_status != "received" and status == "received":
+    if old_status.lower() != "received" and status.lower() == "received":
+        from datetime import datetime
+        from app.models.inventory import LocationStock, InventoryTransaction
+        
         for detail in purchase.details:
+            # Update global stock
             update_item_stock(db, detail.item_id, detail.quantity, "in")
+            
+            # CRITICAL FIX: Update destination location stock
+            if purchase.destination_location_id:
+                loc_stock = db.query(LocationStock).filter(
+                    LocationStock.location_id == purchase.destination_location_id,
+                    LocationStock.item_id == detail.item_id
+                ).first()
+                
+                if loc_stock:
+                    loc_stock.quantity += detail.quantity
+                    loc_stock.last_updated = datetime.utcnow()
+                else:
+                    loc_stock = LocationStock(
+                        location_id=purchase.destination_location_id,
+                        item_id=detail.item_id,
+                        quantity=detail.quantity,
+                        last_updated=datetime.utcnow()
+                    )
+                    db.add(loc_stock)
+            
             # Create transaction if not exists
             existing_transaction = db.query(InventoryTransaction).filter(
                 InventoryTransaction.purchase_master_id == purchase_id,
@@ -473,7 +504,7 @@ def generate_issue_number(db: Session):
 
 
 def create_stock_issue(db: Session, data: dict, issued_by: int):
-    from app.models.inventory import StockIssue, StockIssueDetail, InventoryTransaction, InventoryItem
+    from app.models.inventory import StockIssue, StockIssueDetail, InventoryTransaction, InventoryItem, Location, LocationStock
     from datetime import datetime
     
     issue_number = generate_issue_number(db)
@@ -510,35 +541,102 @@ def create_stock_issue(db: Session, data: dict, issued_by: int):
         if issued_qty <= 0:
             continue  # Skip zero or negative quantities
         
-        # Allow issuing even if stock is 0 (for initial allocations or adjustments)
-        # Only warn if stock would go negative
-        # Strict Stock Check
-        if item.current_stock < issued_qty:
-                raise ValueError(f"Insufficient stock for {item.name}. Available: {item.current_stock}, Requested: {issued_qty}")
+        # SMART SOURCE LOCATION DETECTION
+        # If no source specified, find which non-guest-room location actually has this item
+        source_loc_id = data.get("source_location_id")
+        if not source_loc_id:
+            from app.models.inventory import LocationStock
+            # Find locations that have this item (excluding guest rooms)
+            available_locations = db.query(LocationStock).join(Location).filter(
+                LocationStock.item_id == detail_data["item_id"],
+                LocationStock.quantity >= issued_qty,
+                Location.location_type != "GUEST_ROOM"
+            ).order_by(LocationStock.quantity.desc()).all()
+            
+            if available_locations:
+                # Use the location with most stock
+                source_loc_id = available_locations[0].location_id
+                source_loc_name = available_locations[0].location.name if available_locations[0].location else f"Location {source_loc_id}"
+                print(f"[AUTO-DETECT] Item {item.name}: Using {source_loc_name} (ID: {source_loc_id}) as source (has {available_locations[0].quantity} units)")
+                # Update the issue record's source if this is the first item
+                if not issue.source_location_id:
+                    issue.source_location_id = source_loc_id
+            else:
+                # Fallback: try to find ANY warehouse/store
+                warehouse = db.query(Location).filter(
+                    Location.location_type.in_(["WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE", "STORAGE", "STORE"])
+                ).first()
+                if warehouse:
+                    source_loc_id = warehouse.id
+                    if not issue.source_location_id:
+                        issue.source_location_id = source_loc_id
         
-        # Calculate cost
-        cost = item.unit_price * issued_qty if item.unit_price else None
+        # Strict Stock Check
+        # Check against Source Location Stock if specified (preferred for allocations)
+        if source_loc_id:
+             from app.models.inventory import LocationStock
+             source_stock_record = db.query(LocationStock).filter(
+                 LocationStock.location_id == source_loc_id,
+                 LocationStock.item_id == detail_data["item_id"]
+             ).first()
+             
+             available_qty = source_stock_record.quantity if source_stock_record else 0.0
+             
+             # Fallback: If location stock is insufficient BUT global stock is sufficient,
+             # we DO NOT allow it anymore to prevent negative stock at location level.
+             if available_qty < issued_qty:
+                 raise HTTPException(status_code=400, detail=f"Insufficient stock at source location for {item.name}. Available: {available_qty}, Requested: {issued_qty}")
+        else:
+             # Fallback to global stock check if no source specified
+             if item.current_stock < issued_qty:
+                 raise HTTPException(status_code=400, detail=f"Insufficient Global Stock for {item.name}. Available: {item.current_stock}, Requested: {issued_qty}.")
+        
+        # Calculate cost/price
+        # Ensure float arithmetic
+        # USE SELLING PRICE PREFERENCE for Guest Room issues (or generally if defined)
+        price_to_use = item.unit_price # Default to cost
+        if item.selling_price and item.selling_price > 0:
+             price_to_use = item.selling_price
+        
+        u_price = float(price_to_use or 0)
+        i_qty = float(issued_qty or 0)
+        cost = u_price * i_qty
+        
+        # Use is_payable from request if provided (frontend sends this), otherwise default to False
+        is_payable = detail_data.get("is_payable", False)
+        print(f"[DEBUG] Item {item.name}: is_payable from request = {is_payable}, detail_data = {detail_data}")
         
         # Create issue detail
         detail = StockIssueDetail(
             issue_id=issue.id,
             item_id=detail_data["item_id"],
-            issued_quantity=issued_qty,
+            issued_quantity=i_qty,
             batch_lot_number=detail_data.get("batch_lot_number"),
             unit=detail_data["unit"],
-            unit_price=item.unit_price,
+            unit_price=u_price,
             cost=cost,
             notes=detail_data.get("notes"),
+            is_payable=is_payable,
+            rental_price=detail_data.get("rental_price"),
         )
         db.add(detail)
         
-        # Deduct stock
-        item.current_stock -= issued_qty
-        
-        # Get destination location name for transaction notes
+        # Get destination location for determining if this is a transfer or consumption
+        # CRITICAL FIX: Check destination_location_id directly, not just the fetched object
+        dest_location_id = data.get("destination_location_id")
         dest_location = None
-        if data.get("destination_location_id"):
-            dest_location = get_location_by_id(db, data.get("destination_location_id"))
+        if dest_location_id:
+            dest_location = get_location_by_id(db, dest_location_id)
+        
+        # CRITICAL FIX: Only deduct global stock if this is actual consumption (no destination)
+        # If there's a destination, it's a transfer - stock still exists, just moved locations
+        if not dest_location_id:
+            # Actual consumption - deduct from global stock
+            print(f"[STOCK] Consumption: Deducting {issued_qty} of {item.name} from global stock")
+            item.current_stock -= issued_qty
+        else:
+            # Transfer between locations - global stock unchanged (just location stocks change)
+            print(f"[STOCK] Transfer: Moving {issued_qty} of {item.name} between locations (global stock unchanged)")
         
         dest_location_name = ""
         if dest_location:
@@ -560,8 +658,8 @@ def create_stock_issue(db: Session, data: dict, issued_by: int):
         transaction_out = InventoryTransaction(
             item_id=detail_data["item_id"],
             transaction_type=out_transaction_type,
-            quantity=issued_qty,
-            unit_price=item.unit_price,
+            quantity=i_qty,
+            unit_price=u_price,
             total_amount=cost,
             reference_number=issue_number,
             notes=transaction_notes,
@@ -574,8 +672,8 @@ def create_stock_issue(db: Session, data: dict, issued_by: int):
             transaction_in = InventoryTransaction(
                 item_id=detail_data["item_id"],
                 transaction_type="transfer_in",
-                quantity=issued_qty,
-                unit_price=item.unit_price,
+                quantity=i_qty,
+                unit_price=u_price,
                 total_amount=cost,
                 reference_number=issue_number,
                 notes=f"Stock Received: {issue_number} from {data.get('source_location_id', 'Central')}",
@@ -617,13 +715,13 @@ def create_stock_issue(db: Session, data: dict, issued_by: int):
              ).first()
              
              if loc_stock:
-                 loc_stock.quantity += issued_qty
+                 loc_stock.quantity += i_qty
                  loc_stock.last_updated = datetime.utcnow()
              else:
                  new_stock = LocationStock(
                      location_id=dest_loc_id,
                      item_id=detail_data["item_id"],
-                     quantity=issued_qty,
+                     quantity=i_qty,
                      last_updated=datetime.utcnow()
                  )
                  db.add(new_stock)
@@ -639,11 +737,24 @@ def create_stock_issue(db: Session, data: dict, issued_by: int):
              ).first()
              
              if source_stock:
-                 source_stock.quantity -= issued_qty
-                 if source_stock.quantity < 0:
-                      # Warn but allow (or set to 0? For now allow negative to track deficit)
-                      pass
-                 source_stock.last_updated = datetime.utcnow()
+                 source_stock.quantity -= i_qty
+                 # If negative, we allowed it via fallback, so just track it.
+             else:
+                 # If source stock record didn't exist but we allowed it (Fallback logic),
+                 # we should Create it with negative value (or 0) to track the gap?
+                 # Or if Global had it, maybe we just assume it was there.
+                 # Let's create it with quantity = -issued_qty (or 0 if we assume it was unrecorded positive)
+                 # Actually, if we assume it was there but unrecorded, setting to 0 is safer than negative.
+                 # BUT, for accounting, let's set it to 0 (assuming we just consumed the unrecorded stock).
+                 # Wait, if we want to be strict, we'd say -i_qty.
+                 # Let's init at 0 and subtract.
+                 new_source_stock = LocationStock(
+                     location_id=source_loc_id,
+                     item_id=detail_data["item_id"],
+                     quantity= -i_qty if i_qty > 0 else 0, # Initialize negative if we believe we owe it
+                     last_updated=datetime.utcnow()
+                 )
+                 db.add(new_source_stock)
     
     db.commit()
     db.refresh(issue)
@@ -916,13 +1027,13 @@ def create_asset_mapping(db: Session, data: dict, assigned_by: Optional[int] = N
     item_id = data["item_id"]
     quantity = data.get("quantity", 1.0)
     
-    # 1. Check Stock Availability
+    # 1. Get Item (No stock check - allow negative stock to track deficits)
     item = get_item_by_id(db, item_id)
     if not item:
         raise ValueError("Item not found")
-        
-    if item.current_stock < quantity:
-        raise ValueError(f"Insufficient stock for {item.name}. Available: {item.current_stock}, Requested: {quantity}")
+    
+    # Allow assignment even with insufficient stock - will create negative stock if needed
+    # This helps track deficits and maintains transaction history
         
     # 2. Create Mapping
     mapping = AssetMapping(

@@ -256,7 +256,9 @@ const AddExtraAllocationModal = ({
       item_id: "",
       quantity: 1,
       is_payable: false,
-      manual_override: false, // When true, use is_payable directly instead of auto-calculation
+      manual_override: false, // When true, use complimentary_qty and payable_qty
+      complimentary_qty: 0,
+      payable_qty: 0,
       notes: "",
     },
   ]);
@@ -265,6 +267,75 @@ const AddExtraAllocationModal = ({
   const [loadingCurrentItems, setLoadingCurrentItems] = useState(false);
   const [activeTab, setActiveTab] = useState("current"); // "current" or "add"
   const [paidStatusMap, setPaidStatusMap] = useState({}); // Track paid status by item_id
+  const [sourceLocationItems, setSourceLocationItems] = useState({});
+  const [loadingSourceStock, setLoadingSourceStock] = useState(false);
+  // State for Stock Counts in Row Dropdowns (Map<ItemId, Map<LocationId, Qty>>)
+  const [itemStockCache, setItemStockCache] = useState({});
+
+  // Helper to fetch stock for a specific item and cache it
+  const ensureItemStock = async (itemId) => {
+    if (!itemId || itemStockCache[itemId]) return;
+
+    try {
+      const res = await API.get(`/inventory/items/${itemId}/stocks`, authHeader());
+      const stockMap = {};
+      if (res.data) {
+        res.data.forEach(s => {
+          stockMap[s.location_id] = s.quantity;
+        });
+      }
+      setItemStockCache(prev => ({ ...prev, [itemId]: stockMap }));
+    } catch (error) {
+      console.error(`Error fetching stock for item ${itemId}:`, error);
+    }
+  };
+
+
+
+  // Stock View Modal State
+  const [showStockModal, setShowStockModal] = useState(false);
+  const [stockModalItem, setStockModalItem] = useState(null);
+  const [itemStocks, setItemStocks] = useState([]);
+  const [loadingItemStocks, setLoadingItemStocks] = useState(false);
+
+  const fetchItemStocks = async (item) => {
+    setStockModalItem(item);
+    setShowStockModal(true);
+    setLoadingItemStocks(true);
+    try {
+      const res = await API.get(`/inventory/items/${item.id}/stocks`, authHeader());
+      setItemStocks(res.data);
+    } catch (error) {
+      console.error("Error fetching item stocks:", error);
+      setItemStocks([]);
+    } finally {
+      setLoadingItemStocks(false);
+    }
+  };
+
+  // Initialize default source location logic refactored
+  // We want to set a default source for new rows, but not global state
+  const getDefaultSourceLocationId = () => {
+    if (inventoryLocations.length > 0) {
+      const mainWarehouse = inventoryLocations.find((loc) => {
+        const type = String(loc.location_type || "").toUpperCase();
+        return (
+          (loc.is_inventory_point === true &&
+            (type === "CENTRAL_WAREHOUSE" ||
+              type === "WAREHOUSE" ||
+              type === "BRANCH_STORE")) ||
+          type === "CENTRAL_WAREHOUSE" ||
+          type === "WAREHOUSE" ||
+          type === "BRANCH_STORE"
+        );
+      });
+      return mainWarehouse ? mainWarehouse.id : inventoryLocations[0].id;
+    }
+    return "";
+  };
+
+
+  // Global source stock fetch removed - stocks are now row-specific
 
   // Generate unique booking ID for notes
   const generateBookingId = (booking) => {
@@ -299,6 +370,7 @@ const AddExtraAllocationModal = ({
 
       console.log("=== Fetching Current Room Items ===");
       console.log("Booking:", booking);
+      console.log("Booking ID:", booking?.id);
       console.log("Booking rooms:", booking.rooms);
       console.log("Room for fetch:", roomForFetch);
       console.log("Room number extracted:", roomNumber);
@@ -425,9 +497,16 @@ const AddExtraAllocationModal = ({
       }
     };
 
-    if (booking && inventoryLocations && inventoryLocations.length > 0) {
+    // Only fetch if booking has been saved (has an ID) and has rooms assigned
+    // This prevents showing inventory from previous bookings when creating a new booking
+    if (booking && booking.id && booking.rooms && booking.rooms.length > 0 && inventoryLocations && inventoryLocations.length > 0) {
       fetchCurrentItems();
     } else {
+      if (!booking?.id) {
+        console.log("Skipping inventory fetch - booking not saved yet (no ID)");
+      } else if (!booking?.rooms || booking.rooms.length === 0) {
+        console.log("Skipping inventory fetch - booking has no rooms assigned yet");
+      }
       setCurrentRoomItems([]);
     }
   }, [booking, inventoryLocations]);
@@ -441,6 +520,7 @@ const AddExtraAllocationModal = ({
         is_payable: false,
         manual_override: false,
         notes: "",
+        source_location_id: getDefaultSourceLocationId(),
       },
     ]);
   };
@@ -454,6 +534,12 @@ const AddExtraAllocationModal = ({
   const updateAllocationItem = (index, field, value) => {
     const updated = [...allocationItems];
     updated[index] = { ...updated[index], [field]: value };
+
+    // If item changed, fetch its stocks
+    if (field === "item_id" && value) {
+      ensureItemStock(value);
+    }
+
     setAllocationItems(updated);
   };
 
@@ -518,128 +604,62 @@ const AddExtraAllocationModal = ({
         return;
       }
 
-      // Calculate total quantities per item already allocated (to track complimentary limit usage)
-      const itemQuantityMap = {}; // item_id -> total quantity already allocated
-      currentRoomItems.forEach((roomItem) => {
-        const itemId = roomItem.item_id;
-        if (!itemQuantityMap[itemId]) {
-          itemQuantityMap[itemId] = 0;
+      // GROUP ITEMS BY SOURCE LOCATION
+      const itemsBySource = {};
+
+      validItems.forEach(item => {
+        const sourceId = item.source_location_id || mainWarehouse.id;
+        if (!itemsBySource[sourceId]) {
+          itemsBySource[sourceId] = [];
         }
-        itemQuantityMap[itemId] += parseFloat(roomItem.location_stock || 0);
+        itemsBySource[sourceId].push(item);
       });
 
-      // Build issue details with automatic complimentary/payable split or manual override
-      const issueDetails = [];
-      let totalPayableQty = 0;
-      let totalComplimentaryQty = 0;
+      const sourceIds = Object.keys(itemsBySource);
+      let successCount = 0;
 
-      validItems.forEach((item) => {
-        const selectedItem = inventoryItems.find(
-          (it) => it.id === parseInt(item.item_id),
-        );
-        if (!selectedItem) return;
+      for (const sourceId of sourceIds) {
+        const items = itemsBySource[sourceId];
 
-        const itemId = parseInt(item.item_id);
-        const requestedQty = parseFloat(item.quantity);
+        const issueDetails = items.map((item) => {
+          const selectedInvItem = inventoryItems.find(i => i.id === parseInt(item.item_id));
+          const unit = selectedInvItem?.unit || "pcs";
 
-        // If manual override is enabled, use the is_payable flag directly
-        if (item.manual_override) {
-          issueDetails.push({
-            item_id: itemId,
-            issued_quantity: requestedQty,
-            unit: selectedItem.unit || "pcs",
-            batch_lot_number: null,
-            cost: null,
-            is_payable: item.is_payable,
-            notes:
-              (item.is_payable ? "Payable" : "Complimentary") +
-              ` item (${requestedQty} ${selectedItem.unit || "pcs"})` +
-              (item.notes ? ` - ${item.notes}` : ""),
-          });
-          if (item.is_payable) {
-            totalPayableQty += requestedQty;
-          } else {
-            totalComplimentaryQty += requestedQty;
-          }
-          return;
-        }
+          return {
+            item_id: item.item_id,
+            issued_quantity: parseFloat(item.quantity),
+            unit: unit,
+            is_payable: item.is_payable === true,
+            notes: item.notes || "",
+            // Extra fields for notes generation only, not sent to API if API ignores extra fields, 
+            // BUT strict Pydantic might fail if extra fields are present and forbid_extra=True.
+            // Better to keep payload clean.
+          };
+        });
 
-        // Automatic calculation based on complimentary limit
-        const complimentaryLimit = selectedItem.complimentary_limit || 0;
-
-        // Calculate how many complimentary items are already used
-        const alreadyAllocatedQty = itemQuantityMap[itemId] || 0;
-        const complimentaryUsed = Math.min(
-          alreadyAllocatedQty,
-          complimentaryLimit,
-        );
-        const complimentaryRemaining = Math.max(
+        const totalPayableQty = issueDetails.reduce(
+          (sum, d) => sum + (d.is_payable ? d.issued_quantity : 0),
           0,
-          complimentaryLimit - complimentaryUsed,
+        );
+        const totalComplimentaryQty = issueDetails.reduce(
+          (sum, d) => sum + (!d.is_payable ? d.issued_quantity : 0),
+          0,
         );
 
-        // Split requested quantity into complimentary and payable
-        const complimentaryQty = Math.min(requestedQty, complimentaryRemaining);
-        const payableQty = Math.max(0, requestedQty - complimentaryQty);
+        const issueData = {
+          requisition_id: null,
+          source_location_id: sourceId,
+          destination_location_id: destinationLocation.id,
+          issue_date: getCurrentDateTimeIST(),
+          notes: `Extra allocation for booking ${generateBookingId(booking)} (${totalPayableQty} payable, ${totalComplimentaryQty} comp) - Source: ${sourceId}`,
+          details: issueDetails,
+        };
 
-        // Create issue detail for complimentary items (if any)
-        if (complimentaryQty > 0) {
-          issueDetails.push({
-            item_id: itemId,
-            issued_quantity: complimentaryQty,
-            unit: selectedItem.unit || "pcs",
-            batch_lot_number: null,
-            cost: null,
-            is_payable: false,
-            notes:
-              `Complimentary item (${complimentaryQty} ${selectedItem.unit || "pcs"})` +
-              (item.notes ? ` - ${item.notes}` : ""),
-          });
-          totalComplimentaryQty += complimentaryQty;
-        }
-
-        // Create issue detail for payable items (if any)
-        if (payableQty > 0) {
-          issueDetails.push({
-            item_id: itemId,
-            issued_quantity: payableQty,
-            unit: selectedItem.unit || "pcs",
-            batch_lot_number: null,
-            cost: null,
-            is_payable: true,
-            notes:
-              `Payable item (${payableQty} ${selectedItem.unit || "pcs"})` +
-              (item.notes ? ` - ${item.notes}` : ""),
-          });
-          totalPayableQty += payableQty;
-        }
-      });
-
-      if (issueDetails.length === 0) {
-        alert("No valid items to add");
-        setIsSubmitting(false);
-        return;
+        await API.post("/inventory/issues", issueData, authHeader());
+        successCount += items.length;
       }
 
-      // Count payable vs complimentary items
-      const payableCount = issueDetails.filter((d) => d.is_payable).length;
-      const complimentaryCount = issueDetails.filter(
-        (d) => !d.is_payable,
-      ).length;
-
-      // Create stock issue
-      const issueData = {
-        requisition_id: null,
-        source_location_id: mainWarehouse.id,
-        destination_location_id: destinationLocation.id,
-        issue_date: getCurrentDateTimeIST(),
-        notes: `Extra allocation for booking ${generateBookingId(booking)} (${totalPayableQty} payable qty, ${totalComplimentaryQty} complimentary qty)`,
-        details: issueDetails,
-      };
-
-      await API.post("/inventory/issues", issueData, authHeader());
-
-      alert(`Successfully added ${validItems.length} item(s) to room!`);
+      alert(`Successfully added ${successCount} item(s) to room from ${sourceIds.length} source(s)!`);
       setAllocationItems([
         {
           item_id: "",
@@ -647,6 +667,7 @@ const AddExtraAllocationModal = ({
           is_payable: false,
           manual_override: false,
           notes: "",
+          source_location_id: getDefaultSourceLocationId(),
         },
       ]);
 
@@ -905,17 +926,6 @@ const AddExtraAllocationModal = ({
             </div>
             {loadingCurrentItems ? (
               <div className="text-center py-8 text-gray-500">Loading current items...</div>
-            ) : currentRoomItems.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>No items currently allocated to this room.</p>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("add")}
-                  className="mt-4 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700"
-                >
-                  Add Items Now
-                </button>
-              </div>
             ) : (
               <div className="flex flex-col gap-8">
                 {currentRoomItems.filter(i => i.type !== 'asset').length > 0 && (
@@ -1072,7 +1082,7 @@ const AddExtraAllocationModal = ({
                                       className="w-full px-2 py-1 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
                                     >
                                       <option value="">Select Rentable Asset...</option>
-                                      {inventoryItems.filter(inv => inv.is_asset_fixed).map(inv => (
+                                      {inventoryItems.filter(inv => inv.is_asset_fixed || inv.track_laundry_cycle || (!inv.is_sellable_to_guest && !inv.is_perishable)).map(inv => (
                                         <option key={inv.id} value={inv.id}>{inv.name}</option>
                                       ))}
                                     </select>
@@ -1147,7 +1157,9 @@ const AddExtraAllocationModal = ({
                                       className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
                                     />
                                   ) : (
-                                    <span className="text-gray-400 text-xs">-</span>
+                                    <span className="font-medium text-gray-900">
+                                      {item.unit_price > 0 ? `₹${item.unit_price}` : '-'}
+                                    </span>
                                   )}
                                 </td>
                                 <td className="px-3 py-2 text-sm">
@@ -1215,15 +1227,20 @@ const AddExtraAllocationModal = ({
                             // Save each rentable asset
                             for (const asset of rentableAssets) {
                               const issueData = {
-                                item_id: asset.item_id,
-                                from_location_id: 1, // Main store - adjust as needed
-                                to_location_id: destinationLocation.id,
-                                quantity: asset.location_stock || 1,
-                                issue_type: "rental",
-                                notes: `Rentable asset: ${asset.item_name} - Rental price: ₹${asset.rental_price}`,
-                                rental_price: asset.rental_price,
-                                is_damaged: asset.is_damaged || false,
-                                damage_notes: asset.damage_notes || null
+                                source_location_id: 14, // Central Warehouse
+                                destination_location_id: destinationLocation.id,
+                                issue_date: new Date().toISOString(),
+                                notes: `Rentable asset: ${asset.item_name}`,
+                                details: [
+                                  {
+                                    item_id: asset.item_id,
+                                    issued_quantity: 1,
+                                    unit: "pcs",
+                                    rental_price: asset.rental_price,
+                                    is_payable: true,
+                                    notes: `Rental price: ₹${asset.rental_price || 0}`
+                                  }
+                                ]
                               };
 
                               await API.post('/inventory/issues', issueData, authHeader());
@@ -1282,27 +1299,30 @@ const AddExtraAllocationModal = ({
               <h4 className="text-lg font-semibold text-gray-800">
                 Items to Allocate
               </h4>
-              <button
-                type="button"
-                onClick={addAllocationRow}
-                className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-1"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="h-4 w-4"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
+              <div className="flex items-center gap-2">
+
+                <button
+                  type="button"
+                  onClick={addAllocationRow}
+                  className="px-3 py-1 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 flex items-center gap-1"
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 4v16m8-8H4"
-                  />
-                </svg>
-                Add Item
-              </button>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 4v16m8-8H4"
+                    />
+                  </svg>
+                  Add Item
+                </button>
+              </div>
             </div>
 
             <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -1325,7 +1345,7 @@ const AddExtraAllocationModal = ({
                       </button>
                     )}
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
                         Item
@@ -1335,23 +1355,78 @@ const AddExtraAllocationModal = ({
                         onChange={(e) =>
                           updateAllocationItem(index, "item_id", e.target.value)
                         }
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 pr-8"
                       >
                         <option value="">Select an item</option>
                         {inventoryItems
-                          .filter((it) => it.is_active !== false)
+                          .filter((it) => it.is_active !== false && it.is_sellable_to_guest)
                           .map((invItem) => (
+
+
+
+
+
+
+
+
                             <option key={invItem.id} value={invItem.id}>
                               {invItem.name}{" "}
                               {invItem.item_code
                                 ? `(${invItem.item_code})`
                                 : ""}{" "}
-                              - Stock: {invItem.current_stock} {invItem.unit}
+                              - Avail: {itemStockCache[invItem.id]?.[item.source_location_id || getDefaultSourceLocationId()] || 0} {invItem.unit} (Global: {invItem.current_stock})
                               {invItem.complimentary_limit
                                 ? ` (First ${invItem.complimentary_limit} free)`
                                 : ""}
                             </option>
                           ))}
+                      </select>
+                      {item.item_id && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const selectedItem = inventoryItems.find(i => i.id == item.item_id);
+                            if (selectedItem) fetchItemStocks(selectedItem);
+                          }}
+                          className="absolute right-2 top-8 text-indigo-600 hover:text-indigo-800"
+                          title="View Stock Locations"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Source Location
+                      </label>
+                      <select
+                        value={item.source_location_id || getDefaultSourceLocationId()}
+                        onChange={(e) =>
+                          updateAllocationItem(index, "source_location_id", parseInt(e.target.value))
+                        }
+                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        {inventoryLocations
+                          .filter((loc) => {
+                            const type = String(loc.location_type || "").toUpperCase();
+                            return (
+                              (loc.is_inventory_point === true) ||
+                              ["CENTRAL_WAREHOUSE", "WAREHOUSE", "BRANCH_STORE", "STORE", "STORAGE"].includes(type)
+                            );
+                          })
+                          .map((loc) => {
+                            // Show stock avaiability in this source if item is selected
+                            const stock = item.item_id ? (itemStockCache[item.item_id]?.[loc.id] !== undefined ? itemStockCache[item.item_id][loc.id] : '-') : null;
+                            return (
+                              <option key={loc.id} value={loc.id}>
+                                {loc.name} {loc.building && loc.room_area ? `(${loc.building} - ${loc.room_area})` : ""}
+                                {stock !== null && stock !== '-' ? ` - Avail: ${stock}` : ""}
+                              </option>
+                            );
+                          })}
                       </select>
                     </div>
                     <div>
@@ -1374,136 +1449,33 @@ const AddExtraAllocationModal = ({
                       />
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id={`manual_override_${index}`}
-                      checked={item.manual_override || false}
-                      onChange={(e) =>
-                        updateAllocationItem(
-                          index,
-                          "manual_override",
-                          e.target.checked,
-                        )
-                      }
-                      className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                    />
-                    <label
-                      htmlFor={`manual_override_${index}`}
-                      className="text-xs font-medium text-gray-700 cursor-pointer"
-                    >
-                      Manual Override (ignore automatic calculation)
-                    </label>
-                  </div>
-                  {item.manual_override ? (
-                    <div className="mt-3 flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                      <input
-                        type="checkbox"
-                        id={`is_payable_${index}`}
-                        checked={item.is_payable}
-                        onChange={(e) =>
-                          updateAllocationItem(
-                            index,
-                            "is_payable",
-                            e.target.checked,
-                          )
-                        }
-                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                      />
-                      <label
-                        htmlFor={`is_payable_${index}`}
-                        className="text-xs font-medium text-gray-700 cursor-pointer"
-                      >
-                        Mark entire quantity as{" "}
-                        <span
-                          className={
-                            item.is_payable
-                              ? "text-orange-700 font-semibold"
-                              : "text-green-700 font-semibold"
-                          }
-                        >
-                          {item.is_payable ? "Payable" : "Complimentary"}
-                        </span>
+
+                  <div className="mt-3">
+                    <label className="block text-xs font-medium text-gray-700 mb-2">Item Type</label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center cursor-pointer p-2 border rounded-lg hover:bg-gray-50 transition-colors">
+                        <input
+                          type="radio"
+                          name={`is_payable_${index}`}
+                          checked={!item.is_payable}
+                          onChange={() => updateAllocationItem(index, "is_payable", false)}
+                          className="w-4 h-4 text-green-600 focus:ring-green-500 border-gray-300 mr-2"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Complimentary</span>
+                      </label>
+                      <label className="flex items-center cursor-pointer p-2 border rounded-lg hover:bg-gray-50 transition-colors">
+                        <input
+                          type="radio"
+                          name={`is_payable_${index}`}
+                          checked={item.is_payable === true}
+                          onChange={() => updateAllocationItem(index, "is_payable", true)}
+                          className="w-4 h-4 text-orange-600 focus:ring-orange-500 border-gray-300 mr-2"
+                        />
+                        <span className="text-sm font-medium text-gray-700">Payable</span>
                       </label>
                     </div>
-                  ) : (
-                    (() => {
-                      const selectedItem = inventoryItems.find(
-                        (it) => it.id === parseInt(item.item_id),
-                      );
-                      if (!selectedItem || !item.item_id || !item.quantity)
-                        return null;
+                  </div>
 
-                      // Get already allocated quantity for this item
-                      const alreadyAllocatedQty = currentRoomItems
-                        .filter(
-                          (roomItem) => roomItem.item_id === selectedItem.id,
-                        )
-                        .reduce(
-                          (sum, roomItem) =>
-                            sum + parseFloat(roomItem.location_stock || 0),
-                          0,
-                        );
-
-                      const complimentaryLimit =
-                        selectedItem.complimentary_limit || 0;
-                      const complimentaryUsed = Math.min(
-                        alreadyAllocatedQty,
-                        complimentaryLimit,
-                      );
-                      const complimentaryRemaining = Math.max(
-                        0,
-                        complimentaryLimit - complimentaryUsed,
-                      );
-                      const requestedQty = parseFloat(item.quantity) || 0;
-                      const complimentaryQty = Math.min(
-                        requestedQty,
-                        complimentaryRemaining,
-                      );
-                      const payableQty = Math.max(
-                        0,
-                        requestedQty - complimentaryQty,
-                      );
-
-                      return (
-                        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                          <div className="text-xs font-semibold text-gray-700 mb-2">
-                            Automatic Quantity Breakdown:
-                          </div>
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div>
-                              <span className="text-green-700 font-medium">
-                                Complimentary: {complimentaryQty}{" "}
-                                {selectedItem.unit}
-                              </span>
-                              {complimentaryLimit > 0 && (
-                                <div className="text-gray-500 mt-1">
-                                  ({complimentaryRemaining} remaining from{" "}
-                                  {complimentaryLimit} limit)
-                                </div>
-                              )}
-                            </div>
-                            <div>
-                              <span className="text-orange-700 font-medium">
-                                Payable: {payableQty} {selectedItem.unit}
-                              </span>
-                              {payableQty > 0 && (
-                                <div className="text-gray-500 mt-1">
-                                  @{" "}
-                                  {formatCurrency(
-                                    selectedItem.selling_price ||
-                                    selectedItem.unit_price ||
-                                    0,
-                                  )}{" "}
-                                  each
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })()
-                  )}
                   <div className="mt-2">
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Notes (Optional)
@@ -1540,10 +1512,72 @@ const AddExtraAllocationModal = ({
                   : `Add ${allocationItems.filter((i) => i.item_id && i.quantity > 0).length} Item(s)`}
               </button>
             </div>
-          </form>
+          </form >
         )}
-      </motion.div>
-    </div>
+
+        {/* Stock View Modal */}
+        {showStockModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60]">
+            <div className="bg-white rounded-lg w-full max-w-md p-6 m-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Stock Locations: {stockModalItem?.name}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowStockModal(false)}
+                  className="text-gray-400 hover:text-gray-500"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {loadingItemStocks ? (
+                <div className="text-center py-4">Loading stocks...</div>
+              ) : itemStocks.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">No stock found in any location.</div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="bg-blue-50 p-2 rounded text-sm text-blue-700 mb-2">
+                    Total Global Stock: {stockModalItem?.current_stock}
+                  </div>
+                  <table className="min-w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-left">
+                        <th className="px-3 py-2 font-medium text-gray-600">Location</th>
+                        <th className="px-3 py-2 font-medium text-gray-600">Type</th>
+                        <th className="px-3 py-2 font-medium text-gray-600 text-right">Quantity</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {itemStocks.map((stock, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-3 py-2 text-gray-800">{stock.location_name}</td>
+                          <td className="px-3 py-2 text-gray-500 text-xs">{stock.location_type}</td>
+                          <td className="px-3 py-2 text-gray-800 text-right font-medium">{stock.quantity}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowStockModal(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </motion.div >
+    </div >
   );
 };
 

@@ -301,6 +301,13 @@ def get_item(item_id: int, db: Session = Depends(get_db), current_user: User = D
     }
 
 
+
+@router.get("/items/{item_id}/stocks")
+def get_item_stocks(item_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Get stock distribution for an item across all locations"""
+    return inventory_crud.get_item_stocks(db, item_id)
+
+
 @router.put("/items/{item_id}", response_model=InventoryItemOut)
 async def update_item(
     item_id: int,
@@ -482,7 +489,7 @@ def create_purchase(
     created = inventory_crud.create_purchase_master(db, purchase, created_by=current_user.id)
     
     # Auto-update item prices from purchase details if purchase is confirmed/received
-    if purchase.status in ["confirmed", "received"]:
+    if purchase.status.lower() in ["confirmed", "received"]:
         try:
             from app.models.inventory import InventoryItem
             for detail in created.details:
@@ -502,7 +509,7 @@ def create_purchase(
     with open("purchase_debug.log", "a") as f:
         f.write(f"Checking if status is 'received': purchase.status = '{purchase.status}'\n")
     
-    if purchase.status == "received":
+    if purchase.status.lower() == "received":
         # Validate and ensure destination location is set
         if not purchase.destination_location_id:
             from app.models.inventory import Location
@@ -547,25 +554,34 @@ def create_purchase(
                     continue
                 
                 # Weighted average cost
-                old_stock = item.current_stock or 0
-                old_price = item.unit_price or 0
-                old_value = old_stock * old_price
-                
-                new_stock = detail.quantity
-                new_price = detail.unit_price
-                new_value = new_stock * new_price
-                
-                total_stock = old_stock + new_stock
-                total_value = old_value + new_value
-                
-                item.current_stock = total_stock
-                if total_stock > 0:
-                    item.unit_price = round(total_value / total_stock, 2)
+                try:
+                    old_stock = float(item.current_stock or 0)
+                    old_price = float(item.unit_price or 0)
+                    old_value = old_stock * old_price
+                    
+                    new_stock = float(detail.quantity or 0)
+                    new_price = float(detail.unit_price or 0)
+                    new_value = new_stock * new_price
+                    
+                    total_stock = old_stock + new_stock
+                    total_value = old_value + new_value
+                    
+                    item.current_stock = total_stock
+                    if total_stock > 0:
+                        item.unit_price = round(total_value / total_stock, 2)
+                except Exception as calc_err:
+                    print(f"Error calculating weighted average: {calc_err}")
+                    with open("purchase_debug.log", "a") as f:
+                        f.write(f"Calculation Error Item {item.id}: {str(calc_err)}\n")
+                    # Fallback: Just add stock, ignore price update if calculation failed
+                    item.current_stock = float(item.current_stock or 0) + float(detail.quantity or 0)
                 
                 print(f"[CREATE-RECEIVED] {item.name}: Stock {old_stock}→{total_stock}, Cost ₹{old_price}→₹{item.unit_price}")
                 
                 # Location stock
                 print(f"[DEBUG] created.destination_location_id = {created.destination_location_id}")
+                with open("purchase_debug.log", "a") as f:
+                    f.write(f"Location Stock Logic: Dest={created.destination_location_id}\n")
                 if created.destination_location_id:
                     print(f"[DEBUG] Creating/updating location stock for location {created.destination_location_id}, item {detail.item_id}")
                     location_stock = db.query(LocationStock).filter(
@@ -575,7 +591,12 @@ def create_purchase(
                     
                     if location_stock:
                         print(f"[DEBUG] Updating existing location stock, old qty: {location_stock.quantity}")
-                        location_stock.quantity += detail.quantity
+                        try:
+                            # Use session update instead of raw engine execution
+                            location_stock.quantity += float(detail.quantity or 0)
+                            print(f"[DEBUG] New location stock qty: {location_stock.quantity}")
+                        except Exception as e:
+                            print(f"[ERROR] updating location stock object: {e}")
                     else:
                         print(f"[DEBUG] Creating new location stock with qty: {detail.quantity}")
                         location_stock = LocationStock(
@@ -588,12 +609,16 @@ def create_purchase(
                     print(f"[DEBUG] No destination location specified, skipping location stock")
                 
                 # Transaction
+                # Ensure types are compatible for calculation (Decimal vs Float)
+                u_price = float(detail.unit_price or 0)
+                qty = float(detail.quantity or 0)
+                
                 transaction = InventoryTransaction(
                     item_id=detail.item_id,
                     transaction_type="in",
-                    quantity=detail.quantity,
-                    unit_price=detail.unit_price,
-                    total_amount=detail.unit_price * detail.quantity,
+                    quantity=qty,
+                    unit_price=u_price,
+                    total_amount=u_price * qty,
                     reference_number=created.purchase_number,
                     notes=f"Purchase received: {created.purchase_number}",
                     created_by=current_user.id
@@ -608,7 +633,7 @@ def create_purchase(
     
     # Automatically create journal entry for purchase (Scenario 1)
     # Only create if purchase is confirmed/received (not draft)
-    if purchase.status in ["confirmed", "received"]:
+    if purchase.status.lower() in ["confirmed", "received"]:
         try:
             from app.utils.accounting_helpers import create_purchase_journal_entry
             from app.models.inventory import Vendor
@@ -777,14 +802,18 @@ def update_purchase(
         raise HTTPException(status_code=404, detail="Purchase not found")
     
     old_status = purchase.status
-    new_status = purchase_update.status if hasattr(purchase_update, 'status') else old_status
+    new_status = purchase_update.status if purchase_update.status is not None else old_status
     
     updated = inventory_crud.update_purchase_master(db, purchase_id, purchase_update)
     if not updated:
         raise HTTPException(status_code=400, detail="Cannot update purchase")
     
     # CASE 1: Purchase RECEIVED
-    if new_status == "received" and old_status != "received":
+    # Safely handle None values before calling .lower()
+    new_status_lower = new_status.lower() if new_status else ""
+    old_status_lower = old_status.lower() if old_status else ""
+    
+    if new_status_lower == "received" and old_status_lower != "received":
         # Validate and ensure destination location is set
         if not updated.destination_location_id:
             from app.models.inventory import Location
@@ -848,12 +877,15 @@ def update_purchase(
                     db.add(location_stock)
             
             # Transaction
+            u_price = float(detail.unit_price or 0)
+            qty = float(detail.quantity or 0)
+            
             transaction = InventoryTransaction(
                 item_id=detail.item_id,
                 transaction_type="in",
-                quantity=detail.quantity,
-                unit_price=detail.unit_price,
-                total_amount=detail.unit_price * detail.quantity,
+                quantity=qty,
+                unit_price=u_price,
+                total_amount=u_price * qty,
                 reference_number=updated.purchase_number,
                 notes=f"Purchase received: {updated.purchase_number}",
                 created_by=current_user.id
@@ -861,7 +893,7 @@ def update_purchase(
             db.add(transaction)
     
     # CASE 2: Purchase CANCELLED
-    elif new_status == "cancelled" and old_status == "received":
+    elif new_status.lower() == "cancelled" and old_status.lower() == "received":
         for detail in updated.details:
             if not detail.item_id:
                 continue
@@ -897,9 +929,9 @@ def update_purchase(
             transaction = InventoryTransaction(
                 item_id=detail.item_id,
                 transaction_type="out",
-                quantity=detail.quantity,
-                unit_price=detail.unit_price,
-                total_amount=detail.unit_price * detail.quantity,
+                quantity=float(detail.quantity or 0),
+                unit_price=float(detail.unit_price or 0),
+                total_amount=float(detail.unit_price or 0) * float(detail.quantity or 0),
                 reference_number=updated.purchase_number,
                 notes=f"Purchase cancelled: {updated.purchase_number}",
                 created_by=current_user.id
@@ -1101,20 +1133,31 @@ def update_purchase_payment_status(
     if not purchase:
         raise HTTPException(status_code=404, detail="Purchase not found")
     
+    # Check if payment_status is None or empty
+    if not payment_status or payment_status.strip() == "":
+        raise HTTPException(status_code=400, detail="Payment status is required")
+    
+    # Normalize payment status to lowercase for comparison
+    payment_status_lower = payment_status.strip().lower()
+    
     # Validate payment status
     valid_statuses = ["pending", "partial", "paid"]
-    if payment_status not in valid_statuses:
+    if payment_status_lower not in valid_statuses:
         raise HTTPException(status_code=400, detail=f"Invalid payment status. Must be one of: {', '.join(valid_statuses)}")
     
     # Update payment status
-    purchase.payment_status = payment_status
+    purchase.payment_status = payment_status_lower
     
-    # Update payment method if provided
-    if payment_method:
-        purchase.payment_method = payment_method
+    # Update payment method if provided (handle None and empty strings)
+    if payment_method and payment_method.strip():
+        purchase.payment_method = payment_method.strip().lower()
     
-    db.commit()
-    db.refresh(purchase)
+    try:
+        db.commit()
+        db.refresh(purchase)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to update payment status: {str(e)}")
     
     return {
         "message": "Payment status updated successfully",
@@ -1303,6 +1346,10 @@ def create_issue(
         db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        # If it's already an HTTPException (like our 400 validation error), re-raise it
+        if isinstance(e, HTTPException):
+            raise e
+            
         import traceback
         traceback.print_exc()
         # Log to file for debugging
@@ -1655,6 +1702,35 @@ def get_location_items(
         if item:
             key = f"stock_{item.id}"
             category = inventory_crud.get_category_by_id(db, item.category_id)
+            
+            # Calculate complimentary vs payable from StockIssueDetail
+            complimentary_qty = 0.0
+            payable_qty = 0.0
+            
+            # Get all stock issue details for this item at this location
+            issue_details = db.query(StockIssueDetail).join(StockIssue).filter(
+                StockIssue.destination_location_id == location_id,
+                StockIssueDetail.item_id == item.id
+            ).all()
+            
+            last_issue_price = 0.0
+            for detail in issue_details:
+                if detail.is_payable:
+                    payable_qty += detail.issued_quantity
+                    # Check rental_price first, then unit_price
+                    price = detail.rental_price if detail.rental_price and detail.rental_price > 0 else detail.unit_price
+                    if price and price > 0:
+                        last_issue_price = price
+                else:
+                    complimentary_qty += detail.issued_quantity
+            
+            # Determine selling/rental price for billing (Prioritize Issue Price > Selling Price > Cost Price)
+            selling_unit_price = last_issue_price if last_issue_price > 0 else (item.selling_price if item.selling_price and item.selling_price > 0 else item.unit_price)
+            
+            # IMPORTANT: Stock value should ALWAYS use cost price (unit_price), not selling price
+            cost_price = item.unit_price or 0
+            stock_value = stock.quantity * cost_price
+
             items_dict[key] = {
                 "item_id": item.id,
                 "item_name": item.name,
@@ -1663,13 +1739,19 @@ def get_location_items(
                 "unit": item.unit,
                 "current_stock": stock.quantity, # Location specific stock
                 "location_stock": stock.quantity, # Alias for frontend
+                "complimentary_qty": complimentary_qty,
+                "payable_qty": payable_qty,
                 "min_stock_level": item.min_stock_level,
-                "unit_price": item.unit_price,
-                "total_value": stock.quantity * (item.unit_price or 0),
+                "unit_price": cost_price,  # Show COST price (purchase price) by default
+                "cost_price": cost_price,  # Actual cost for stock valuation
+                "selling_price": selling_unit_price,  # Selling/rental price for billing (only when needed)
+                "total_value": stock_value,  # Stock value based on COST, not selling price
                 "source": "Stock",
                 "last_updated": stock.last_updated,
-                "type": "asset" if (category and category.is_asset_fixed) else "consumable"
+                "type": "asset" if ((category and category.is_asset_fixed) or item.is_asset_fixed or item.track_laundry_cycle or (not item.is_sellable_to_guest and not item.is_perishable)) else "consumable"
             }
+
+
 
     # Add items from asset mappings
     for mapping in asset_mappings:
@@ -1797,6 +1879,32 @@ def get_location_items(
             "notes": log.notes,
             "color": "red"
         })
+
+    # 5. Get Purchase History (Directly Received at Location)
+    from app.models.inventory import PurchaseMaster, PurchaseDetail
+    
+    purchases = db.query(PurchaseDetail).join(PurchaseMaster).options(
+        joinedload(PurchaseDetail.item),
+        joinedload(PurchaseDetail.purchase_master).joinedload(PurchaseMaster.user)
+    ).filter(
+        PurchaseMaster.destination_location_id == location_id,
+        PurchaseMaster.status == "received"
+    ).order_by(PurchaseMaster.updated_at.desc()).limit(50).all()
+    
+    for detail in purchases:
+        purchase = detail.purchase_master
+        if detail.item:
+            history.append({
+                "date": purchase.updated_at, # Using updated_at as receive date proxy
+                "type": "Purchase Received",
+                "item_name": detail.item.name,
+                "quantity": detail.quantity,
+                "unit": detail.unit,
+                "reference": purchase.purchase_number,
+                "user": purchase.user.name if purchase.user else "System",
+                "notes": f"Vendor: {purchase.vendor.name if purchase.vendor else 'Unknown'}",
+                "color": "blue"
+            })
     
     # Sort combined history by date desc
     history.sort(key=lambda x: x["date"], reverse=True)

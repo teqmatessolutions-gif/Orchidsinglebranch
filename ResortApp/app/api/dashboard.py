@@ -636,7 +636,7 @@ def get_summary(period: str = "all", db: Session = Depends(get_db), current_user
                     # Calculate capital investment (inventory purchases for this department)
                     capital_investment = 0
                     try:
-                        from app.models.inventory import PurchaseMaster, PurchaseDetail
+                        from app.models.inventory import PurchaseDetail
                         purchase_query = apply_date_filter(
                             db.query(PurchaseDetail).join(PurchaseMaster),
                             PurchaseMaster.purchase_date

@@ -1269,8 +1269,9 @@ const Services = () => {
 
         alert("Employee assigned to checkout verification successfully!");
         setQuickAssignModal(null);
-        fetchServiceRequests();
-        fetchAll(false);
+        // Immediately refresh data to show in activity
+        await fetchServiceRequests();
+        await fetchAll(false);
         return;
       }
 
@@ -1283,8 +1284,10 @@ const Services = () => {
 
       alert("Employee assigned successfully!");
       setQuickAssignModal(null);
-      fetchServiceRequests();
-      fetchAll(false);
+
+      // Immediately refresh data to show in activity
+      await fetchServiceRequests();
+      await fetchAll(false);
     } catch (err) {
       console.error("Failed to assign service", err);
       let errorMsg = "Failed to assign service. ";

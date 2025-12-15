@@ -396,6 +396,7 @@ def check_inventory_for_checkout(
     
     inventory_data_with_charges = []
     
+    # Safety check: ensure we have items to process
     if payload.items:
         for item in payload.items:
             item_dict = item.dict()
@@ -408,21 +409,276 @@ def check_inventory_for_checkout(
             
             # Calculate charge for missing items
             if item.missing_qty and item.missing_qty > 0 and inv_item:
-                    if inv_item.price:
-                        item_charge = float(inv_item.price) * item.missing_qty
+                    if inv_item.unit_price:
+                        # Update logic: Charge Cost + GST
+                        gst_multiplier = 1.0 + (float(inv_item.gst_rate or 0.0) / 100.0)
+                        unit_cost_with_tax = float(inv_item.unit_price) * gst_multiplier
+                        
+                        item_charge = unit_cost_with_tax * item.missing_qty
                         total_missing_charges += item_charge
                         item_dict['missing_item_charge'] = item_charge
-                        item_dict['unit_price'] = float(inv_item.price)
+                        item_dict['unit_price'] = unit_cost_with_tax
                         
                         missing_items_details.append({
                             "item_name": inv_item.name,
                             "item_code": inv_item.item_code,
                             "missing_qty": item.missing_qty,
-                            "unit_price": float(inv_item.price),
+                            "unit_price": unit_cost_with_tax,
                             "total_charge": item_charge
                         })
             
             inventory_data_with_charges.append(item_dict)
+            
+            # --- STOCK RETURN LOGIC & USAGE CALCULATION (REWRITTEN FOR CORRECTNESS) ---
+            # Strictly handle variable scope by checking inv_item
+            if inv_item and not getattr(inv_item, 'is_asset_fixed', False) and not item_dict.get('is_fixed_asset'):
+                
+                # Get current room stock for this item
+                room_room = db.query(Room).filter(Room.number == checkout_request.room_number).first()
+                # Ensure we have the room and location
+                if room_room and room_room.inventory_location_id:
+                    room_loc_id = room_room.inventory_location_id
+                    
+                    from app.models.inventory import LocationStock, InventoryTransaction, StockIssue, StockIssueDetail, Location
+                    
+                    room_stock_record = db.query(LocationStock).filter(
+                        LocationStock.location_id == room_loc_id,
+                        LocationStock.item_id == item.item_id
+                    ).first()
+                    
+                    # STEP 1: Get quantities and validate
+                    allocated_stock = room_stock_record.quantity if room_stock_record else 0.0
+                    used_qty = item.used_qty or 0.0
+                    missing_qty = item.missing_qty or 0.0
+                    
+                    # Calculate unused (ensure non-negative)
+                    unused_qty = max(0, allocated_stock - used_qty - missing_qty)
+                    consumed_qty = used_qty + missing_qty
+                    
+                    # Validation: Check if reported quantities exceed allocated
+                    if consumed_qty > allocated_stock:
+                        print(f"[WARNING] Room {checkout_request.room_number} Item {inv_item.name}: Consumed ({consumed_qty}) > Allocated ({allocated_stock}). Guest may have brought own items or stock record is incorrect.")
+                        # Allow it but log - guest might have used their own items
+                        unused_qty = 0  # No unused if over-consumed
+                    
+                    print(f"[CHECKOUT] Room {checkout_request.room_number} Item {inv_item.name}: Allocated={allocated_stock}, Used={used_qty}, Missing={missing_qty}, Unused={unused_qty}, Consumed={consumed_qty}")
+                    
+                    # STEP 2: Find source location to return unused items to
+                    # This logic uses User-Provided Location if available, otherwise Auto-Detect
+                    source_loc_id = None
+                    source_loc_name = "Unknown"
+                    
+                    # 2a. Check if user specified a return location (GRANULAR CONTROL)
+                    if item.return_location_id:
+                        user_loc = db.query(Location).filter(Location.id == item.return_location_id).first()
+                        if user_loc:
+                             # Validate it's a storage location
+                             if user_loc.is_inventory_point or user_loc.location_type in ["WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE", "STORAGE", "STORE", "SUB_STORE", "DEPARTMENT", "LAUNDRY"]:
+                                 source_loc_id = user_loc.id
+                                 source_loc_name = user_loc.name
+                                 print(f"[CHECKOUT] Using User-Selected Return Location: {source_loc_name}")
+                             else:
+                                 print(f"[CHECKOUT] User-selected location {user_loc.name} is not a valid inventory point. Falling back to auto-detect.")
+                        else:
+                            print(f"[CHECKOUT] User-selected return location ID {item.return_location_id} not found. Falling back.")
+                    
+                    if unused_qty > 0 and not source_loc_id:
+                        # Strategy 1: Try to find the original source from stock issue
+                        last_issue = (db.query(StockIssue)
+                            .join(StockIssueDetail)
+                            .filter(
+                                StockIssue.destination_location_id == room_loc_id,
+                                StockIssueDetail.item_id == item.item_id
+                            )
+                            .order_by(StockIssue.issue_date.desc())
+                            .first()
+                        )
+                        
+                        original_source_id = None
+                        if last_issue and last_issue.source_location_id:
+                            original_source_id = last_issue.source_location_id
+                            
+                            # Verify the original source location still exists and is valid
+                            original_source = db.query(Location).filter(Location.id == original_source_id).first()
+                            
+                            if original_source:
+                                # Check if this location is still a valid storage location (not a room)
+                                if original_source.location_type in ["WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE", "STORAGE", "STORE"]:
+                                    source_loc_id = original_source_id
+                                    source_loc_name = original_source.name
+                                    print(f"[CHECKOUT] Found original source location: {source_loc_name} (ID: {source_loc_id})")
+                                else:
+                                    print(f"[CHECKOUT] Original source {original_source.name} is not a storage location (type: {original_source.location_type}). Finding alternative...")
+                            else:
+                                print(f"[CHECKOUT] Original source location (ID: {original_source_id}) no longer exists. Finding alternative...")
+                        
+                        # Strategy 2: If original source not found or invalid, find location with existing stock
+                        if not source_loc_id:
+                            print(f"[CHECKOUT] Searching for best location to return {inv_item.name}...")
+                            
+                            # Find all storage locations that have this item
+                            locations_with_stock = (db.query(LocationStock)
+                                .join(Location)
+                                .filter(
+                                    LocationStock.item_id == item.item_id,
+                                    LocationStock.quantity > 0,
+                                    Location.id != room_loc_id,  # Exclude the room itself
+                                    Location.location_type.in_(["WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE", "STORAGE", "STORE", "SUB_STORE", "DEPARTMENT", "LAUNDRY"])
+                                )
+                                .order_by(LocationStock.quantity.desc())  # Prefer location with most stock
+                                .all()
+                            )
+                            
+                            if locations_with_stock:
+                                # Use the location with the most stock
+                                best_location = locations_with_stock[0]
+                                source_loc_id = best_location.location_id
+                                source_loc_name = best_location.location.name
+                                print(f"[CHECKOUT] Found location with existing stock: {source_loc_name} (has {best_location.quantity} units)")
+                            else:
+                                # Strategy 3: No location has this item - find any appropriate storage location
+                                print(f"[CHECKOUT] No location currently has {inv_item.name}. Finding appropriate storage location...")
+                                
+                                # Try to find a location of the same type as the original source (if we know it)
+                                if original_source_id:
+                                    original_type_location = db.query(Location).filter(
+                                        Location.location_type == original_source.location_type if original_source else None,
+                                        Location.id != room_loc_id
+                                    ).first()
+                                    
+                                    if original_type_location:
+                                        source_loc_id = original_type_location.id
+                                        source_loc_name = original_type_location.name
+                                        print(f"[CHECKOUT] Using location of same type: {source_loc_name}")
+                                
+                                # Strategy 4: Last fallback - find any warehouse/store
+                                if not source_loc_id:
+                                    fallback_location = db.query(Location).filter(
+                                        Location.location_type.in_(["WAREHOUSE", "CENTRAL_WAREHOUSE", "BRANCH_STORE", "STORAGE", "STORE", "SUB_STORE", "DEPARTMENT", "LAUNDRY"])
+                                    ).first()
+                                    
+                                    if fallback_location:
+                                        source_loc_id = fallback_location.id
+                                        source_loc_name = fallback_location.name
+                                        print(f"[CHECKOUT] Using fallback storage location: {source_loc_name}")
+                                    else:
+                                        print(f"[CHECKOUT] WARNING: No storage location found! Cannot return unused items.")
+                    
+                    
+                    # STEP 3: Execute stock movements atomically (single pass)
+                    
+                    # 3a. Clear room stock completely (ONE OPERATION ONLY)
+                    if room_stock_record:
+                        old_room_qty = room_stock_record.quantity
+                        room_stock_record.quantity = 0
+                        room_stock_record.last_updated = datetime.utcnow()
+                        print(f"[CHECKOUT] Cleared room stock: {old_room_qty} → 0")
+                    
+                    # 3b. Return unused items to source location
+                    if unused_qty > 0 and source_loc_id:
+                        source_stock = db.query(LocationStock).filter(
+                            LocationStock.location_id == source_loc_id,
+                            LocationStock.item_id == item.item_id
+                        ).first()
+                        
+                        if source_stock:
+                            old_source_qty = source_stock.quantity
+                            source_stock.quantity += unused_qty
+                            source_stock.last_updated = datetime.utcnow()
+                            print(f"[CHECKOUT] Returned {unused_qty} to source location: {old_source_qty} → {source_stock.quantity}")
+                        else:
+                            # Create new source stock record
+                            new_source_stock = LocationStock(
+                                location_id=source_loc_id,
+                                item_id=item.item_id,
+                                quantity=unused_qty,
+                                last_updated=datetime.utcnow()
+                            )
+                            db.add(new_source_stock)
+                            print(f"[CHECKOUT] Created new source stock with {unused_qty} units")
+                        
+                        # Record return transaction
+                        # Use 'transfer_in' so frontend displays it as Positive (+) Stock Received
+                        return_txn = InventoryTransaction(
+                            item_id=item.item_id,
+                            transaction_type="transfer_in",
+                            quantity=unused_qty,
+                            unit_price=inv_item.unit_price,
+                            total_amount=unused_qty * (inv_item.unit_price or 0),
+                            # Format reference to show Room Number clearly in frontend lists
+                            reference_number=f"RET-RM{checkout_request.room_number}",
+                            notes=f"Stock return: Room {checkout_request.room_number} -> {source_loc_name} (Checkout #{checkout_request.id})",
+                            created_by=current_user.id
+                        )
+                        db.add(return_txn)
+                        
+                        # NEW: Create Stock Issue record for History Visibility
+                        try:
+                            from app.models.inventory import StockIssue, StockIssueDetail
+                            from app.curd.inventory import generate_issue_number
+                            
+                            issue_num = generate_issue_number(db)
+                            
+                            return_issue = StockIssue(
+                                issue_number=issue_num,
+                                issued_by=current_user.id,
+                                source_location_id=room_loc_id, # Source is the Room
+                                destination_location_id=source_loc_id, # Destination is the Warehouse
+                                issue_date=datetime.utcnow(),
+                                notes=f"Auto-return from Checkout Room {checkout_request.room_number}"
+                            )
+                            db.add(return_issue)
+                            db.flush() # Get ID
+                            
+                            return_detail = StockIssueDetail(
+                                issue_id=return_issue.id,
+                                item_id=item.item_id,
+                                issued_quantity=unused_qty,
+                                unit=inv_item.unit,
+                                is_payable=False,
+                                notes="Unused Return"
+                            )
+                            db.add(return_detail)
+                            print(f"[CHECKOUT] Created Stock Issue {issue_num} for return history.")
+                        except Exception as e:
+                            print(f"[WARNING] Failed to create Stock Issue for return: {e}")
+                    
+                    # 3c. Deduct consumed items from GLOBAL stock
+                    # CRITICAL: This is where we reduce total inventory for consumed items
+                    if consumed_qty > 0:
+                        old_global_stock = inv_item.current_stock
+                        inv_item.current_stock -= consumed_qty
+                        print(f"[CHECKOUT] Deducted {consumed_qty} from global stock: {old_global_stock} → {inv_item.current_stock}")
+                        
+                        # Record consumption transaction
+                        cons_txn = InventoryTransaction(
+                            item_id=item.item_id,
+                            transaction_type="out",
+                            quantity=consumed_qty,
+                            unit_price=inv_item.unit_price,
+                            total_amount=consumed_qty * (inv_item.unit_price or 0),
+                            reference_number=f"CONSUME-CHK-{checkout_request.id}",
+                            notes=f"Consumed/Missing at checkout - Room {checkout_request.room_number} (Used: {used_qty}, Missing: {missing_qty})",
+                            created_by=current_user.id
+                        )
+                        db.add(cons_txn)
+
+                    # STEP 4: Calculate charges for used items (if payable)
+                    if used_qty > 0:
+                        # Check complimentary limit
+                        limit = inv_item.complimentary_limit or 0
+                        chargeable_qty = max(0, used_qty - limit)
+                        
+                        if chargeable_qty > 0 and inv_item.unit_price:
+                            usage_charge = float(inv_item.unit_price) * chargeable_qty
+                            
+                            # Update item dict with charge info
+                            item_dict['total_charge'] = item_dict.get('total_charge', 0) + usage_charge
+                            item_dict['payable_usage_qty'] = chargeable_qty
+                            item_dict['unit_price'] = float(inv_item.unit_price)
+                            
+                            print(f"[CHECKOUT] Calculated usage charge: {chargeable_qty} units × ₹{inv_item.unit_price} = ₹{usage_charge}")
+
     
     # Process asset damages
     if payload.asset_damages:
@@ -447,53 +703,14 @@ def check_inventory_for_checkout(
                 "notes": asset.notes
             })
             
-            inventory_data_with_charges.append(asset_dict)
+            inventory_data_with_charges.append(asset_dict) # Changed from item_dict to asset_dict
             
-            # Calculate consumables charges (used_qty)
-            consumables_charges = 0.0
-            asset_damage_charges = 0.0
-            
-            # Calculate from inventory_data to be consistent
-            for item in inventory_data_with_charges:
-                if item.get('is_fixed_asset'):
-                    asset_damage_charges += item.get('total_charge', 0)
-                else:
-                    # Logic for used consumables
-                    # Re-verify if charge logic for used items is needed
-                    # Currently frontend only sends missing_qty charge if missing logic is triggered
-                    
-                    # If this is a consumed item (not missing, but used), we need to charge if over limit
-                    # Logic: if item_id is present, get limit from DB
-                    if item.get('used_qty', 0) > 0 and not item.get('missing_qty'):
-                        inv_item = db.query(InventoryItem).filter(InventoryItem.id == item.get('item_id')).first()
-                        if inv_item:
-                            limit = inv_item.complimentary_limit or 0
-                            used_qty = item.get('used_qty', 0)
-                            if used_qty > limit:
-                                chargeable = used_qty - limit
-                                if inv_item.price:
-                                    charge = float(inv_item.price) * chargeable
-                                    # Add to item dict
-                                    item['total_charge'] = charge
-                                    item['unit_price'] = float(inv_item.price)
-                                    item['payable_qty'] = chargeable # for reference
-                                    
-                                    consumables_charges += charge
-            
-            # Recalculate total missing charges which includes asset damages and missing items
-            # But we also need to include 'consumables_charges' for used items
-            
-            # Note: total_missing_charges calculated above only includes 'missing_qty' items and 'asset_damage'
-            # We need to add 'consumables_charges' (from used > limit) to the Checkout object
-            # BUT: 'check_inventory_for_checkout' updates 'CheckoutRequest', NOT 'Checkout' directly?
-            # Wait, billing uses 'checkout_request.inventory_data' to calculate bill?
-            # Let's verify 'create_checkout_bill' or whatever billing uses.
-            
-            pass # Placeholder logic, see next step for clean implementation in one go
-
     
     if inventory_data_with_charges:
         checkout_request.inventory_data = inventory_data_with_charges
+    else:
+        # Ensure inventory_data is at least an empty list, not None
+        checkout_request.inventory_data = []
         
     checkout_request.status = "completed"
     checkout_request.completed_at = datetime.utcnow()
@@ -565,12 +782,37 @@ def get_pre_checkout_verification_data(room_number: str, db: Session = Depends(g
             # Skip if 0 quantity? Maybe show 0 to indicate it SHOULD be there? 
             # Showing 0 might clutter. Let's show specific positive stock or items that are 'consumable_instant'
             if stock.quantity > 0 or stock.item.category.consumable_instant:
-                 consumables.append({
+                # Get stock issue details to determine complimentary vs payable
+                from app.models.inventory import StockIssue, StockIssueDetail
+                
+                issue_details = db.query(StockIssueDetail).join(StockIssue).filter(
+                    StockIssueDetail.item_id == stock.item_id,
+                    StockIssue.destination_location_id == room.inventory_location_id
+                ).all()
+                
+                complimentary_qty = 0
+                payable_qty = 0
+                
+                for detail in issue_details:
+                    if detail.is_payable:
+                        payable_qty += detail.issued_quantity
+                    else:
+                        complimentary_qty += detail.issued_quantity
+                
+                # Calculate potential charge ONLY for payable items
+                selling_price = stock.item.selling_price or stock.item.unit_price or 0.0
+                potential_charge = payable_qty * selling_price
+                
+                consumables.append({
                     "item_id": stock.item_id,
                     "item_name": stock.item.name,
                     "current_stock": stock.quantity,
+                    "complimentary_qty": complimentary_qty,
+                    "payable_qty": payable_qty,
                     "complimentary_limit": stock.item.complimentary_limit or 0,
-                    "charge_per_unit": stock.item.selling_price or stock.item.unit_price or 0.0,
+                    "charge_per_unit": selling_price,  # Selling price for billing
+                    "cost_per_unit": stock.item.unit_price or 0.0,  # Cost price for reference
+                    "potential_charge": potential_charge,  # Charge for payable items only
                     "unit": stock.item.unit
                 })
 
@@ -896,6 +1138,61 @@ def repair_room_checkout_status(room_number: str, db: Session = Depends(get_db),
         # This shouldn't happen, but fix it
         if existing_checkout:
             room.status = "Available"
+
+            
+            # 13.1. Return remaining consumables to warehouse
+            try:
+                if room.inventory_location_id:
+                    from app.models.inventory import LocationStock, Location, InventoryTransaction, InventoryItem
+                    from sqlalchemy.orm import joinedload
+                    
+                    remaining = db.query(LocationStock).join(InventoryItem).options(
+                        joinedload(LocationStock.item)
+                    ).filter(
+                        LocationStock.location_id == room.inventory_location_id,
+                        LocationStock.quantity > 0,
+                        InventoryItem.is_fixed_asset == False
+                    ).all()
+                    
+                    if remaining:
+                        warehouse = db.query(Location).filter(Location.location_type == "WAREHOUSE").first()
+                        if warehouse:
+                            for item_stock in remaining:
+                                qty = item_stock.quantity
+                                item_name = item_stock.item.name if item_stock.item else f"Item #{item_stock.item_id}"
+                                
+                                wh_stock = db.query(LocationStock).filter(
+                                    LocationStock.location_id == warehouse.id,
+                                    LocationStock.item_id == item_stock.item_id
+                                ).first()
+                                
+                                if wh_stock:
+                                    wh_stock.quantity += qty
+                                    wh_stock.last_updated = datetime.utcnow()
+                                else:
+                                    db.add(LocationStock(
+                                        location_id=warehouse.id,
+                                        item_id=item_stock.item_id,
+                                        quantity=qty,
+                                        last_updated=datetime.utcnow()
+                                    ))
+                                
+                                db.add(InventoryTransaction(
+                                    item_id=item_stock.item_id,
+                                    transaction_type="transfer_out",
+                                    quantity=-qty,
+                                    location_id=room.inventory_location_id,
+                                    destination_location_id=warehouse.id,
+                                    transaction_date=datetime.utcnow(),
+                                    notes=f"Checkout cleanup - returned from Room {room.number}",
+                                    user_id=current_user.id if current_user else None
+                                ))
+                                
+                                item_stock.quantity = 0
+                                item_stock.last_updated = datetime.utcnow()
+                                print(f"[CLEANUP] Returned {qty} x {item_name} from Room {room.number}")
+            except Exception as e:
+                print(f"[WARNING] Cleanup failed: {e}")
             repairs_made.append(f"Fixed room {room_number} status to match booking status")
         else:
             # Booking says checked out but room and checkout don't match - reset booking status
@@ -1458,12 +1755,39 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
                 # Skip consumable logic for fixed assets
                 continue
             
-            # Add charges for used consumables (over complimentary limit)
+            # Add charges for used consumables
             if used_qty > 0:
                 inv_item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
                 if inv_item and inv_item.is_sellable_to_guest:
-                    limit = inv_item.complimentary_limit or 0
-                    chargeable_qty = max(0, used_qty - limit)
+                    # Get actual allocation split (complimentary vs payable) from stock issues
+                    from app.models.inventory import StockIssue, StockIssueDetail
+                    
+                    allocated_complimentary_qty = 0.0
+                    allocated_payable_qty = 0.0
+                    
+                    # Query stock issues for this room and item
+                    if room.inventory_location_id:
+                        issue_details = db.query(StockIssueDetail).join(StockIssue).filter(
+                            StockIssue.destination_location_id == room.inventory_location_id,
+                            StockIssueDetail.item_id == item_id
+                        ).all()
+                        
+                        for detail in issue_details:
+                            if detail.is_payable:
+                                allocated_payable_qty += detail.issued_quantity
+                            else:
+                                allocated_complimentary_qty += detail.issued_quantity
+                    
+                    # Calculate chargeable quantity
+                    # If there's a specific allocation, use it; otherwise fall back to complimentary_limit
+                    if allocated_complimentary_qty > 0 or allocated_payable_qty > 0:
+                        # Use actual allocation: charge only for what was allocated as payable and used
+                        chargeable_qty = min(used_qty, allocated_payable_qty)
+                        limit = allocated_complimentary_qty
+                    else:
+                        # Fall back to complimentary_limit from item configuration
+                        limit = inv_item.complimentary_limit if inv_item.complimentary_limit is not None else 0
+                        chargeable_qty = max(0, used_qty - limit)
                     
                     price = inv_item.selling_price or inv_item.unit_price or 0
                     amount = 0
@@ -1533,10 +1857,17 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
                         "damage_notes": damage_notes
                     })
                     
-                    # Calculate inventory charges for payable items
-                    if getattr(detail, 'is_payable', False) and not getattr(detail, 'is_paid', False):
-                        # Get item price (use selling_price if available, otherwise unit_price)
-                        item_price = detail.item.selling_price or detail.item.unit_price or 0.0
+                    # Calculate inventory charges for payable items (Exclude Rentable Items handled below)
+                    is_rentable_charge = getattr(detail, 'rental_price', 0) and getattr(detail, 'rental_price', 0) > 0
+                    
+                    if getattr(detail, 'is_payable', False) and not getattr(detail, 'is_paid', False) and not is_rentable_charge:
+                        # Get item price (use actual recorded unit_price from issue if available, then fallback)
+                        # Fix: Priority 1 - detail.unit_price (contains Rental Price - Backwards Compat)
+                        if detail.unit_price and detail.unit_price > 0:
+                             item_price = detail.unit_price
+                        else:
+                             item_price = detail.item.selling_price or detail.item.unit_price or 0.0
+                        
                         item_charge = item_price * detail.issued_quantity
                         charges.inventory_charges = (charges.inventory_charges or 0) + item_charge
                     
@@ -1885,8 +2216,37 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
                 if used_qty > 0:
                     inv_item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
                     if inv_item and inv_item.is_sellable_to_guest:
-                        limit = inv_item.complimentary_limit or 0
-                        chargeable_qty = max(0, used_qty - limit)
+                        # Get actual allocation split (complimentary vs payable) from stock issues
+                        from app.models.inventory import StockIssue, StockIssueDetail
+                        
+                        allocated_complimentary_qty = 0.0
+                        allocated_payable_qty = 0.0
+                        
+                        # Find the room for this checkout
+                        room_for_item = db.query(Room).filter(Room.number == room_number).first()
+                        
+                        # Query stock issues for this room and item
+                        if room_for_item and room_for_item.inventory_location_id:
+                            issue_details = db.query(StockIssueDetail).join(StockIssue).filter(
+                                StockIssue.destination_location_id == room_for_item.inventory_location_id,
+                                StockIssueDetail.item_id == item_id
+                            ).all()
+                            
+                            for detail in issue_details:
+                                if detail.is_payable:
+                                    allocated_payable_qty += detail.issued_quantity
+                                else:
+                                    allocated_complimentary_qty += detail.issued_quantity
+                        
+                        # Calculate chargeable quantity
+                        if allocated_complimentary_qty > 0 or allocated_payable_qty > 0:
+                            # Use actual allocation
+                            chargeable_qty = min(used_qty, allocated_payable_qty)
+                            limit = allocated_complimentary_qty
+                        else:
+                            # Fall back to complimentary_limit
+                            limit = inv_item.complimentary_limit if inv_item.complimentary_limit is not None else 0
+                            chargeable_qty = max(0, used_qty - limit)
                         
                         if chargeable_qty > 0:
                             price = inv_item.selling_price or inv_item.unit_price or 0
@@ -1938,8 +2298,14 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
                     
                     # Calculate inventory charges for payable items
                     if getattr(detail, 'is_payable', False) and not getattr(detail, 'is_paid', False):
-                        # Get item price (use selling_price if available, otherwise unit_price)
-                        item_price = detail.item.selling_price or detail.item.unit_price or 0.0
+                        # Get item price: Priority 1: Rental Price, Priority 2: Issue Unit Price, Priority 3: Master Price
+                        if getattr(detail, 'rental_price', 0) and getattr(detail, 'rental_price', 0) > 0:
+                             item_price = detail.rental_price
+                        elif detail.unit_price and detail.unit_price > 0:
+                             item_price = detail.unit_price
+                        else:
+                             item_price = detail.item.selling_price or detail.item.unit_price or 0.0
+                        
                         item_charge = item_price * detail.issued_quantity
                         charges.inventory_charges = (charges.inventory_charges or 0) + item_charge
 
@@ -2490,10 +2856,14 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                         consumables_list.append(SimpleConsumable(item.get('item_id'), float(item.get('used_qty', 0))))
                 
                 if consumables_list:
-                    deduct_room_consumables(
-                        db, room.id, consumables_list, 
-                        new_checkout.id, current_user.id if current_user else None
-                    )
+                    # Logic Removed: deduct_room_consumables is NOT needed here because 
+                    # check_inventory_for_checkout already handled stock deduction and transaction creation.
+                    # Calling it again causes double deduction (negative stock) and duplicate transactions.
+                    pass
+                    # deduct_room_consumables(
+                    #    db, room.id, consumables_list, 
+                    #    new_checkout.id, current_user.id if current_user else None
+                    # )
             elif request.room_verifications:
                 room_verification = next(
                     (rv for rv in request.room_verifications if rv.room_number == room.number),
@@ -2516,6 +2886,51 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
             
             # 13. Update room status
             room.status = "Available"  # Room moves to "Dirty" status (ready for housekeeping)
+
+            
+            # 13.1. Return remaining consumables to warehouse
+            try:
+                if room.inventory_location_id:
+                    from app.models.inventory import LocationStock, Location, InventoryTransaction, InventoryItem
+                    from sqlalchemy.orm import joinedload
+                    
+                    remaining = db.query(LocationStock).join(InventoryItem).options(
+                        joinedload(LocationStock.item)
+                    ).filter(
+                        LocationStock.location_id == room.inventory_location_id,
+                        LocationStock.quantity > 0,
+                        InventoryItem.is_fixed_asset == False
+                    ).all()
+                    
+                    if remaining:
+                        warehouse = db.query(Location).filter(Location.location_type == "WAREHOUSE").first()
+                        if warehouse:
+                            for item_stock in remaining:
+                                qty = item_stock.quantity
+                                item_name = item_stock.item.name if item_stock.item else f"Item #{item_stock.item_id}"
+                                
+                                wh_stock = db.query(LocationStock).filter(
+                                    LocationStock.location_id == warehouse.id,
+                                    LocationStock.item_id == item_stock.item_id
+                                ).first()
+                                
+                                if wh_stock:
+                                    wh_stock.quantity += qty
+                                    wh_stock.last_updated = datetime.utcnow()
+                                else:
+                                    db.add(LocationStock(
+                                        location_id=warehouse.id,
+                                        item_id=item_stock.item_id,
+                                        quantity=qty,
+                                        last_updated=datetime.utcnow()
+                                    ))
+                                
+                                
+                                item_stock.quantity = 0
+                                item_stock.last_updated = datetime.utcnow()
+                                print(f"[CLEANUP] Returned {qty} x {item_name} from Room {room.number}")
+            except Exception as e:
+                print(f"[WARNING] Cleanup failed: {e}")
             
             # 13.5. Automatically create cleaning and refill service requests
             try:
@@ -2805,7 +3220,7 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                         if used_qty > 0:
                             inv_item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
                             if inv_item and inv_item.is_sellable_to_guest:
-                                limit = inv_item.complimentary_limit or 0
+                                limit = 0  # Charge for all items by default
                                 chargeable_qty = max(0, used_qty - limit)
                                 
                                 if chargeable_qty > 0:
@@ -2934,10 +3349,14 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                                 consumables_list.append(SimpleConsumable(item.get('item_id'), float(item.get('used_qty', 0))))
                         
                         if consumables_list:
-                            deduct_room_consumables(
-                                db, room_obj.id, consumables_list, 
-                                new_checkout.id, current_user.id if current_user else None
-                            )
+                            # Logic Removed: deduct_room_consumables is NOT needed here because 
+                            # check_inventory_for_checkout already handled stock deduction and transaction creation.
+                            # Calling it again causes double deduction (negative stock) and duplicate transactions.
+                            pass
+                            # deduct_room_consumables(
+                            #    db, room_obj.id, consumables_list, 
+                            #    new_checkout.id, current_user.id if current_user else None
+                            # )
             
             # Link checkout requests to this checkout
             for checkout_request in checkout_requests:

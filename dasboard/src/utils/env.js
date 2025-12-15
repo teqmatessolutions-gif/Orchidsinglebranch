@@ -15,11 +15,11 @@ export const isOrchidDeployment = () => {
 };
 
 export const getMediaBaseUrl = () => {
-  // For local development (localhost or 127.0.0.1 or LAN IP), always use port 8011 for Orchid
+  // For local development (localhost or 127.0.0.1 or LAN IP), always use port 8000 for Orchid
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname || "";
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
-      return `http://${hostname}:8011`;
+      return `http://${hostname}:8000`;
     }
   }
 
@@ -49,8 +49,8 @@ export const getApiBaseUrl = () => {
 
     // Check if running on localhost or a local network IP (e.g. 192.168.x.x)
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
-      // Use the SAME hostname as the frontend, but port 8011
-      const apiUrl = `http://${hostname}:8011/api`;
+      // Use the SAME hostname as the frontend, but port 8000
+      const apiUrl = `http://${hostname}:8000/api`;
       console.log("Using dynamic local API URL:", apiUrl);
       return apiUrl;
     }

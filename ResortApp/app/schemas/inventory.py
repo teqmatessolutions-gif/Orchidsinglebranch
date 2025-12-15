@@ -314,9 +314,21 @@ class PurchaseMasterUpdate(BaseModel):
     gst_number: Optional[str] = None
     payment_terms: Optional[str] = None
     payment_status: Optional[str] = None
+    payment_method: Optional[str] = None  # Added missing field
     status: Optional[str] = None
+    destination_location_id: Optional[int] = None
     notes: Optional[str] = None
     details: Optional[List[PurchaseDetailCreate]] = None
+    
+    @field_validator('payment_status', 'payment_method', mode='before')
+    @classmethod
+    def normalize_payment_fields(cls, v):
+        """Normalize payment fields to lowercase and handle None/empty strings"""
+        if v is None or (isinstance(v, str) and v.strip() == ''):
+            return None
+        if isinstance(v, str):
+            return v.strip().lower()
+        return v
 
 
 class PurchaseMasterOut(PurchaseMasterBase):
@@ -436,6 +448,7 @@ class StockIssueDetailBase(BaseModel):
     rental_price: Optional[float] = None  # For rentable assets like laundry
     is_damaged: Optional[bool] = False  # Track if asset is damaged
     damage_notes: Optional[str] = None  # Damage description
+    is_payable: bool = False  # Track if the item is chargeable to the guest
 
 
 class StockIssueDetailCreate(StockIssueDetailBase):

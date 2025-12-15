@@ -74,12 +74,19 @@ def get_service_requests(
             joinedload(CheckoutRequestModel.employee)
         )
         
-        # Show all checkout requests except cancelled and completed ones
+        # Show all checkout requests, including recently completed ones (last 7 days)
+        from datetime import datetime, timedelta
+        
         if status:
             checkout_query = checkout_query.filter(CheckoutRequestModel.status == status)
         else:
+            # Include all pending, in_progress, and recently completed (last 7 days)
+            # Exclude only old completed and cancelled requests
+            seven_days_ago = datetime.utcnow() - timedelta(days=7)
             checkout_query = checkout_query.filter(
-                CheckoutRequestModel.status.notin_(["cancelled", "completed"])
+                (CheckoutRequestModel.status.notin_(["cancelled", "completed"])) |
+                ((CheckoutRequestModel.status.in_(["completed", "cancelled"])) & 
+                 (CheckoutRequestModel.completed_at >= seven_days_ago))
             )
         
         checkout_requests = checkout_query.order_by(CheckoutRequestModel.created_at.desc()).limit(limit).offset(skip).all()

@@ -416,6 +416,7 @@ const Billing = () => {
   // New State for Inventory Verification Modal
   const [checkoutInventoryModal, setCheckoutInventoryModal] = useState(null); // Request ID
   const [checkoutInventoryDetails, setCheckoutInventoryDetails] = useState(null);
+  const [returnLocations, setReturnLocations] = useState([]); // Valid return locations
 
   // Filter and search states
   const [searchQuery, setSearchQuery] = useState("");
@@ -757,6 +758,19 @@ const Billing = () => {
         }
       }
 
+      // 3. Fetch valid return locations
+      try {
+        const locRes = await api.get('/inventory/locations?limit=100');
+        // Filter for valid return points (Warehouses, Stores, etc.)
+        const validLocs = (locRes.data || []).filter(l =>
+          l.is_inventory_point ||
+          ['WAREHOUSE', 'CENTRAL_WAREHOUSE', 'BRANCH_STORE', 'SUB_STORE', 'STORE', 'DEPARTMENT', 'LAUNDRY'].includes(l.location_type)
+        );
+        setReturnLocations(validLocs);
+      } catch (e) {
+        console.error("Failed to fetch return locations", e);
+      }
+
       setCheckoutInventoryDetails(details);
       setCheckoutInventoryModal(checkoutRequest.request_id);
 
@@ -790,6 +804,15 @@ const Billing = () => {
     });
   };
 
+  const handleUpdateReturnLocation = (index, locationId) => {
+    const newItems = [...checkoutInventoryDetails.items];
+    newItems[index].return_location_id = locationId ? parseInt(locationId) : null;
+    setCheckoutInventoryDetails({
+      ...checkoutInventoryDetails,
+      items: newItems
+    });
+  };
+
   const handleUpdateAssetDamage = (index, field, value) => {
     const newAssets = [...(checkoutInventoryDetails.fixed_assets || [])];
     newAssets[index][field] = value;
@@ -807,7 +830,8 @@ const Billing = () => {
       const items = checkoutInventoryDetails.items.map(item => ({
         item_id: item.id,
         used_qty: item.used_qty || 0,
-        missing_qty: item.missing_qty || 0
+        missing_qty: item.missing_qty || 0,
+        return_location_id: item.return_location_id // Send user selection
       }));
 
       // Collect asset damages
@@ -1873,6 +1897,7 @@ const Billing = () => {
                           <th className="py-3 px-4 text-left">Item Name</th>
                           <th className="py-3 px-4 text-center">Current Stock</th>
                           <th className="py-3 px-4 text-center">Available Stock</th>
+                          <th className="py-3 px-4 text-left">Return Unused To</th>
                           <th className="py-3 px-4 text-center">Used/Consumed</th>
                           <th className="py-3 px-4 text-right">Potential Charge</th>
                         </tr>
@@ -1897,6 +1922,24 @@ const Billing = () => {
                                   value={item.available_stock}
                                   onChange={(e) => handleUpdateInventoryVerification(idx, 'available_stock', e.target.value)}
                                 />
+                              </td>
+                              <td className="py-3 px-4">
+                                {item.available_stock > 0 ? (
+                                  <select
+                                    className="w-full text-sm border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                                    value={item.return_location_id || ""}
+                                    onChange={(e) => handleUpdateReturnLocation(idx, e.target.value)}
+                                  >
+                                    <option value="">Auto-detect (Default)</option>
+                                    {returnLocations.map(loc => (
+                                      <option key={loc.id} value={loc.id}>
+                                        {loc.name} {loc.location_type ? `(${loc.location_type})` : ''}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span className="text-gray-400 text-xs">-</span>
+                                )}
                               </td>
                               <td className="py-3 px-4 text-center text-gray-700">
                                 {item.used_qty || 0}

@@ -53,6 +53,8 @@ import ItemHistoryModal from "./inventory/modals/ItemHistoryModal";
 const LocationStockDetailsModal = ({ locationData, onClose }) => {
   if (!locationData) return null;
 
+  const visibleItems = locationData.items?.filter(item => (item.location_stock || 0) > 0) || [];
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto">
@@ -283,7 +285,7 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {locationData.items.length === 0 ? (
+                  {visibleItems.length === 0 ? (
                     <tr>
                       <td
                         colSpan="8"
@@ -293,7 +295,7 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
                       </td>
                     </tr>
                   ) : (
-                    locationData.items.map((item, index) => (
+                    visibleItems.map((item, index) => (
                       <tr
                         key={index}
                         className={item.is_low_stock ? "bg-red-50" : ""}
@@ -327,8 +329,12 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
                           {formatCurrency((item.location_stock || 0) * (item.unit_price || 0))}
                         </td>
                         <td className="px-3 py-2">
-                          {item.is_low_stock ? (
+                          {(item.location_stock || 0) <= 0 ? (
                             <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">
+                              Out of Stock
+                            </span>
+                          ) : item.is_low_stock ? (
+                            <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">
                               Low Stock
                             </span>
                           ) : (
@@ -386,8 +392,14 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
                         <td className="px-4 py-3">
                           <span
                             className={`px-2 py-1 text-xs rounded-full font-medium ${record.color === "green"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
+                                ? "bg-green-100 text-green-800"
+                                : record.color === "red"
+                                  ? "bg-red-100 text-red-800"
+                                  : record.color === "blue"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : record.color === "orange"
+                                      ? "bg-orange-100 text-orange-800"
+                                      : "bg-gray-100 text-gray-800"
                               }`}
                           >
                             {record.type}
@@ -8740,7 +8752,7 @@ const RequisitionDetailsModal = ({ requisition, items, onClose }) => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {requisition.details?.map((detail, index) => {
-                    const item = items.find((i) => i.id === detail.item_id);
+                    const item = items?.find((i) => i.id === detail.item_id);
                     return (
                       <tr key={index}>
                         <td className="px-3 py-2 text-sm text-gray-900">
@@ -8885,7 +8897,7 @@ const IssueDetailsModal = ({ issue, items, locations, onClose }) => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {issue.details?.map((detail, index) => {
-                    const item = items.find((i) => i.id === detail.item_id);
+                    const item = items?.find((i) => i.id === detail.item_id);
                     return (
                       <tr key={index}>
                         <td className="px-3 py-2 text-sm text-gray-900">
@@ -8926,8 +8938,8 @@ const IssueDetailsModal = ({ issue, items, locations, onClose }) => {
 
 // Waste Log Details Modal
 const WasteLogDetailsModal = ({ wasteLog, items, locations, onClose }) => {
-  const item = items.find((i) => i.id === wasteLog.item_id);
-  const location = locations.find((l) => l.id === wasteLog.location_id);
+  const item = items?.find((i) => i.id === wasteLog.item_id);
+  const location = locations?.find((l) => l.id === wasteLog.location_id);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
@@ -9076,7 +9088,7 @@ const WasteLogDetailsModal = ({ wasteLog, items, locations, onClose }) => {
 
 // Location Details Modal
 const LocationDetailsModal = ({ location, locations, onClose }) => {
-  const parentLocation = locations.find(
+  const parentLocation = locations?.find(
     (l) => l.id === location.parent_location_id,
   );
 
@@ -9212,8 +9224,8 @@ const LocationDetailsModal = ({ location, locations, onClose }) => {
 
 // Asset Details Modal
 const AssetDetailsModal = ({ asset, items, locations, onClose }) => {
-  const item = items.find((i) => i.id === asset.item_id);
-  const location = locations.find((l) => l.id === asset.current_location_id);
+  const item = items?.find((i) => i.id === asset.item_id);
+  const location = locations?.find((l) => l.id === asset.current_location_id);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
@@ -9432,7 +9444,7 @@ const RecipeFormModal = ({
               required
             >
               <option value="">Select Food Item</option>
-              {foodItems.map((item) => (
+              {foodItems?.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.name}
                 </option>

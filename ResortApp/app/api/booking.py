@@ -352,10 +352,10 @@ def create_booking(booking: BookingCreate, db: Session = Depends(get_db), curren
         (Booking.guest_email == booking.guest_email) & (Booking.guest_mobile == booking.guest_mobile)
     ).order_by(Booking.id.desc()).first()
 
+    # Logic Removed: We should NOT overwrite the provided guest name with an old one.
+    # If the user provides a name "jeena", we should save "jeena", even if previous bookings
+    # with this email/mobile were "haryhh". The user might be correcting a typo or it might be different.
     guest_name_to_use = booking.guest_name
-    if existing_booking:
-        # If a guest with the same email and mobile exists, use their established name
-        guest_name_to_use = existing_booking.guest_name
 
     # Validate room capacity for adults and children separately
     selected_rooms = db.query(Room).filter(Room.id.in_(booking.room_ids)).all()
@@ -591,10 +591,8 @@ def create_guest_booking(booking: BookingCreate, db: Session = Depends(get_db)):
             
             existing_booking = existing_query.order_by(Booking.id.desc()).first()
 
+        # Logic Removed: Do not overwrite guest name with old data.
         guest_name_to_use = booking.guest_name or "Guest User"
-        if existing_booking:
-            # If a guest with the same email and mobile exists, use their established name
-            guest_name_to_use = existing_booking.guest_name
 
         # Validate room capacity for adults and children separately
         selected_rooms = db.query(Room).filter(Room.id.in_(booking.room_ids)).all()
@@ -752,8 +750,8 @@ def create_guest_booking(booking: BookingCreate, db: Session = Depends(get_db)):
 @router.put("/{booking_id}/check-in", response_model=BookingOut)
 def check_in_booking(
     booking_id: Union[str, int],
-    id_card_image: UploadFile = File(...),
-    guest_photo: UploadFile = File(...),
+    id_card_image: Optional[UploadFile] = File(None),
+    guest_photo: Optional[UploadFile] = File(None),
     amenityAllocation: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -797,19 +795,21 @@ def check_in_booking(
                      detail=f"Cannot check-in. The following room(s) are currently marked as Checked-in/Occupied: {occupied_numbers}. Please check-out the previous guest first."
                  )
 
-    # Save ID card image
-    id_card_filename = f"id_{booking_id}_{uuid.uuid4().hex}.jpg"
-    id_card_path = os.path.join(UPLOAD_DIR, id_card_filename)
-    with open(id_card_path, "wb") as buffer:
-        shutil.copyfileobj(id_card_image.file, buffer)
-    booking.id_card_image_url = id_card_filename
+    # Save ID card image (if provided)
+    if id_card_image:
+        id_card_filename = f"id_{booking_id}_{uuid.uuid4().hex}.jpg"
+        id_card_path = os.path.join(UPLOAD_DIR, id_card_filename)
+        with open(id_card_path, "wb") as buffer:
+            shutil.copyfileobj(id_card_image.file, buffer)
+        booking.id_card_image_url = id_card_filename
 
-    # Save guest photo
-    guest_photo_filename = f"guest_{booking_id}_{uuid.uuid4().hex}.jpg"
-    guest_photo_path = os.path.join(UPLOAD_DIR, guest_photo_filename)
-    with open(guest_photo_path, "wb") as buffer:
-        shutil.copyfileobj(guest_photo.file, buffer)
-    booking.guest_photo_url = guest_photo_filename
+    # Save guest photo (if provided)
+    if guest_photo:
+        guest_photo_filename = f"guest_{booking_id}_{uuid.uuid4().hex}.jpg"
+        guest_photo_path = os.path.join(UPLOAD_DIR, guest_photo_filename)
+        with open(guest_photo_path, "wb") as buffer:
+            shutil.copyfileobj(guest_photo.file, buffer)
+        booking.guest_photo_url = guest_photo_filename
 
     booking.status = "checked-in"
     # Set the actual check-in timestamp for strict bill scoping

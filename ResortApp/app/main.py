@@ -143,5 +143,18 @@ if inventory is not None:
         traceback.print_exc()
 else:
     print("❌ Inventory router not imported in app.main, skipping registration")
+
+# Include stock reconciliation router
+print("DEBUG: About to import stock_reconciliation router...")
+try:
+    from app.api import stock_reconciliation
+    print(f"DEBUG: Stock reconciliation module imported, has {len(stock_reconciliation.router.routes)} routes")
+    app.include_router(stock_reconciliation.router, prefix="/api")
+    print(f"✅ Stock reconciliation router registered with {len(stock_reconciliation.router.routes)} routes")
+except Exception as e:
+    print(f"❌ ERROR importing/registering stock reconciliation router: {e}")
+    import traceback
+    traceback.print_exc()
+
 # app.include_router(guest_api.guest_router) # <--- And add this line
 # app.include_router(billing_api.router) # <-- Now billing is active
