@@ -912,50 +912,68 @@ def get_pre_checkout_verification_data(room_number: str, db: Session = Depends(g
                     StockIssue.destination_location_id == room.inventory_location_id
                 ).all()
                 
-                complimentary_qty = 0
-                payable_qty = 0
-                
-                payable_price = 0.0
-                
-                for detail in issue_details:
-                    if detail.is_payable:
-                        payable_qty += detail.issued_quantity
-                        # Prefer rental_price, then unit_price, then item selling_price
-                        p_price = detail.rental_price if detail.rental_price and detail.rental_price > 0 else (detail.unit_price)
-                        if p_price and p_price > 0:
-                             payable_price = float(p_price)
-                    else:
-                        complimentary_qty += detail.issued_quantity
-                
-                # Determine final charge price
-                selling_price = payable_price if payable_price > 0 else (stock.item.selling_price or stock.item.unit_price or 0.0)
-                
-                # Calculate potential charge ONLY for payable items
-                potential_charge = payable_qty * selling_price
-                
                 # Robust Fixed Asset Detection
                 is_fixed_asset_flag = (
                     (stock.item.category.classification and stock.item.category.classification.lower() in ["asset", "fixed asset"]) or 
                     stock.item.is_asset_fixed or 
                     stock.item.category.is_asset_fixed
                 )
+                
+                # Split Logic: Separate Rented from Standard/Fixed Stock
+                rented_details = [d for d in issue_details if d.rental_price and d.rental_price > 0]
+                non_rented_details = [d for d in issue_details if not (d.rental_price and d.rental_price > 0)]
+                
+                rented_qty_total = sum(d.issued_quantity for d in rented_details)
+                rented_qty_total = min(stock.quantity, rented_qty_total) # Clamp to avoid showing more rented than exist
+                
+                standard_qty_total = max(0, stock.quantity - rented_qty_total)
+                
+                # Helper to append row
+                def append_consumable_row(qty, details, is_rent, is_fixed):
+                    complimentary_qty = 0
+                    payable_qty = 0
+                    payable_price = 0.0
+                    
+                    for detail in details:
+                        if detail.is_payable:
+                            payable_qty += detail.issued_quantity
+                            # Prefer rental_price, then unit_price, then item selling_price
+                            p_price = detail.rental_price if detail.rental_price and detail.rental_price > 0 else (detail.unit_price)
+                            if p_price and p_price > 0:
+                                 payable_price = float(p_price)
+                        else:
+                            complimentary_qty += detail.issued_quantity
+                    
+                    # Determine final charge price
+                    selling_price = payable_price if payable_price > 0 else (stock.item.selling_price or stock.item.unit_price or 0.0)
+                    
+                    # Calculate potential charge ONLY for payable items
+                    potential_charge = payable_qty * selling_price
+                    
+                    consumables.append({
+                        "item_id": stock.item_id,
+                        "item_name": stock.item.name,
+                        "current_stock": qty,
+                        "complimentary_qty": complimentary_qty,
+                        "payable_qty": payable_qty,
+                        "complimentary_limit": stock.item.complimentary_limit or 0,
+                        "charge_per_unit": selling_price,  # Selling/Rental price for billing
+                        "cost_per_unit": stock.item.unit_price or 0.0,  # Cost price for reference (Damage)
+                        "potential_charge": potential_charge,  # Charge for payable items only
+                        "unit": stock.item.unit,
+                        "is_fixed_asset": is_fixed,
+                        "is_payable": (payable_qty > 0),
+                        "is_rentable": is_rent,
+                    })
 
-                consumables.append({
-                    "item_id": stock.item_id,
-                    "item_name": stock.item.name,
-                    "current_stock": stock.quantity,
-                    "complimentary_qty": complimentary_qty,
-                    "payable_qty": payable_qty,
-                    "complimentary_limit": stock.item.complimentary_limit or 0,
-                    "charge_per_unit": selling_price,  # Selling/Rental price for billing
-                    "cost_per_unit": stock.item.unit_price or 0.0,  # Cost price for reference (Damage)
-                    "potential_charge": potential_charge,  # Charge for payable items only
-                    "unit": stock.item.unit,
-                    "is_fixed_asset": is_fixed_asset_flag,
-
-                    "is_payable": (payable_qty > 0),  # Mark as payable if it has payable quantity
-                    "is_rentable": any((d.rental_price and d.rental_price > 0) for d in issue_details), # True only if assigned with rental price
-                })
+                # 1. Rented Row
+                if rented_qty_total > 0:
+                    append_consumable_row(rented_qty_total, rented_details, True, False)
+                    
+                # 2. Standard/Fixed Row
+                # Show if there is stock, OR if it's instant consumable (show 0 if needed), but if everything is rented we skip unless standard_qty > 0
+                if standard_qty_total > 0 or (stock.item.category.consumable_instant and rented_qty_total == 0):
+                    append_consumable_row(standard_qty_total, non_rented_details, False, is_fixed_asset_flag)
 
         # 2. Fetch Fixed Assets (AssetRegistry)
         # These are individual items with serial numbers
