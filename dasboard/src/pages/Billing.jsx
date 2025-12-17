@@ -1458,6 +1458,8 @@ const Billing = () => {
                     {hasFoodItems && <li>Food Charges: {formatCurrency(foodCharges)} {foodCharges === 0 && billData.charges.food_items.some(item => item.is_paid) && <span className="text-xs text-gray-500">(All paid)</span>}</li>}
                     {billData.charges.service_charges > 0 && <li>Service Charges: {formatCurrency(billData.charges.service_charges)}</li>}
                     {billData.charges.consumables_charges > 0 && <li>Consumables Charges: {formatCurrency(billData.charges.consumables_charges)}</li>}
+                    {billData.charges.inventory_charges > 0 && <li className="text-blue-700 font-semibold">Inventory/Rental Charges: {formatCurrency(billData.charges.inventory_charges)}</li>}
+                    {billData.charges.asset_damage_charges > 0 && <li className="text-red-700 font-semibold">Asset Damage Charges: {formatCurrency(billData.charges.asset_damage_charges)}</li>}
                   </ul>
 
                   {billData.charges.food_items.length > 0 && (
@@ -1514,8 +1516,28 @@ const Billing = () => {
                           <li key={i}>
                             <span className="font-medium text-gray-700">{item.item_name}</span>
                             {item.quantity > 0 && ` (x${item.quantity} ${item.unit})`}
+                            {item.rental_price > 0 && (
+                              <span className="text-blue-700 font-semibold ml-2">
+                                @ ₹{item.rental_price} = ₹{item.rental_charge || (item.rental_price * item.quantity)}
+                              </span>
+                            )}
                             {item.room_number && ` - Room ${item.room_number}`}
                             <span className="text-gray-400 ml-1">[{new Date(item.date).toLocaleDateString()}]</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {billData.charges.asset_damages && billData.charges.asset_damages.length > 0 && (
+                    <div className="mt-3">
+                      <h4 className="font-semibold text-gray-600">Asset Damages:</h4>
+                      <ul className="list-disc list-inside ml-4 text-xs text-red-500">
+                        {billData.charges.asset_damages.map((item, i) => (
+                          <li key={i}>
+                            <span className="font-medium text-gray-700">{item.item_name}</span>
+                            <span> - {formatCurrency(item.replacement_cost)}</span>
+                            {item.notes && <span className="text-gray-400 ml-1">({item.notes})</span>}
                           </li>
                         ))}
                       </ul>
@@ -1890,6 +1912,12 @@ const Billing = () => {
 
                 <div className="mb-6">
                   <h3 className="text-lg font-semibold mb-3 text-gray-800">Consumables Inventory Check</h3>
+                  <div className="mb-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      📦 <strong>Consumables Usage Tracking:</strong> Track how many items were consumed (e.g., beverages, snacks).
+                      No damage reporting needed for consumables - only usage quantity matters.
+                    </p>
+                  </div>
                   <div className="overflow-x-auto border rounded-lg">
                     <table className="min-w-full text-sm">
                       <thead className="bg-gray-100 uppercase tracking-wider text-gray-700">
@@ -1898,7 +1926,7 @@ const Billing = () => {
                           <th className="py-3 px-4 text-center">Current Stock</th>
                           <th className="py-3 px-4 text-center">Available Stock</th>
                           <th className="py-3 px-4 text-left">Return Unused To</th>
-                          <th className="py-3 px-4 text-center">Used/Consumed</th>
+                          <th className="py-3 px-4 text-center">Consumed Qty</th>
                           <th className="py-3 px-4 text-right">Potential Charge</th>
                         </tr>
                       </thead>
@@ -2074,7 +2102,7 @@ const Billing = () => {
           </div>
         )}
       </div>
-    </DashboardLayout>
+    </DashboardLayout >
   );
 };
 

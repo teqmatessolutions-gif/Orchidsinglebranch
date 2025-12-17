@@ -392,14 +392,14 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
                         <td className="px-4 py-3">
                           <span
                             className={`px-2 py-1 text-xs rounded-full font-medium ${record.color === "green"
-                                ? "bg-green-100 text-green-800"
-                                : record.color === "red"
-                                  ? "bg-red-100 text-red-800"
-                                  : record.color === "blue"
-                                    ? "bg-blue-100 text-blue-800"
-                                    : record.color === "orange"
-                                      ? "bg-orange-100 text-orange-800"
-                                      : "bg-gray-100 text-gray-800"
+                              ? "bg-green-100 text-green-800"
+                              : record.color === "red"
+                                ? "bg-red-100 text-red-800"
+                                : record.color === "blue"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : record.color === "orange"
+                                    ? "bg-orange-100 text-orange-800"
+                                    : "bg-gray-100 text-gray-800"
                               }`}
                           >
                             {record.type}
@@ -2026,7 +2026,7 @@ const Inventory = () => {
   // Asset mapping handlers
   const [assetMappingForm, setAssetMappingForm] = useState({
     location_id: "",
-    assets: [{ item_id: "", serial_number: "", quantity: 1, notes: "" }],
+    assets: [{ item_id: "", source_location_id: "", serial_number: "", quantity: 1, notes: "" }],
   });
   const [editingAssetMapping, setEditingAssetMapping] = useState(null);
 
@@ -2065,6 +2065,7 @@ const Inventory = () => {
           await API.post("/inventory/asset-mappings", {
             item_id: parseInt(asset.item_id),
             location_id: parseInt(assetMappingForm.location_id),
+            source_location_id: asset.source_location_id ? parseInt(asset.source_location_id) : null,
             serial_number: asset.serial_number || null,
             quantity: parseFloat(asset.quantity) || 1,
             notes: asset.notes || null,
@@ -2077,7 +2078,7 @@ const Inventory = () => {
       setEditingAssetMapping(null);
       setAssetMappingForm({
         location_id: "",
-        assets: [{ item_id: "", serial_number: "", quantity: 1, notes: "" }],
+        assets: [{ item_id: "", source_location_id: "", serial_number: "", quantity: 1, notes: "" }],
       });
       fetchData();
     } catch (error) {
@@ -8434,12 +8435,38 @@ const AssetMappingFormModal = ({
     return category?.is_asset_fixed || false;
   });
 
+  // Fetch detailed location stocks
+  const [detailedStocks, setDetailedStocks] = useState([]);
+  useEffect(() => {
+    const fetchStocks = async () => {
+      try {
+        const res = await API.get("/inventory/stocks");
+        setDetailedStocks(res.data || []);
+      } catch (err) {
+        console.error("Failed to fetch detailed stocks", err);
+      }
+    };
+    fetchStocks();
+  }, []);
+
+  const getStockForLocation = (itemId, locationId) => {
+    if (!itemId) return 0;
+    if (!locationId) {
+      // Return Global Stock
+      const item = items.find(i => i.id == itemId);
+      return item ? (item.current_stock || 0) : 0;
+    }
+    // Return Location Stock
+    const stock = detailedStocks.find(s => s.item_id == itemId && s.location_id == parseInt(locationId));
+    return stock ? stock.quantity : 0;
+  };
+
   const addAssetRow = () => {
     setForm({
       ...form,
       assets: [
         ...(form.assets || []),
-        { item_id: "", serial_number: "", quantity: 1, notes: "" },
+        { item_id: "", source_location_id: "", serial_number: "", quantity: 1, notes: "" },
       ],
     });
   };
@@ -8472,9 +8499,10 @@ const AssetMappingFormModal = ({
         </div>
         <form onSubmit={onSubmit} className="p-6 space-y-6">
           {/* Global Location Selection */}
+          {/* Global Location Selection */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Location *
+              Target Location *
             </label>
             <select
               value={form.location_id || ""}
@@ -8484,7 +8512,7 @@ const AssetMappingFormModal = ({
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
               required
             >
-              <option value="">Select Location</option>
+              <option value="">Select Target</option>
               {locations.map((loc) => (
                 <option key={loc.id} value={loc.id}>
                   {loc.building} - {loc.room_area}{" "}
@@ -8519,6 +8547,36 @@ const AssetMappingFormModal = ({
                   key={index}
                   className="flex flex-col sm:flex-row gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200 items-start sm:items-start relative group transition-all hover:shadow-sm"
                 >
+                  <div className="w-full sm:w-48">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                      Source (Optional)
+                    </label>
+                    <select
+                      value={asset.source_location_id || ""}
+                      onChange={(e) =>
+                        updateAssetRow(index, "source_location_id", e.target.value)
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                      disabled={isEditing}
+                    >
+                      <option value="">Default (Warehouse) {(() => {
+                        if (!asset.item_id) return "";
+                        const warehouse = locations.find(l => l.location_type === "Warehouse" || l.name?.toLowerCase().includes("warehouse"));
+                        if (warehouse) {
+                          return `(Stock: ${getStockForLocation(asset.item_id, warehouse.id)})`;
+                        }
+                        return "";
+                      })()}</option>
+                      {locations
+                        .filter((loc) => loc.is_inventory_point)
+                        .map((loc) => (
+                          <option key={loc.id} value={loc.id}>
+                            {loc.name || `${loc.building} - ${loc.room_area}`}
+                            {asset.item_id ? ` (Stock: ${getStockForLocation(asset.item_id, loc.id)})` : ""}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
                   <div className="flex-1 w-full">
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                       Asset Item *
@@ -8533,11 +8591,14 @@ const AssetMappingFormModal = ({
                       disabled={isEditing}
                     >
                       <option value="">Select Asset</option>
-                      {fixedAssets.map((item) => (
-                        <option key={item.id} value={item.id} disabled={item.current_stock <= 0}>
-                          {item.name} (Stock: {item.current_stock})
-                        </option>
-                      ))}
+                      {fixedAssets.map((item) => {
+                        const stock = getStockForLocation(item.id, asset.source_location_id);
+                        return (
+                          <option key={item.id} value={item.id} disabled={stock <= 0}>
+                            {item.name} ({asset.source_location_id ? "Location" : "Global"} Stock: {stock})
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
 
@@ -8547,7 +8608,12 @@ const AssetMappingFormModal = ({
                     </label>
                     {(() => {
                       const selectedItem = items.find(i => i.id == asset.item_id);
-                      const maxStock = selectedItem ? selectedItem.current_stock : 0;
+                      const currentSourceId = asset.source_location_id;
+                      // Fallback: if no source selected, assume warehouse for display ONLY IF we found one, else global might be misleading if we want specific source.
+                      // Actually, for "Available" display, if source is empty, we show Global as per previous logic, or Warehouse stock?
+                      // Let's stick to Global for Default to be consistent with dropdown label "Default"
+                      const displayStock = getStockForLocation(asset.item_id, currentSourceId);
+
                       return (
                         <div>
                           <input
@@ -8558,7 +8624,7 @@ const AssetMappingFormModal = ({
                           />
                           {selectedItem && (
                             <span className="text-[10px] text-gray-500 block mt-1">
-                              Max: {selectedItem.current_stock}
+                              Available ({currentSourceId ? "Location" : "Global"}): {displayStock}
                             </span>
                           )}
                         </div>

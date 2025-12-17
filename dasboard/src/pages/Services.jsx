@@ -1152,7 +1152,8 @@ const Services = () => {
       const items = checkoutInventoryDetails.items.map(item => ({
         item_id: item.item_id || item.id,
         used_qty: Number(item.used_qty || 0),
-        missing_qty: Number(item.missing_qty || 0)
+        missing_qty: Number(item.missing_qty || 0),
+        damage_qty: Number(item.damage_qty || 0)
       }));
 
       // Collect asset damages
@@ -3934,56 +3935,195 @@ const Services = () => {
               </div>
             )}
 
-            {checkoutInventoryDetails.items && checkoutInventoryDetails.items.length > 0 ? (
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-3 text-gray-800">Consumables Inventory Check</h3>
-                <div className="overflow-x-auto border rounded-lg">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-gray-100 uppercase tracking-wider text-gray-700">
-                      <tr>
-                        <th className="py-3 px-4 text-left">Item Name</th>
-                        <th className="py-3 px-4 text-center">Current Stock</th>
-                        <th className="py-3 px-4 text-center">Available Stock</th>
-                        <th className="py-3 px-4 text-center">Used/Consumed</th>
-                        <th className="py-3 px-4 text-right">Potential Charge</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                      {checkoutInventoryDetails.items.map((item, idx) => {
-                        const charge = (item.used_qty || 0) * (item.charge_per_unit || item.unit_price || 0);
-                        // Determine actual charge based on complimentary limit
-                        const isChargeable = (item.used_qty || 0) > (item.complimentary_limit || 0);
-                        const chargeAmount = isChargeable ? ((item.used_qty - item.complimentary_limit) * (item.charge_per_unit || 0)) : 0;
+            {/* Separate items into consumables and assets */}
+            {(() => {
+              const consumableItems = (checkoutInventoryDetails.items || []).filter(item => {
+                const isFixedItem = item.is_fixed_asset ||
+                  ['TV', 'Bulb', 'Remote', 'AC', 'Kettle', 'Hair Dryer', 'Safe', 'Iron'].some(k => (item.item_name || "").includes(k));
+                const isRentable = item.is_rentable;
+                return !isFixedItem && !isRentable; // Only pure consumables
+              });
 
-                        return (
-                          <tr key={idx} className="hover:bg-gray-50">
-                            <td className="py-3 px-4 font-medium">{item.item_name}</td>
-                            <td className="py-3 px-4 text-center text-gray-600 font-semibold">{item.current_stock || 0}</td>
-                            <td className="py-3 px-4 text-center">
-                              <input
-                                type="number"
-                                min="0"
-                                max={item.current_stock}
-                                className={`w-20 border rounded p-1 text-center font-bold ${(item.available_stock < item.current_stock) ? 'text-orange-600 border-orange-300 bg-orange-50' : 'text-green-600 border-gray-300'}`}
-                                value={item.available_stock}
-                                onChange={(e) => handleUpdateInventoryVerification(idx, 'available_stock', e.target.value)}
-                              />
-                            </td>
-                            <td className="py-3 px-4 text-center text-gray-700">
-                              {item.used_qty || 0}
-                              {item.complimentary_limit > 0 && <span className="text-xs text-green-600 block">(Free: {item.complimentary_limit})</span>}
-                            </td>
-                            <td className="py-3 px-4 text-right font-medium text-red-600">
-                              {chargeAmount > 0 ? `+${(chargeAmount).toFixed(2)}` : '-'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ) : (
+              const assetItems = (checkoutInventoryDetails.items || []).filter(item => {
+                const isFixedItem = item.is_fixed_asset ||
+                  ['TV', 'Bulb', 'Remote', 'AC', 'Kettle', 'Hair Dryer', 'Safe', 'Iron'].some(k => (item.item_name || "").includes(k));
+                const isRentable = item.is_rentable;
+                return isFixedItem || isRentable; // Fixed or rentable items
+              });
+
+              return (
+                <>
+                  {/* Consumables Section - Simple tracking */}
+                  {consumableItems.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold mb-3 text-gray-800">Consumables Inventory Check</h3>
+                      <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                        <p className="text-sm text-blue-800">
+                          📦 <strong>For Consumables:</strong> Enter the remaining quantity (balance) in the "Available Stock" field.
+                          The system will auto-calculate how much was consumed. No damage reporting needed for consumables.
+                        </p>
+                      </div>
+                      <div className="overflow-x-auto border rounded-lg">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-gray-100 uppercase tracking-wider text-gray-700">
+                            <tr>
+                              <th className="py-3 px-4 text-left">Item Name</th>
+                              <th className="py-3 px-4 text-center">Current Stock</th>
+                              <th className="py-3 px-4 text-center">Available Stock</th>
+                              <th className="py-3 px-4 text-center">Consumed Qty</th>
+                              <th className="py-3 px-4 text-right">Potential Charge</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {consumableItems.map((item, idx) => {
+                              const originalIdx = checkoutInventoryDetails.items.indexOf(item);
+                              const price = item.charge_per_unit || item.unit_price || 0;
+                              const totalQty = item.current_stock || 0;
+                              const availableQty = item.available_stock || 0;
+                              const consumedQty = item.used_qty || 0;
+
+                              const freeLimit = item.complimentary_limit || 0;
+                              const chargeable = Math.max(0, consumedQty - freeLimit);
+                              const chargeAmount = chargeable * price;
+
+                              return (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                  <td className="py-3 px-4 font-medium">
+                                    {item.item_name}
+                                    {item.is_payable && <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">PAYABLE</span>}
+                                  </td>
+                                  <td className="py-3 px-4 text-center text-gray-600 font-semibold">{totalQty}</td>
+                                  <td className="py-3 px-4 text-center">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max={totalQty}
+                                      className="w-20 border rounded p-1.5 text-center font-bold text-green-600 border-gray-300 focus:ring-2 focus:ring-green-500"
+                                      value={availableQty}
+                                      onChange={(e) => {
+                                        const val = Math.min(totalQty, Math.max(0, parseInt(e.target.value) || 0));
+                                        handleUpdateInventoryVerification(originalIdx, 'available_stock', val);
+                                        handleUpdateInventoryVerification(originalIdx, 'used_qty', totalQty - val);
+                                      }}
+                                      placeholder="Remaining"
+                                    />
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <div className="font-bold text-orange-600">
+                                      {consumedQty}
+                                      {freeLimit > 0 && (
+                                        <div className="text-xs text-green-600 font-normal">
+                                          (Free: {freeLimit})
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-medium text-red-600">
+                                    {chargeAmount > 0 ? `+₹${chargeAmount.toFixed(2)}` : '-'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Rent/Fixed Assets Section - Detailed tracking with damage */}
+                  {assetItems.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold mb-3 text-red-700">Rent / Fixed Assets Check</h3>
+                      <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                        <p className="text-sm text-red-800">
+                          🔧 <strong>For Rent/Fixed Assets:</strong> Track good, damaged, and missing items.
+                          Enter quantities for each condition. Missing items = Total - Good - Damaged.
+                        </p>
+                      </div>
+                      <div className="overflow-x-auto border rounded-lg">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-red-50 uppercase tracking-wider text-red-800">
+                            <tr>
+                              <th className="py-3 px-4 text-left">Item Name</th>
+                              <th className="py-3 px-4 text-center">Total Stock</th>
+                              <th className="py-3 px-4 text-center">Good</th>
+                              <th className="py-3 px-4 text-center">Damaged</th>
+                              <th className="py-3 px-4 text-center">Missing</th>
+                              <th className="py-3 px-4 text-right">Potential Charge</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {assetItems.map((item, idx) => {
+                              const originalIdx = checkoutInventoryDetails.items.indexOf(item);
+                              const isRentable = item.is_rentable;
+                              const price = item.charge_per_unit || item.unit_price || 0;
+                              const damagePrice = item.cost_per_unit || price;
+                              const totalQty = item.current_stock || 0;
+                              const good = item.available_stock || 0;
+                              const damaged = item.damage_qty || 0;
+                              const missing = Math.max(0, totalQty - good - damaged);
+
+                              let chargeAmount = 0;
+                              if (isRentable) chargeAmount += (item.payable_qty || 0) * price; // Rent charge
+                              chargeAmount += damaged * damagePrice; // Damage charge
+                              chargeAmount += missing * damagePrice; // Missing charge
+
+                              return (
+                                <tr key={idx} className="hover:bg-red-50">
+                                  <td className="py-3 px-4 font-medium">
+                                    {item.item_name}
+                                    {item.is_fixed_asset && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">FIXED</span>}
+                                    {isRentable && <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">RENT</span>}
+                                  </td>
+                                  <td className="py-3 px-4 text-center text-gray-600 font-semibold">{totalQty}</td>
+                                  <td className="py-3 px-4 text-center">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max={totalQty}
+                                      className="w-16 border rounded p-1.5 text-center font-bold text-green-600 border-gray-300 focus:ring-2 focus:ring-green-500"
+                                      value={good}
+                                      onChange={(e) => {
+                                        const val = Math.min(totalQty, Math.max(0, parseInt(e.target.value) || 0));
+                                        handleUpdateInventoryVerification(originalIdx, 'available_stock', val);
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max={totalQty}
+                                      className="w-16 border rounded p-1.5 text-center font-bold text-red-600 border-gray-300 focus:ring-2 focus:ring-red-500"
+                                      value={damaged}
+                                      onChange={(e) => {
+                                        const val = Math.min(totalQty, Math.max(0, parseInt(e.target.value) || 0));
+                                        handleUpdateInventoryVerification(originalIdx, 'damage_qty', val);
+                                        handleUpdateInventoryVerification(originalIdx, 'is_damaged', val > 0);
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <div className="font-bold text-orange-600">
+                                      {missing > 0 ? missing : '-'}
+                                    </div>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-medium text-red-600">
+                                    {chargeAmount > 0 ? `+₹${chargeAmount.toFixed(2)}` : '-'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+
+            {(!checkoutInventoryDetails.items || checkoutInventoryDetails.items.length === 0) && (
               <div className="mb-4 text-gray-500">
                 {checkoutInventoryDetails.message || "No inventory items found"}
               </div>

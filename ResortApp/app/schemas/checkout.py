@@ -157,6 +157,7 @@ class InventoryCheckItem(BaseModel):
     item_id: int
     used_qty: float = 0
     missing_qty: float = 0
+    damage_qty: float = 0
     return_location_id: Optional[int] = None
 
 class InventoryCheckRequest(BaseModel):

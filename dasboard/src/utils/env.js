@@ -19,7 +19,7 @@ export const getMediaBaseUrl = () => {
   if (typeof window !== "undefined") {
     const hostname = window.location.hostname || "";
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
-      return `http://${hostname}:8000`;
+      return `http://${hostname}:8011`;
     }
   }
 
@@ -35,11 +35,11 @@ export const getMediaBaseUrl = () => {
   }
   return process.env.NODE_ENV === "production"
     ? "https://www.teqmates.com"
-    : "http://localhost:8000";
+    : "http://localhost:8011";
 };
 
 export const getApiBaseUrl = () => {
-  // For local development (localhost or 127.0.0.1), ALWAYS use port 8000
+  // For local development (localhost or 127.0.0.1), ALWAYS use port 8011
   // This check MUST come FIRST, even before REACT_APP_API_BASE_URL
   // to override any environment variables for local development
   if (typeof window !== "undefined") {
@@ -50,7 +50,7 @@ export const getApiBaseUrl = () => {
     // Check if running on localhost or a local network IP (e.g. 192.168.x.x)
     if (hostname === "localhost" || hostname === "127.0.0.1" || hostname.startsWith("192.168.") || hostname.startsWith("10.")) {
       // Use the SAME hostname as the frontend, but port 8000
-      const apiUrl = `http://${hostname}:8000/api`;
+      const apiUrl = `http://${hostname}:8011/api`;
       console.log("Using dynamic local API URL:", apiUrl);
       return apiUrl;
     }

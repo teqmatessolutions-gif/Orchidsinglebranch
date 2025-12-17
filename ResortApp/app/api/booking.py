@@ -790,10 +790,11 @@ def check_in_booking(
             # Actually, we just verified booking.status == 'booked'. So it can't be occupied by this booking.
             if len(occupied_rooms) > 0:
                  occupied_numbers = ", ".join([str(r.number) for r in occupied_rooms])
-                 raise HTTPException(
-                     status_code=400, 
-                     detail=f"Cannot check-in. The following room(s) are currently marked as Checked-in/Occupied: {occupied_numbers}. Please check-out the previous guest first."
-                 )
+                 print(f"WARNING: Forced check-in despite occupied status for rooms: {occupied_numbers}. Statuses: {[r.status for r in occupied_rooms]}")
+                 # raise HTTPException(
+                 #     status_code=400, 
+                 #     detail=f"Cannot check-in. The following room(s) are currently marked as Checked-in/Occupied: {occupied_numbers}. Please check-out the previous guest first."
+                 # )
 
     # Save ID card image (if provided)
     if id_card_image:

@@ -682,3 +682,341 @@ ENTERING stock update block for received purchase
 Details count in created object: 1
 Processing detail: item_id=20, qty=40.0
 Location Stock Logic: Dest=24
+
+=== 2025-12-16 13:38:19.420693 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 14
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=24, qty=10.0
+Location Stock Logic: Dest=14
+Processing detail: item_id=25, qty=50.0
+Location Stock Logic: Dest=14
+
+=== 2025-12-16 13:51:41.715957 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 14
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=24, qty=10.0
+Location Stock Logic: Dest=14
+Processing detail: item_id=25, qty=20.0
+Location Stock Logic: Dest=14
+
+=== 2025-12-16 16:09:47.517233 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 15
+  Details count: 1
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 1
+Processing detail: item_id=20, qty=20.0
+Location Stock Logic: Dest=15
+
+=== 2025-12-16 16:10:09.309553 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 16
+  Details count: 1
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 1
+Processing detail: item_id=19, qty=20.0
+Location Stock Logic: Dest=16
+
+=== 2025-12-16 16:11:39.119983 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 14
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=24, qty=10.0
+Location Stock Logic: Dest=14
+Processing detail: item_id=25, qty=10.0
+Location Stock Logic: Dest=14
+
+=== 2025-12-16 17:08:43.939097 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 14
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=25, qty=20.0
+Location Stock Logic: Dest=14
+Processing detail: item_id=25, qty=20.0
+Location Stock Logic: Dest=14
+
+=== 2025-12-16 17:09:59.393265 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 16
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=19, qty=20.0
+Location Stock Logic: Dest=16
+Processing detail: item_id=20, qty=20.0
+Location Stock Logic: Dest=16
+
+=== 2025-12-16 17:46:11.464396 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 14
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=24, qty=20.0
+Location Stock Logic: Dest=14
+Processing detail: item_id=25, qty=20.0
+Location Stock Logic: Dest=14
+
+=== 2025-12-16 17:47:19.509714 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 15
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=19, qty=20.0
+Location Stock Logic: Dest=15
+Processing detail: item_id=20, qty=10.0
+Location Stock Logic: Dest=15
+
+=== 2025-12-16 17:49:38.577477 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 24
+  Details count: 1
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 1
+Processing detail: item_id=21, qty=20.0
+Location Stock Logic: Dest=24
+
+=== 2025-12-16 18:15:36.714905 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 14
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=24, qty=10.0
+Location Stock Logic: Dest=14
+Processing detail: item_id=25, qty=10.0
+Location Stock Logic: Dest=14
+
+=== 2025-12-16 18:16:08.882785 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 15
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=19, qty=20.0
+Location Stock Logic: Dest=15
+Processing detail: item_id=20, qty=20.0
+Location Stock Logic: Dest=15
+
+=== 2025-12-16 18:20:35.809122 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 17
+  Details count: 1
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 1
+Processing detail: item_id=21, qty=10.0
+Location Stock Logic: Dest=17
+
+=== 2025-12-16 18:48:08.378360 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 14
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=24, qty=10.0
+Location Stock Logic: Dest=14
+Processing detail: item_id=25, qty=10.0
+Location Stock Logic: Dest=14
+
+=== 2025-12-16 18:48:41.487269 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 24
+  Details count: 1
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 1
+Processing detail: item_id=20, qty=20.0
+Location Stock Logic: Dest=24
+
+=== 2025-12-16 18:49:09.698321 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 15
+  Details count: 1
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 1
+Processing detail: item_id=19, qty=10.0
+Location Stock Logic: Dest=15
+
+=== 2025-12-16 18:56:33.891475 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 17
+  Details count: 1
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 1
+Processing detail: item_id=21, qty=20.0
+Location Stock Logic: Dest=17
+
+=== 2025-12-16 19:32:44.419766 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 15
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=19, qty=10.0
+Location Stock Logic: Dest=15
+Processing detail: item_id=20, qty=10.0
+Location Stock Logic: Dest=15
+
+=== 2025-12-16 19:33:39.593634 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 14
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=24, qty=10.0
+Location Stock Logic: Dest=14
+Processing detail: item_id=25, qty=10.0
+Location Stock Logic: Dest=14
+
+=== 2025-12-16 19:34:05.713592 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 17
+  Details count: 1
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 1
+Processing detail: item_id=21, qty=10.0
+Location Stock Logic: Dest=17
+
+=== 2025-12-17 13:05:57.529868 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 14
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=25, qty=10.0
+Location Stock Logic: Dest=14
+Processing detail: item_id=24, qty=10.0
+Location Stock Logic: Dest=14
+
+=== 2025-12-17 13:12:46.537828 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 15
+  Details count: 3
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 3
+Processing detail: item_id=29, qty=20.0
+Location Stock Logic: Dest=15
+Processing detail: item_id=19, qty=20.0
+Location Stock Logic: Dest=15
+Processing detail: item_id=20, qty=20.0
+Location Stock Logic: Dest=15
+
+=== 2025-12-17 13:13:30.683247 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 24
+  Details count: 1
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 1
+Processing detail: item_id=21, qty=20.0
+Location Stock Logic: Dest=24
+
+=== 2025-12-17 14:17:15.654936 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 24
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=24, qty=10.0
+Location Stock Logic: Dest=24
+Processing detail: item_id=25, qty=10.0
+Location Stock Logic: Dest=24
+
+=== 2025-12-17 14:17:16.202679 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 24
+  Details count: 2
+
+=== 2025-12-17 14:17:17.643993 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 24
+  Details count: 2
+
+=== 2025-12-17 14:17:17.651360 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 24
+  Details count: 2
+
+=== 2025-12-17 14:18:43.604306 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 15
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=19, qty=20.0
+Location Stock Logic: Dest=15
+Processing detail: item_id=29, qty=20.0
+Location Stock Logic: Dest=15
+
+=== 2025-12-17 14:20:12.769939 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 17
+  Details count: 1
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 1
+Processing detail: item_id=21, qty=10.0
+Location Stock Logic: Dest=17

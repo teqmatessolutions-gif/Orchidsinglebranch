@@ -1024,7 +1024,8 @@ const AddExtraAllocationModal = ({
                           rental_price: 0,
                           is_present: true,
                           is_damaged: false,
-                          damage_notes: ''
+                          damage_notes: '',
+                          source_location_id: inventoryLocations.find(l => l.is_inventory_point || ['WAREHOUSE', 'STORE', 'CENTRAL_WAREHOUSE'].includes(String(l.location_type).toUpperCase()))?.id || ''
                         };
                         setCurrentRoomItems([...currentRoomItems, newAsset]);
                       }}
@@ -1053,6 +1054,7 @@ const AddExtraAllocationModal = ({
                             <th className="px-3 py-2 text-center text-xs font-medium text-blue-800 uppercase">Damaged</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">Condition</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">Rental Price</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">Source</th>
                             <th className="px-3 py-2 text-left text-xs font-medium text-blue-800 uppercase">Actions</th>
                           </tr>
                         </thead>
@@ -1143,12 +1145,12 @@ const AddExtraAllocationModal = ({
                                   )}
                                 </td>
                                 <td className="px-3 py-2 text-sm">
-                                  {item.is_rentable ? (
+                                  {item.is_rentable || (item.payable_qty > 0) ? (
                                     <input
                                       type="number"
                                       min="0"
                                       step="0.01"
-                                      value={item.rental_price || 0}
+                                      value={item.rental_price || item.selling_price || 0}
                                       onChange={(e) => {
                                         const updated = [...currentRoomItems];
                                         updated[actualIndex] = { ...updated[actualIndex], rental_price: parseFloat(e.target.value) || 0 };
@@ -1157,9 +1159,29 @@ const AddExtraAllocationModal = ({
                                       className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
                                     />
                                   ) : (
-                                    <span className="font-medium text-gray-900">
-                                      {item.unit_price > 0 ? `₹${item.unit_price}` : '-'}
-                                    </span>
+                                    <span className="text-gray-400 text-xs">-</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  {item.is_rentable ? (
+                                    <select
+                                      value={item.source_location_id || ''}
+                                      onChange={(e) => {
+                                        const updated = [...currentRoomItems];
+                                        updated[actualIndex] = { ...updated[actualIndex], source_location_id: e.target.value };
+                                        setCurrentRoomItems(updated);
+                                      }}
+                                      className="w-32 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+                                    >
+                                      <option value="">Select Source</option>
+                                      {inventoryLocations
+                                        .filter(loc => loc.is_inventory_point || ['WAREHOUSE', 'STORE', 'BRANCH_STORE', 'CENTRAL_WAREHOUSE'].includes(String(loc.location_type || '').toUpperCase()))
+                                        .map(loc => (
+                                          <option key={loc.id} value={loc.id}>{loc.name}</option>
+                                        ))}
+                                    </select>
+                                  ) : (
+                                    <span className="text-gray-500 text-xs">{item.source || '-'}</span>
                                   )}
                                 </td>
                                 <td className="px-3 py-2 text-sm">
@@ -1226,8 +1248,12 @@ const AddExtraAllocationModal = ({
 
                             // Save each rentable asset
                             for (const asset of rentableAssets) {
+                              if (!asset.source_location_id) {
+                                alert(`Please select a source location for ${asset.item_name}`);
+                                return;
+                              }
                               const issueData = {
-                                source_location_id: 14, // Central Warehouse
+                                source_location_id: asset.source_location_id,
                                 destination_location_id: destinationLocation.id,
                                 issue_date: new Date().toISOString(),
                                 notes: `Rentable asset: ${asset.item_name}`,
@@ -1407,7 +1433,11 @@ const AddExtraAllocationModal = ({
                         onChange={(e) =>
                           updateAllocationItem(index, "source_location_id", parseInt(e.target.value))
                         }
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                          (item.item_id && (itemStockCache[item.item_id]?.[item.source_location_id || getDefaultSourceLocationId()] || 0) < item.quantity)
+                            ? "border-red-500 bg-red-50 text-red-900"
+                            : "border-gray-300"
+                        }`}
                       >
                         {inventoryLocations
                           .filter((loc) => {
@@ -1445,8 +1475,15 @@ const AddExtraAllocationModal = ({
                             parseFloat(e.target.value) || 0,
                           )
                         }
-                        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
+                          (item.item_id && (itemStockCache[item.item_id]?.[item.source_location_id || getDefaultSourceLocationId()] || 0) < item.quantity)
+                            ? "border-red-500 bg-red-50 text-red-900"
+                            : "border-gray-300"
+                        }`}
                       />
+                      {(item.item_id && (itemStockCache[item.item_id]?.[item.source_location_id || getDefaultSourceLocationId()] || 0) < item.quantity) && (
+                        <p className="text-xs text-red-600 mt-1 font-medium">Insufficient Stock!</p>
+                      )}
                     </div>
                   </div>
 

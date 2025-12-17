@@ -627,7 +627,7 @@ class AssetMappingBase(BaseModel):
 
 
 class AssetMappingCreate(AssetMappingBase):
-    pass
+    source_location_id: Optional[int] = None
 
 
 class AssetMappingUpdate(BaseModel):

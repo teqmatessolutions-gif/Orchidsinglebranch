@@ -211,8 +211,11 @@ def create_checkout_verification(db: Session, checkout_id: int, room_verificatio
         consumables_audit_data={
             item.item_id: {
                 "actual": item.actual_consumed,
+                "issued": getattr(item, 'issued_qty', item.actual_consumed), # Fallback for legacy
                 "limit": item.complimentary_limit,
-                "charge": item.total_charge
+                "charge": item.total_charge,
+                "is_rentable": getattr(item, 'is_rentable', False),
+                "missing": getattr(item, 'missing_qty', 0)
             }
             for item in room_verification.consumables
         },

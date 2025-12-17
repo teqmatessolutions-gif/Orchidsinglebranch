@@ -143,7 +143,16 @@ def create_return_items_service_request(db: Session, room_id: int, room_number: 
                     item_id = int(item_id_str)
                     issued_qty = item_data.get("issued", 0)
                     actual_consumed = item_data.get("actual", 0)
-                    returned_qty = issued_qty - actual_consumed  # Items not consumed = returned
+                    is_rentable = item_data.get("is_rentable", False)
+                    missing_qty = item_data.get("missing", 0)
+                    
+                    if is_rentable:
+                        # For rentables, we must return everything that wasn't lost/missing
+                        # Even if it was "used" (rented), the physical item must be returned to storage
+                        returned_qty = issued_qty - missing_qty
+                    else:
+                        # For consumables, we return what wasn't used OR missing
+                        returned_qty = issued_qty - actual_consumed
                     
                     if returned_qty > 0:
                         # Get inventory item details
@@ -154,7 +163,8 @@ def create_return_items_service_request(db: Session, room_id: int, room_number: 
                                 "item_name": inv_item.name,
                                 "item_code": inv_item.item_code,
                                 "quantity_to_return": returned_qty,
-                                "unit": inv_item.unit or "pcs"
+                                "unit": inv_item.unit or "pcs",
+                                "is_rentable": is_rentable
                             })
                 except (ValueError, KeyError):
                     continue

@@ -1303,6 +1303,23 @@ def approve_requisition_quantities(
     return {"message": "Approved quantities updated successfully"}
 
 
+@router.get("/stocks", response_model=List[dict])
+def get_all_stocks(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from app.models.inventory import LocationStock
+    stocks = db.query(LocationStock).filter(LocationStock.quantity > 0).all()
+    result = []
+    for s in stocks:
+        result.append({
+            "location_id": s.location_id,
+            "item_id": s.item_id,
+            "quantity": float(s.quantity)
+        })
+    return result
+
+
 # Stock Issue Endpoints
 @router.post("/issues", response_model=StockIssueOut)
 def create_issue(
@@ -1700,29 +1717,51 @@ def get_location_items(
     for stock in location_stocks:
         item = stock.item
         if item:
-            key = f"stock_{item.id}"
+            key = f"item_{item.id}"
             category = inventory_crud.get_category_by_id(db, item.category_id)
             
-            # Calculate complimentary vs payable from StockIssueDetail
+            # Calculate complimentary vs payable using LIFO (Last-In First-Out) logic
+            # usage: we attribute the current stock to the most recent issues
             complimentary_qty = 0.0
             payable_qty = 0.0
+            remaining_stock_to_attribute = float(stock.quantity)
             
-            # Get all stock issue details for this item at this location
+            # Get stock issue details for this item at this location, ordered by date DESC
             issue_details = db.query(StockIssueDetail).join(StockIssue).filter(
                 StockIssue.destination_location_id == location_id,
                 StockIssueDetail.item_id == item.id
-            ).all()
+            ).order_by(StockIssue.issue_date.desc()).all()
             
             last_issue_price = 0.0
-            for detail in issue_details:
-                if detail.is_payable:
-                    payable_qty += detail.issued_quantity
-                    # Check rental_price first, then unit_price
-                    price = detail.rental_price if detail.rental_price and detail.rental_price > 0 else detail.unit_price
-                    if price and price > 0:
-                        last_issue_price = price
-                else:
-                    complimentary_qty += detail.issued_quantity
+            
+            # If stock is 0, everything is 0
+            if remaining_stock_to_attribute <= 0:
+                complimentary_qty = 0.0
+                payable_qty = 0.0
+                if issue_details:
+                     # Get price from last issue just for reference/next issue? 
+                     # Actually better to stick to item master if no stock
+                     pass
+            else:
+                for detail in issue_details:
+                    if remaining_stock_to_attribute <= 0:
+                        break
+                        
+                    issued_qty = float(detail.issued_quantity)
+                    # How much of this issue is still "in the room"?
+                    # We assume this issue contributes min(remaining, issued)
+                    attributed_qty = min(remaining_stock_to_attribute, issued_qty)
+                    
+                    if detail.is_payable:
+                        payable_qty += attributed_qty
+                        # Check rental_price first, then unit_price for the *latest* relevant issue
+                        price = detail.rental_price if detail.rental_price and detail.rental_price > 0 else detail.unit_price
+                        if price and price > 0 and last_issue_price == 0:
+                            last_issue_price = price
+                    else:
+                        complimentary_qty += attributed_qty
+                        
+                    remaining_stock_to_attribute -= attributed_qty
             
             # Determine selling/rental price for billing (Prioritize Issue Price > Selling Price > Cost Price)
             selling_unit_price = last_issue_price if last_issue_price > 0 else (item.selling_price if item.selling_price and item.selling_price > 0 else item.unit_price)
@@ -1757,7 +1796,7 @@ def get_location_items(
     for mapping in asset_mappings:
         item = inventory_crud.get_item_by_id(db, mapping.item_id)
         if item:
-            key = f"asset_{item.id}"
+            key = f"item_{item.id}"
             if key not in items_dict:
                 category = inventory_crud.get_category_by_id(db, item.category_id)
                 items_dict[key] = {
@@ -1777,10 +1816,14 @@ def get_location_items(
                     "type": "asset"
                 }
             else:
-                # If already exists (e.g. multiple assets of same type), increment count
-                items_dict[key]["current_stock"] += (mapping.quantity or 1)
-                items_dict[key]["location_stock"] += (mapping.quantity or 1)
-                items_dict[key]["total_value"] += (item.unit_price or 0) * (mapping.quantity or 1)
+                # If already exists (e.g. from LocationStock), DO NOT increment count to avoid double counting
+                # Assuming Asset Mapping is just detailing the existing stock
+                if "Asset Mapping" not in items_dict[key]["source"]:
+                     items_dict[key]["source"] += ", Asset Mapping"
+                
+                # Check for discrepancy?
+                # If mapped qty > stock qty, we might want to warn or show max?
+                # But for now, stick to LocationStock as truth.
 
     # Add items from asset registry
     for asset in asset_registry:
@@ -1903,7 +1946,7 @@ def get_location_items(
                 "reference": purchase.purchase_number,
                 "user": purchase.user.name if purchase.user else "System",
                 "notes": f"Vendor: {purchase.vendor.name if purchase.vendor else 'Unknown'}",
-                "color": "blue"
+                "color": "green"  # Green for incoming stock (positive quantity)
             })
     
     # Sort combined history by date desc
@@ -1945,68 +1988,74 @@ def get_stock_by_location(
         
         for location in locations:
             try:
-                # 1. Count assets in this location
+                items_map = {} # Map item_id -> quantity
+                
+                # 1. Get items from LocationStock (PRIMARY source)
+                location_stocks = db.query(LocationStock).filter(
+                    LocationStock.location_id == location.id
+                ).all()
+                
+                for stock in location_stocks:
+                    if stock.quantity > 0:
+                        items_map[stock.item_id] = stock.quantity
+                
+                # 2. Check AssetMappings (Only add if item NOT in LocationStock)
                 asset_mappings = db.query(AssetMapping).filter(
                     AssetMapping.location_id == location.id,
                     AssetMapping.is_active == True
                 ).all()
                 
-                asset_count = sum(m.quantity for m in asset_mappings)
-                asset_value = 0
                 for mapping in asset_mappings:
-                    item = inventory_crud.get_item_by_id(db, mapping.item_id)
-                    if item:
-                        asset_value += mapping.quantity * (item.unit_price or 0)
+                    if mapping.item_id not in items_map:
+                        items_map[mapping.item_id] = mapping.quantity
                 
-                registry_count = db.query(AssetRegistry).filter(
+                # 3. Check AssetRegistry (Only add if item NOT in LocationStock/Mapping)
+                # Registry items are individual instances, so we sum them up per item type
+                registry_items = db.query(AssetRegistry).filter(
                     AssetRegistry.current_location_id == location.id
-                ).count()
-                
-                # 2. Get items from LocationStock (PRIMARY source for bulk items)
-                location_stocks = db.query(LocationStock).filter(
-                    LocationStock.location_id == location.id
                 ).all()
                 
-                total_stock_value = asset_value
-                items_count = 0
+                registry_counts = {}
+                for reg in registry_items:
+                    registry_counts[reg.item_id] = registry_counts.get(reg.item_id, 0) + 1
+                    
+                for item_id, count in registry_counts.items():
+                    if item_id not in items_map:
+                         items_map[item_id] = count
+
+                # 4. Calculate Totals and Values
+                total_items = 0
+                asset_count = 0
+                consumable_count = 0
+                total_stock_value = 0.0
                 
-                # Calculate from LocationStock
-                for stock in location_stocks:
-                    item = stock.item
-                    if item and stock.quantity > 0:
-                        items_count += 1
-                        total_stock_value += stock.quantity * (item.unit_price or 0)
-                
-                # 3. Get stock issues to this location (legacy/fallback)
-                issues = db.query(StockIssueDetail).join(StockIssue).filter(
-                    StockIssue.destination_location_id == location.id
-                ).all()
-                
-                items_dict = {}  # Track unique items from issues
-                
-                for issue_detail in issues:
-                    item = inventory_crud.get_item_by_id(db, issue_detail.item_id)
+                for item_id, qty in items_map.items():
+                    item = inventory_crud.get_item_by_id(db, item_id)
                     if item:
-                        qty = getattr(issue_detail, 'issued_quantity', 0) or 0
-                        if qty > 0:
-                            if issue_detail.item_id not in items_dict:
-                                items_dict[issue_detail.item_id] = 0
-                            items_dict[issue_detail.item_id] += qty
-                            # Only add to value if not already in LocationStock
-                            if not any(s.item_id == issue_detail.item_id for s in location_stocks):
-                                total_stock_value += qty * (item.unit_price or 0)
-                
-                # Add unique items from issues that aren't in LocationStock
-                for item_id in items_dict:
-                    if not any(s.item_id == item_id for s in location_stocks):
-                        items_count += 1
+                        total_items += qty
+                        total_stock_value += qty * (item.unit_price or 0)
+                        
+                        # Categorize
+                        category = inventory_crud.get_category_by_id(db, item.category_id)
+                        is_asset = False
+                        if item.is_asset_fixed:
+                            is_asset = True
+                        elif category and category.is_asset_fixed:
+                            is_asset = True
+                        elif item.track_laundry_cycle: # Sheets are assets?
+                             is_asset = True
+                        
+                        if is_asset:
+                            asset_count += qty
+                        else:
+                            consumable_count += qty
                 
                 result.append({
                     **location.__dict__,
-                    "asset_count": asset_count + registry_count,
-                    "consumable_items_count": items_count,
+                    "asset_count": asset_count,
+                    "consumable_items_count": consumable_count,
                     "total_stock_value": total_stock_value,
-                    "total_items": asset_count + registry_count + items_count
+                    "total_items": total_items
                 })
             except Exception as e:
                 # Skip this location if there's an error
