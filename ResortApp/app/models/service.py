@@ -49,6 +49,7 @@ class AssignedService(Base):
     status = Column(Enum(ServiceStatus), default=ServiceStatus.pending)
     billing_status = Column(String, default="unbilled")
     last_used_at = Column(DateTime, nullable=True)  # Timestamp when service was last used (marked during checkout)
+    override_charges = Column(Float, nullable=True)  # Manual override for service charges (e.g. for damages)
 
     service = relationship("Service")
     employee = relationship("Employee")

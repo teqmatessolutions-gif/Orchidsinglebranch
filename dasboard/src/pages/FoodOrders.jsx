@@ -9,6 +9,7 @@ import { ChefHat, X, Package, Home, UtensilsCrossed, Truck } from "lucide-react"
 import { toast } from "react-hot-toast";
 import { getMediaBaseUrl } from "../utils/env";
 import { formatDateTimeIST, formatDateIST } from "../utils/dateUtils";
+import { normalizeQuantity } from "../utils/quantityValidation";
 
 export default function FoodOrders() {
   const location = useLocation();
@@ -175,7 +176,12 @@ export default function FoodOrders() {
 
   const handleUpdateExtraInventoryItem = (index, field, value) => {
     const updated = [...extraInventoryItems];
-    updated[index][field] = field === "quantity" ? parseFloat(value) || 0 : value;
+    if (field === "quantity") {
+      const invItem = inventoryItemsList.find(item => item.id === parseInt(updated[index].inventory_item_id));
+      updated[index][field] = normalizeQuantity(value, invItem?.unit);
+    } else {
+      updated[index][field] = value;
+    }
     setExtraInventoryItems(updated);
   };
 
@@ -1108,7 +1114,8 @@ export default function FoodOrders() {
 
   const handleItemChange = (index, field, value) => {
     const updated = [...selectedItems];
-    updated[index][field] = field === "quantity" ? parseInt(value) : value;
+    // Food quantities are always whole numbers (pcs)
+    updated[index][field] = field === "quantity" ? Math.round(parseFloat(value) || 0) : value;
     setSelectedItems(updated);
     calculateAmount(updated);
   };

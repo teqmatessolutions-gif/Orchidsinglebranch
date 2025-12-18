@@ -1160,6 +1160,8 @@ const Services = () => {
       const assetDamages = (checkoutInventoryDetails.fixed_assets || [])
         .filter(asset => asset.is_damaged)
         .map(asset => ({
+          asset_registry_id: asset.asset_registry_id,
+          item_id: asset.item_id,
           item_name: asset.item_name,
           replacement_cost: Number(asset.replacement_cost || 0),
           notes: asset.damage_notes || ""
@@ -1173,7 +1175,8 @@ const Services = () => {
       alert("Checkout request completed successfully!");
       setCheckoutInventoryModal(null);
       setCheckoutInventoryDetails(null);
-      fetchServiceRequests();
+      // Immediately refresh service requests to update the table
+      await fetchServiceRequests();
     } catch (error) {
       console.error("Failed to complete checkout request:", error);
       alert(`Failed to complete checkout request: ${error.response?.data?.detail || error.message}`);
@@ -2457,8 +2460,6 @@ const Services = () => {
                         value={item.quantity}
                         onChange={(e) => handleUpdateInventoryItem(index, 'quantity', e.target.value)}
                         placeholder="Qty"
-                        min="0.01"
-                        step="0.01"
                         className="w-24 border p-2 rounded-lg text-sm"
                       />
                       <button
@@ -2907,8 +2908,6 @@ const Services = () => {
                         value={item.quantity}
                         onChange={(e) => handleUpdateExtraInventoryItem(index, 'quantity', e.target.value)}
                         placeholder="Qty"
-                        min="0.01"
-                        step="0.01"
                         className="w-24 border p-2 rounded-lg text-sm"
                       />
                       <button
@@ -3935,20 +3934,30 @@ const Services = () => {
               </div>
             )}
 
-            {/* Separate items into consumables and assets */}
+            {/* Separate items into consumables, rent/laundry, and fixed assets */}
             {(() => {
               const consumableItems = (checkoutInventoryDetails.items || []).filter(item => {
+                const nameCheck = (item.item_name || item.name || "").toString();
                 const isFixedItem = item.is_fixed_asset ||
-                  ['TV', 'Bulb', 'Remote', 'AC', 'Kettle', 'Hair Dryer', 'Safe', 'Iron'].some(k => (item.item_name || "").includes(k));
-                const isRentable = item.is_rentable;
-                return !isFixedItem && !isRentable; // Only pure consumables
+                  ['TV', 'Bulb', 'Remote', 'AC', 'Kettle', 'Hair Dryer', 'Safe', 'Iron'].some(k => nameCheck.includes(k));
+                const isRentable = item.is_rentable || item.track_laundry_cycle;
+                return !isFixedItem && !isRentable; // Pure consumables
               });
 
-              const assetItems = (checkoutInventoryDetails.items || []).filter(item => {
+              const rentalItems = (checkoutInventoryDetails.items || []).filter(item => {
+                const isRentable = item.is_rentable || item.track_laundry_cycle;
+                return isRentable; // Rentals & Laundry (prioritized - if rentable, show here)
+              });
+
+              const fixedItems = (checkoutInventoryDetails.items || []).filter(item => {
+                const nameCheck = (item.item_name || item.name || "").toString();
+                // Only classify as fixed if NOT rentable
+                const isRentable = item.is_rentable || item.track_laundry_cycle;
+                if (isRentable) return false; // Rentable items go to rental section
+
                 const isFixedItem = item.is_fixed_asset ||
-                  ['TV', 'Bulb', 'Remote', 'AC', 'Kettle', 'Hair Dryer', 'Safe', 'Iron'].some(k => (item.item_name || "").includes(k));
-                const isRentable = item.is_rentable;
-                return isFixedItem || isRentable; // Fixed or rentable items
+                  ['TV', 'Bulb', 'Remote', 'AC', 'Kettle', 'Hair Dryer', 'Safe', 'Iron'].some(k => nameCheck.includes(k));
+                return isFixedItem; // Fixed assets (only if not rentable)
               });
 
               return (
@@ -3978,9 +3987,13 @@ const Services = () => {
                             {consumableItems.map((item, idx) => {
                               const originalIdx = checkoutInventoryDetails.items.indexOf(item);
                               const price = item.charge_per_unit || item.unit_price || 0;
-                              const totalQty = item.current_stock || 0;
-                              const availableQty = item.available_stock || 0;
-                              const consumedQty = item.used_qty || 0;
+                              const isPcs = (item.unit || 'pcs').toLowerCase() === 'pcs';
+                              const totalQty = isPcs ? Math.floor(item.current_stock || 0) : (item.current_stock || 0);
+                              const availableQty = isPcs ? Math.floor(item.available_stock || 0) : (item.available_stock || 0);
+
+                              let consumedQty = Math.max(0, totalQty - availableQty);
+                              if (isPcs) consumedQty = Math.round(consumedQty);
+                              else consumedQty = parseFloat(consumedQty.toFixed(2));
 
                               const freeLimit = item.complimentary_limit || 0;
                               const chargeable = Math.max(0, consumedQty - freeLimit);
@@ -3992,18 +4005,28 @@ const Services = () => {
                                     {item.item_name}
                                     {item.is_payable && <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-0.5 rounded">PAYABLE</span>}
                                   </td>
-                                  <td className="py-3 px-4 text-center text-gray-600 font-semibold">{totalQty}</td>
+                                  <td className="py-3 px-4 text-center text-gray-600 font-semibold">{isPcs ? Math.floor(totalQty) : totalQty}</td>
                                   <td className="py-3 px-4 text-center">
                                     <input
                                       type="number"
                                       min="0"
                                       max={totalQty}
+                                      step={isPcs ? "1" : "0.01"}
                                       className="w-20 border rounded p-1.5 text-center font-bold text-green-600 border-gray-300 focus:ring-2 focus:ring-green-500"
                                       value={availableQty}
+                                      onKeyDown={(e) => {
+                                        if (isPcs && (e.key === '.' || e.key === 'e')) {
+                                          e.preventDefault();
+                                        }
+                                      }}
                                       onChange={(e) => {
-                                        const val = Math.min(totalQty, Math.max(0, parseInt(e.target.value) || 0));
+                                        let val = parseFloat(e.target.value);
+                                        if (isNaN(val)) val = 0;
+                                        if (isPcs) val = Math.floor(val);
+                                        val = Math.min(totalQty, Math.max(0, val));
+
                                         handleUpdateInventoryVerification(originalIdx, 'available_stock', val);
-                                        handleUpdateInventoryVerification(originalIdx, 'used_qty', totalQty - val);
+                                        handleUpdateInventoryVerification(originalIdx, 'used_qty', isPcs ? Math.round(totalQty - val) : parseFloat((totalQty - val).toFixed(2)));
                                       }}
                                       placeholder="Remaining"
                                     />
@@ -4012,9 +4035,7 @@ const Services = () => {
                                     <div className="font-bold text-orange-600">
                                       {consumedQty}
                                       {freeLimit > 0 && (
-                                        <div className="text-xs text-green-600 font-normal">
-                                          (Free: {freeLimit})
-                                        </div>
+                                        <div className="text-xs text-green-600 font-normal">(Free: {freeLimit})</div>
                                       )}
                                     </div>
                                   </td>
@@ -4030,14 +4051,121 @@ const Services = () => {
                     </div>
                   )}
 
-                  {/* Rent/Fixed Assets Section - Detailed tracking with damage */}
-                  {assetItems.length > 0 && (
+                  {/* Rent / Laundry Items Section */}
+                  {rentalItems.length > 0 && (
                     <div className="mb-6">
-                      <h3 className="text-lg font-semibold mb-3 text-red-700">Rent / Fixed Assets Check</h3>
+                      <h3 className="text-lg font-semibold mb-3 text-purple-700">Rent / Laundry Items Check</h3>
+                      <div className="mb-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                        <p className="text-sm text-purple-800">
+                          🧺 <strong>For Rent/Laundry Items:</strong> Track good, damaged, and missing items.
+                        </p>
+                      </div>
+                      <div className="overflow-x-auto border rounded-lg">
+                        <table className="min-w-full text-sm">
+                          <thead className="bg-purple-50 uppercase tracking-wider text-purple-800">
+                            <tr>
+                              <th className="py-3 px-4 text-left">Item Name</th>
+                              <th className="py-3 px-4 text-center">Total Stock</th>
+                              <th className="py-3 px-4 text-center">Good</th>
+                              <th className="py-3 px-4 text-center">Damaged</th>
+                              <th className="py-3 px-4 text-center">Missing</th>
+                              <th className="py-3 px-4 text-right">Charge</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {rentalItems.map((item, idx) => {
+                              const originalIdx = checkoutInventoryDetails.items.indexOf(item);
+                              const price = item.charge_per_unit || item.unit_price || 0;
+                              const damagePrice = item.cost_per_unit || price;
+                              const isPcs = (item.unit || 'pcs').toLowerCase() === 'pcs';
+
+                              const totalQty = isPcs ? Math.floor(item.current_stock || 0) : (item.current_stock || 0);
+                              const good = isPcs ? Math.floor(item.available_stock || 0) : (item.available_stock || 0);
+                              const damaged = isPcs ? Math.floor(item.damage_qty || 0) : (item.damage_qty || 0);
+
+                              let missing = totalQty - good - damaged;
+                              if (missing < 0) missing = 0;
+                              if (isPcs) missing = Math.round(missing);
+                              else missing = parseFloat(missing.toFixed(2));
+
+                              let chargeAmount = 0;
+                              // Rent charge (if applicable)
+                              if (item.is_payable || item.payable_qty > 0) chargeAmount += (item.payable_qty || 0) * price;
+                              // Damage/Missing charge
+                              chargeAmount += damaged * damagePrice;
+                              chargeAmount += missing * damagePrice;
+
+                              return (
+                                <tr key={idx} className="hover:bg-purple-50">
+                                  <td className="py-3 px-4 font-medium">
+                                    {item.item_name}
+                                    {item.track_laundry_cycle && <span className="ml-2 text-xs bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">LAUNDRY</span>}
+                                    {item.is_rentable && <span className="ml-2 text-xs bg-purple-100 text-purple-800 px-2 py-0.5 rounded">RENT</span>}
+                                  </td>
+                                  <td className="py-3 px-4 text-center text-gray-600 font-semibold">{isPcs ? Math.floor(totalQty) : totalQty}</td>
+                                  <td className="py-3 px-4 text-center">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max={totalQty}
+                                      step={isPcs ? "1" : "0.01"}
+                                      className="w-16 border rounded p-1.5 text-center font-bold text-green-600 border-gray-300 focus:ring-2 focus:ring-green-500"
+                                      value={good}
+                                      onKeyDown={(e) => {
+                                        if (isPcs && (e.key === '.' || e.key === 'e')) e.preventDefault();
+                                      }}
+                                      onChange={(e) => {
+                                        let val = parseFloat(e.target.value);
+                                        if (isNaN(val)) val = 0;
+                                        if (isPcs) val = Math.floor(val);
+                                        val = Math.min(totalQty, Math.max(0, val));
+                                        handleUpdateInventoryVerification(originalIdx, 'available_stock', val);
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      max={totalQty}
+                                      step={isPcs ? "1" : "0.01"}
+                                      className="w-16 border rounded p-1.5 text-center font-bold text-red-600 border-gray-300 focus:ring-2 focus:ring-red-500"
+                                      value={damaged}
+                                      onKeyDown={(e) => {
+                                        if (isPcs && (e.key === '.' || e.key === 'e')) e.preventDefault();
+                                      }}
+                                      onChange={(e) => {
+                                        let val = parseFloat(e.target.value);
+                                        if (isNaN(val)) val = 0;
+                                        if (isPcs) val = Math.floor(val);
+                                        val = Math.min(totalQty, Math.max(0, val));
+                                        handleUpdateInventoryVerification(originalIdx, 'damage_qty', val);
+                                        handleUpdateInventoryVerification(originalIdx, 'is_damaged', val > 0);
+                                      }}
+                                    />
+                                  </td>
+                                  <td className="py-3 px-4 text-center">
+                                    <div className="font-bold text-orange-600">{missing > 0 ? missing : '-'}</div>
+                                  </td>
+                                  <td className="py-3 px-4 text-right font-medium text-red-600">
+                                    {chargeAmount > 0 ? `+₹${chargeAmount.toFixed(2)}` : '-'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fixed Assets Section */}
+                  {fixedItems.length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-lg font-semibold mb-3 text-red-700">Fixed Assets Check</h3>
                       <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                         <p className="text-sm text-red-800">
-                          🔧 <strong>For Rent/Fixed Assets:</strong> Track good, damaged, and missing items.
-                          Enter quantities for each condition. Missing items = Total - Good - Damaged.
+                          🔧 <strong>For Fixed Assets:</strong> Track items that should stay in the room.
                         </p>
                       </div>
                       <div className="overflow-x-auto border rounded-lg">
@@ -4053,38 +4181,46 @@ const Services = () => {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-200">
-                            {assetItems.map((item, idx) => {
+                            {fixedItems.map((item, idx) => {
                               const originalIdx = checkoutInventoryDetails.items.indexOf(item);
-                              const isRentable = item.is_rentable;
                               const price = item.charge_per_unit || item.unit_price || 0;
                               const damagePrice = item.cost_per_unit || price;
-                              const totalQty = item.current_stock || 0;
-                              const good = item.available_stock || 0;
-                              const damaged = item.damage_qty || 0;
-                              const missing = Math.max(0, totalQty - good - damaged);
+                              const isPcs = (item.unit || 'pcs').toLowerCase() === 'pcs';
 
-                              let chargeAmount = 0;
-                              if (isRentable) chargeAmount += (item.payable_qty || 0) * price; // Rent charge
-                              chargeAmount += damaged * damagePrice; // Damage charge
-                              chargeAmount += missing * damagePrice; // Missing charge
+                              const totalQty = isPcs ? Math.floor(item.current_stock || 0) : (item.current_stock || 0);
+                              const good = isPcs ? Math.floor(item.available_stock || 0) : (item.available_stock || 0);
+                              const damaged = isPcs ? Math.floor(item.damage_qty || 0) : (item.damage_qty || 0);
+
+                              let missing = totalQty - good - damaged;
+                              if (missing < 0) missing = 0;
+                              if (isPcs) missing = Math.round(missing);
+                              else missing = parseFloat(missing.toFixed(2));
+
+                              let chargeAmount = (damaged * damagePrice) + (missing * damagePrice);
 
                               return (
                                 <tr key={idx} className="hover:bg-red-50">
                                   <td className="py-3 px-4 font-medium">
                                     {item.item_name}
-                                    {item.is_fixed_asset && <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">FIXED</span>}
-                                    {isRentable && <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded">RENT</span>}
+                                    <span className="ml-2 text-xs bg-red-100 text-red-800 px-2 py-0.5 rounded">FIXED</span>
                                   </td>
-                                  <td className="py-3 px-4 text-center text-gray-600 font-semibold">{totalQty}</td>
+                                  <td className="py-3 px-4 text-center text-gray-600 font-semibold">{isPcs ? Math.floor(totalQty) : totalQty}</td>
                                   <td className="py-3 px-4 text-center">
                                     <input
                                       type="number"
                                       min="0"
                                       max={totalQty}
+                                      step={isPcs ? "1" : "0.01"}
                                       className="w-16 border rounded p-1.5 text-center font-bold text-green-600 border-gray-300 focus:ring-2 focus:ring-green-500"
                                       value={good}
+                                      onKeyDown={(e) => {
+                                        if (isPcs && (e.key === '.' || e.key === 'e')) e.preventDefault();
+                                      }}
                                       onChange={(e) => {
-                                        const val = Math.min(totalQty, Math.max(0, parseInt(e.target.value) || 0));
+                                        let val = parseFloat(e.target.value);
+                                        if (isNaN(val)) val = 0;
+                                        if (isPcs) val = Math.floor(val);
+                                        val = Math.min(totalQty, Math.max(0, val));
                                         handleUpdateInventoryVerification(originalIdx, 'available_stock', val);
                                       }}
                                     />
@@ -4094,19 +4230,24 @@ const Services = () => {
                                       type="number"
                                       min="0"
                                       max={totalQty}
+                                      step={isPcs ? "1" : "0.01"}
                                       className="w-16 border rounded p-1.5 text-center font-bold text-red-600 border-gray-300 focus:ring-2 focus:ring-red-500"
                                       value={damaged}
+                                      onKeyDown={(e) => {
+                                        if (isPcs && (e.key === '.' || e.key === 'e')) e.preventDefault();
+                                      }}
                                       onChange={(e) => {
-                                        const val = Math.min(totalQty, Math.max(0, parseInt(e.target.value) || 0));
+                                        let val = parseFloat(e.target.value);
+                                        if (isNaN(val)) val = 0;
+                                        if (isPcs) val = Math.floor(val);
+                                        val = Math.min(totalQty, Math.max(0, val));
                                         handleUpdateInventoryVerification(originalIdx, 'damage_qty', val);
                                         handleUpdateInventoryVerification(originalIdx, 'is_damaged', val > 0);
                                       }}
                                     />
                                   </td>
                                   <td className="py-3 px-4 text-center">
-                                    <div className="font-bold text-orange-600">
-                                      {missing > 0 ? missing : '-'}
-                                    </div>
+                                    <div className="font-bold text-orange-600">{missing > 0 ? missing : '-'}</div>
                                   </td>
                                   <td className="py-3 px-4 text-right font-medium text-red-600">
                                     {chargeAmount > 0 ? `+₹${chargeAmount.toFixed(2)}` : '-'}

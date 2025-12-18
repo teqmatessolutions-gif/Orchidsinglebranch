@@ -1689,6 +1689,7 @@ def get_location_items(
     from app.models.inventory import InventoryItem, AssetMapping, AssetRegistry, StockIssueDetail, StockIssue, LocationStock, WasteLog
     from sqlalchemy import func
     from sqlalchemy.orm import joinedload
+    from datetime import datetime, timedelta
     
     location = inventory_crud.get_location_by_id(db, location_id)
     if not location:
@@ -1714,81 +1715,98 @@ def get_location_items(
     items_dict = {}
     
     # Add items from LocationStock
+    # Add items from LocationStock
     for stock in location_stocks:
         item = stock.item
         if item:
-            key = f"item_{item.id}"
             category = inventory_crud.get_category_by_id(db, item.category_id)
             
-            # Calculate complimentary vs payable using LIFO (Last-In First-Out) logic
-            # usage: we attribute the current stock to the most recent issues
-            complimentary_qty = 0.0
-            payable_qty = 0.0
-            remaining_stock_to_attribute = float(stock.quantity)
-            
-            # Get stock issue details for this item at this location, ordered by date DESC
+            # Fetch all issue details ordered by date DESC
             issue_details = db.query(StockIssueDetail).join(StockIssue).filter(
                 StockIssue.destination_location_id == location_id,
                 StockIssueDetail.item_id == item.id
             ).order_by(StockIssue.issue_date.desc()).all()
             
-            last_issue_price = 0.0
+            # Split issues into Rented vs Standard
+            rented_issues = [d for d in issue_details if d.rental_price and d.rental_price > 0]
+            standard_issues = [d for d in issue_details if not (d.rental_price and d.rental_price > 0)]
             
-            # If stock is 0, everything is 0
-            if remaining_stock_to_attribute <= 0:
+            # Determine split quantities based on current stock
+            total_rented_issue_qty = sum(float(d.issued_quantity) for d in rented_issues)
+            current_stock_qty = float(stock.quantity)
+            
+            rented_stock_qty = min(current_stock_qty, total_rented_issue_qty)
+            standard_stock_qty = max(0, current_stock_qty - rented_stock_qty)
+            
+            # Helper to process a batch and add to items_dict
+            def process_batch(qty, issues, key_suffix, is_rent_split):
+                # Don't show 0 qty rows unless it's the standard row (to show item exists)
+                if qty <= 0 and (is_rent_split or (current_stock_qty > 0)): 
+                    return
+
                 complimentary_qty = 0.0
                 payable_qty = 0.0
-                if issue_details:
-                     # Get price from last issue just for reference/next issue? 
-                     # Actually better to stick to item master if no stock
-                     pass
-            else:
-                for detail in issue_details:
-                    if remaining_stock_to_attribute <= 0:
-                        break
-                        
-                    issued_qty = float(detail.issued_quantity)
-                    # How much of this issue is still "in the room"?
-                    # We assume this issue contributes min(remaining, issued)
-                    attributed_qty = min(remaining_stock_to_attribute, issued_qty)
+                remaining = qty
+                last_issue_price = 0.0
+                
+                # Attribute stock to issues (LIFO based on query order)
+                for detail in issues:
+                    if remaining <= 0: break
+                    issued = float(detail.issued_quantity)
+                    attributed = min(remaining, issued)
                     
                     if detail.is_payable:
-                        payable_qty += attributed_qty
-                        # Check rental_price first, then unit_price for the *latest* relevant issue
-                        price = detail.rental_price if detail.rental_price and detail.rental_price > 0 else detail.unit_price
-                        if price and price > 0 and last_issue_price == 0:
-                            last_issue_price = price
+                        payable_qty += attributed
+                        p = detail.rental_price if detail.rental_price and detail.rental_price > 0 else detail.unit_price
+                        if p and p > 0 and last_issue_price == 0:
+                            last_issue_price = float(p)
                     else:
-                        complimentary_qty += attributed_qty
-                        
-                    remaining_stock_to_attribute -= attributed_qty
-            
-            # Determine selling/rental price for billing (Prioritize Issue Price > Selling Price > Cost Price)
-            selling_unit_price = last_issue_price if last_issue_price > 0 else (item.selling_price if item.selling_price and item.selling_price > 0 else item.unit_price)
-            
-            # IMPORTANT: Stock value should ALWAYS use cost price (unit_price), not selling price
-            cost_price = item.unit_price or 0
-            stock_value = stock.quantity * cost_price
+                        complimentary_qty += attributed
+                    remaining -= attributed
+                
+                # Pricing
+                selling_price = last_issue_price if last_issue_price > 0 else (item.selling_price if item.selling_price and item.selling_price > 0 else item.unit_price)
+                cost_price = item.unit_price or 0
+                stock_value = qty * cost_price
+                
+                key = f"item_{item.id}{key_suffix}"
+                
+                # Type determination
+                is_asset = ((category and category.is_asset_fixed) or item.is_asset_fixed or item.track_laundry_cycle or (not item.is_sellable_to_guest and not item.is_perishable))
+                
+                items_dict[key] = {
+                    "item_id": item.id,
+                    "item_name": item.name,
+                    "item_code": item.item_code,
+                    "category_name": category.name if category else None,
+                    "unit": item.unit,
+                    "current_stock": qty,
+                    "location_stock": qty,
+                    "complimentary_qty": complimentary_qty,
+                    "payable_qty": payable_qty,
+                    "min_stock_level": item.min_stock_level,
+                    "unit_price": cost_price,
+                    "cost_price": cost_price,
+                    "selling_price": selling_price,
+                    "total_value": stock_value,
+                    "source": "Stock" + (" (Rented)" if is_rent_split else ""),
+                    "last_updated": stock.last_updated,
+                    "type": "asset" if is_asset else "consumable",
+                    
+                    # Add explicit rental flags
+                    "is_rentable": is_rent_split, 
+                    "is_asset_fixed": item.is_asset_fixed 
+                }
 
-            items_dict[key] = {
-                "item_id": item.id,
-                "item_name": item.name,
-                "item_code": item.item_code,
-                "category_name": category.name if category else None,
-                "unit": item.unit,
-                "current_stock": stock.quantity, # Location specific stock
-                "location_stock": stock.quantity, # Alias for frontend
-                "complimentary_qty": complimentary_qty,
-                "payable_qty": payable_qty,
-                "min_stock_level": item.min_stock_level,
-                "unit_price": cost_price,  # Show COST price (purchase price) by default
-                "cost_price": cost_price,  # Actual cost for stock valuation
-                "selling_price": selling_unit_price,  # Selling/rental price for billing (only when needed)
-                "total_value": stock_value,  # Stock value based on COST, not selling price
-                "source": "Stock",
-                "last_updated": stock.last_updated,
-                "type": "asset" if ((category and category.is_asset_fixed) or item.is_asset_fixed or item.track_laundry_cycle or (not item.is_sellable_to_guest and not item.is_perishable)) else "consumable"
-            }
+            # 1. Process Rented
+            if rented_stock_qty > 0:
+                process_batch(rented_stock_qty, rented_issues, "_rented", True)
+                
+            # 2. Process Standard
+            # Show standard if we have standard stock OR if total stock is 0 (to show item availability/placeholder)
+            # If everything is rented, we skip standard unless standard_stock_qty > 0
+            if standard_stock_qty > 0 or (rented_stock_qty == 0):
+                process_batch(standard_stock_qty, standard_issues, "", False)
 
 
 
@@ -1949,6 +1967,82 @@ def get_location_items(
                 "color": "green"  # Green for incoming stock (positive quantity)
             })
     
+    # 6. Get Adjustment History (InventoryTransactions)
+    # This covers manual adjustments and auto-corrections from checkout
+    from app.models.inventory import InventoryTransaction
+    
+    # Adjustments affecting this location specifically
+    # Note: InventoryTransaction usually tracks global stock or is loosely coupled. 
+    # But if we used specific references like "ADJ-CHK-...-LOC-{id}", we could filter.
+    # However, my checkout fix used: reference_number=f"ADJ-CHK-{checkout_request.id}"
+    # and notes=f"... Deducted from Source ID {adjust_source_id}."
+    # This makes it hard to filter by location_id purely from DB query without a JOIN or structured ref.
+    # But we can try to find transactions referencing this location in notes or reference? 
+    # Better: If we want to show it in History, we should rely on WasteLog or StockIssue.
+    # Since Step 3c created an InventoryTransaction but not a WasteLog/StockIssue for the source deduction, 
+    # it is invisible here. 
+    # TO FIX VISIBILITY: We will fetch InventoryTransactions that have this item and seem to be adjustments,
+    # and filter in python if they mention this location.
+    
+    # 6. Get Adjustment History (InventoryTransactions)
+    # Filter for items that are present in this location view
+    location_item_ids = []
+    for k in items_dict.keys():
+        if k.startswith("item_"):
+            try:
+                location_item_ids.append(int(k.split('_')[1]))
+            except: pass
+        elif k.startswith("registry_"):
+            # Getting item id from registry key might be harder unless we stored it
+            if "item_id" in items_dict[k]:
+                 location_item_ids.append(items_dict[k]["item_id"])
+
+    # Remove duplicates
+    location_item_ids = list(set(location_item_ids))
+    
+    adjustments = []
+    if location_item_ids:
+        adjustments = db.query(InventoryTransaction).options(
+            joinedload(InventoryTransaction.user)
+        ).filter(
+            InventoryTransaction.item_id.in_(location_item_ids),
+            InventoryTransaction.created_at >= (datetime.now() - timedelta(days=30))
+        ).all()
+
+    # Iterate and filter manually for this location context
+    for adj in adjustments:
+        # Check if this transaction is relevant to this location
+        # Our checkout fix used: reference_number=f"ADJ-CHK-{checkout_request.id}"
+        # and notes=f"... Deducted from Source ID {adjust_source_id}."
+        
+        is_relevant = False
+        if str(location.id) in (adj.notes or "") and "Source ID" in (adj.notes or ""):
+             is_relevant = True
+        elif adj.reference_number and f"LOC-{location.id}" in adj.reference_number:
+             is_relevant = True
+             
+        if is_relevant:
+            item_name = "Unknown Item"
+            if adj.item: # If eager loaded or available
+                item_name = adj.item.name
+            else:
+                 # Fetch item name if not loaded
+                 from app.models.inventory import InventoryItem
+                 tmp_item = db.query(InventoryItem).filter(InventoryItem.id == adj.item_id).first()
+                 if tmp_item: item_name = tmp_item.name
+
+            history.append({
+                "date": adj.created_at,
+                "type": "Stock Adjustment",
+                "item_name": item_name,
+                "quantity": -adj.quantity if adj.transaction_type == "out" else adj.quantity, # Negative for deduction
+                "unit": "units", # Fallback
+                "reference": adj.reference_number,
+                "user": adj.user.name if adj.user else "System",
+                "notes": adj.notes,
+                "color": "red" if adj.transaction_type == "out" else "orange"
+            })
+    
     # Sort combined history by date desc
     history.sort(key=lambda x: x["date"], reverse=True)
 
@@ -1965,7 +2059,7 @@ def get_location_items(
             "room_area": location.room_area,
             "location_type": location.location_type
         },
-        "total_items": total_items,
+        "total_items": total_items, # This is the sum of CURRENT LocationStock
         "total_stock_value": total_value,
         "items": items_list,
         "history": history
@@ -1989,27 +2083,32 @@ def get_stock_by_location(
         for location in locations:
             try:
                 items_map = {} # Map item_id -> quantity
-                
+                seen_items = set() # Track items we have checking in LocationStock (to prevent phantom fallback)
+
                 # 1. Get items from LocationStock (PRIMARY source)
+                # Fetch ALL stocks, even 0, to know we have a record
                 location_stocks = db.query(LocationStock).filter(
                     LocationStock.location_id == location.id
                 ).all()
                 
                 for stock in location_stocks:
+                    seen_items.add(stock.item_id)
                     if stock.quantity > 0:
                         items_map[stock.item_id] = stock.quantity
                 
-                # 2. Check AssetMappings (Only add if item NOT in LocationStock)
+                # 2. Check AssetMappings (Only add if item NOT seen in LocationStock)
+                # If it was in LocationStock (even as 0), we trust LocationStock (consumed)
                 asset_mappings = db.query(AssetMapping).filter(
                     AssetMapping.location_id == location.id,
                     AssetMapping.is_active == True
                 ).all()
                 
                 for mapping in asset_mappings:
-                    if mapping.item_id not in items_map:
+                    if mapping.item_id not in seen_items:
                         items_map[mapping.item_id] = mapping.quantity
+                        seen_items.add(mapping.item_id) # Mark as seen
                 
-                # 3. Check AssetRegistry (Only add if item NOT in LocationStock/Mapping)
+                # 3. Check AssetRegistry (Only add if item NOT seen in LocationStock/Mapping)
                 # Registry items are individual instances, so we sum them up per item type
                 registry_items = db.query(AssetRegistry).filter(
                     AssetRegistry.current_location_id == location.id
@@ -2020,7 +2119,7 @@ def get_stock_by_location(
                     registry_counts[reg.item_id] = registry_counts.get(reg.item_id, 0) + 1
                     
                 for item_id, count in registry_counts.items():
-                    if item_id not in items_map:
+                    if item_id not in seen_items:
                          items_map[item_id] = count
 
                 # 4. Calculate Totals and Values
@@ -2258,11 +2357,12 @@ def update_asset_mapping(
 @router.delete("/asset-mappings/{mapping_id}")
 def unassign_asset(
     mapping_id: int,
+    destination_location_id: Optional[int] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     try:
-        mapping = inventory_crud.unassign_asset(db, mapping_id)
+        mapping = inventory_crud.unassign_asset(db, mapping_id, destination_location_id=destination_location_id)
         if not mapping:
             raise HTTPException(status_code=404, detail="Asset mapping not found")
         return {"message": "Asset unassigned successfully"}

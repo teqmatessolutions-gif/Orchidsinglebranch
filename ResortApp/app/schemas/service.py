@@ -77,7 +77,8 @@ class AssignedServiceBase(BaseModel):
     room_id: int
 
 class AssignedServiceCreate(AssignedServiceBase):
-    pass
+    override_charges: Optional[float] = None
+    billing_status: Optional[str] = "unbilled"  # Explicitly track billing status
 
 class InventoryReturnItem(BaseModel):
     assignment_id: int
@@ -88,6 +89,7 @@ class AssignedServiceUpdate(BaseModel):
     status: Optional[ServiceStatus] = None
     employee_id: Optional[int] = None  # Allow employee reassignment
     inventory_returns: Optional[List[InventoryReturnItem]] = None  # Optional inventory items to return when completing
+    billing_status: Optional[str] = None  # Allow updating billing status
 
 class AssignedServiceOut(BaseModel):
     id: int
@@ -100,6 +102,7 @@ class AssignedServiceOut(BaseModel):
     assigned_at: datetime
     status: ServiceStatus
     last_used_at: Optional[datetime] = None  # Timestamp when service was last used (during checkout)
+    override_charges: Optional[float] = None
 
     class Config:
         from_attributes = True

@@ -133,9 +133,23 @@ def get_vendors_by_ids(db: Session, vendor_ids: List[int]):
 
 # Purchase Master CRUD
 def generate_purchase_number(db: Session):
-    """Generate unique purchase number"""
-    count = db.query(PurchaseMaster).count()
-    return f"PO-{datetime.now().strftime('%Y%m%d')}-{count + 1:04d}"
+    """Generate unique purchase number based on latest sequence"""
+    today_str = datetime.now().strftime('%Y%m%d')
+    prefix = f"PO-{today_str}-"
+    
+    last_entry = db.query(PurchaseMaster).filter(
+        PurchaseMaster.purchase_number.like(f"{prefix}%")
+    ).order_by(PurchaseMaster.id.desc()).first()
+
+    if last_entry and last_entry.purchase_number:
+        try:
+            parts = last_entry.purchase_number.split('-')
+            last_seq = int(parts[-1])
+            return f"{prefix}{last_seq + 1:04d}"
+        except (ValueError, IndexError):
+            pass
+            
+    return f"{prefix}0001"
 
 
 def calculate_gst(amount: Decimal, gst_rate: Decimal, is_interstate: bool = False):
@@ -1239,7 +1253,7 @@ def update_asset_mapping(db: Session, mapping_id: int, data: dict):
     return mapping
 
 
-def unassign_asset(db: Session, mapping_id: int):
+def unassign_asset(db: Session, mapping_id: int, destination_location_id: int = None):
     from app.models.inventory import AssetMapping, Location, LocationStock
     from datetime import datetime
     
@@ -1262,10 +1276,48 @@ def unassign_asset(db: Session, mapping_id: int):
             loc_stock.quantity = max(0, loc_stock.quantity - mapping.quantity)
             loc_stock.last_updated = datetime.utcnow()
             
-        # 2. Add back to Main Item Stock (Available)
-        item = get_item_by_id(db, mapping.item_id)
-        if item:
-            item.current_stock += mapping.quantity
+        # 2. Add back to Warehouse (Physical Location)
+        # Find warehouse to return to
+        warehouse = None
+        if destination_location_id:
+             warehouse = db.query(Location).filter(Location.id == destination_location_id).first()
+
+        if not warehouse:
+            # Fallback to default logic
+            warehouse = db.query(Location).filter(
+                Location.location_type.in_(["WAREHOUSE", "CENTRAL_WAREHOUSE"])
+            ).first()
+        
+        if not warehouse:
+             warehouse = db.query(Location).filter(
+                Location.location_type.ilike("%warehouse%")
+            ).first()
+            
+        if warehouse:
+            wh_stock = db.query(LocationStock).filter(
+                LocationStock.location_id == warehouse.id,
+                LocationStock.item_id == mapping.item_id
+            ).first()
+            
+            if wh_stock:
+                wh_stock.quantity += mapping.quantity
+                wh_stock.last_updated = datetime.utcnow()
+            else:
+                wh_stock = LocationStock(
+                    location_id=warehouse.id,
+                    item_id=mapping.item_id,
+                    quantity=mapping.quantity,
+                    last_updated=datetime.utcnow()
+                )
+                db.add(wh_stock)
+        else:
+             print("Warning: No warehouse found to return unassigned asset stock to.")
+
+        # Note: Global stock (item.current_stock) should NOT change because the item 
+        # is just moving from Room -> Warehouse. It is still owned.
+        # But if the previous logic was incrementing global stock, it was wrong because 
+        # unassigning doesn't mean "New Purchase", it means "Return to Shelf".
+        # So we do NOTHING to item.current_stock.
             
     db.commit()
     db.refresh(mapping)

@@ -118,6 +118,8 @@ class ConsumableAuditItem(BaseModel):
     total_charge: float
 
 class AssetDamageItem(BaseModel):
+    asset_registry_id: Optional[int] = None
+    item_id: Optional[int] = None
     item_name: str
     replacement_cost: float
     notes: Optional[str] = None

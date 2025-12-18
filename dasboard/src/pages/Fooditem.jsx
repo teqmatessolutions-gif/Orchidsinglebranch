@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import DashboardLayout from "../layout/DashboardLayout";
 import API from "../services/api";
 import { getMediaBaseUrl } from "../utils/env";
+import { normalizeQuantity } from "../utils/quantityValidation";
 import { ChefHat, Plus, X, ChevronDown, ChevronUp } from "lucide-react";
 
 // Helper function to construct image URLs
@@ -34,7 +35,7 @@ const FoodItems = () => {
   const [foodItems, setFoodItems] = useState([]);
   const [editingItemId, setEditingItemId] = useState(null);
   const [available, setAvailable] = useState(true);
-  
+
   // Recipe/Ingredients state
   const [showIngredients, setShowIngredients] = useState(false);
   const [recipeName, setRecipeName] = useState("");
@@ -153,8 +154,15 @@ const FoodItems = () => {
 
   const handleIngredientChange = (index, field, value) => {
     const updated = [...ingredients];
-    updated[index][field] = value;
-    
+
+    // Normalize quantity if it's the quantity field
+    if (field === "quantity") {
+      const currentUnit = updated[index].unit;
+      updated[index][field] = normalizeQuantity(value, currentUnit);
+    } else {
+      updated[index][field] = value;
+    }
+
     // Auto-set unit from inventory item if available
     if (field === "inventory_item_id" && value) {
       const invItem = inventoryItems.find(item => item.id === parseInt(value));
@@ -162,7 +170,7 @@ const FoodItems = () => {
         updated[index].unit = invItem.unit;
       }
     }
-    
+
     setIngredients(updated);
   };
 
@@ -446,8 +454,6 @@ const FoodItems = () => {
                             <label className="block text-xs text-gray-600 mb-1">Quantity</label>
                             <input
                               type="number"
-                              step="0.01"
-                              min="0"
                               placeholder="0.00"
                               className="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500"
                               value={ingredient.quantity}

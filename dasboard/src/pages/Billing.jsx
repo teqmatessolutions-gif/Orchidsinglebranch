@@ -838,6 +838,8 @@ const Billing = () => {
       const assetDamages = (checkoutInventoryDetails.fixed_assets || [])
         .filter(asset => asset.is_damaged)
         .map(asset => ({
+          asset_registry_id: asset.asset_registry_id,
+          item_id: asset.item_id,
           item_name: asset.item_name,
           replacement_cost: asset.replacement_cost,
           notes: asset.damage_notes || ""
@@ -949,10 +951,8 @@ const Billing = () => {
       setRoomNumber(""); // Clear input on successful checkout
       setCheckoutMode("multiple"); // Reset to default
       showBannerMessage("success", `Checkout successful! ${roomCount} room(s) (${modeText}) checked out. Checkout ID: ${res.data.checkout_id}`);
-      // Refresh all data after successful checkout
-      setTimeout(() => {
-        fetchInitialData();
-      }, 1000);
+      // Immediately refresh all data after successful checkout
+      await fetchInitialData();
     } catch (error) {
       const errorMessage = error.response?.data?.detail || error.message || "Checkout failed";
 
@@ -1420,6 +1420,14 @@ const Billing = () => {
                   .reduce((sum, item) => sum + (item.amount || 0), 0)
                 : 0);
 
+            // Consumables: Show ALL (Complimentary + Payable)
+            const allConsumables = billData.charges.consumables_items || [];
+
+            // For Inventory Usage, show if it's payable, rented (with charge), or explicitly marked as rental
+            const payableInventory = billData.charges.inventory_usage?.filter(
+              item => item.is_payable || (item.rental_price && item.rental_price > 0) || item.rental_charge > 0
+            ) || [];
+
             // Check if there are any food items (paid or unpaid)
             const hasFoodItems = billData.charges.food_items && billData.charges.food_items.length > 0;
 
@@ -1476,14 +1484,17 @@ const Billing = () => {
                     </div>
                   )}
 
-                  {billData.charges.consumables_items && billData.charges.consumables_items.length > 0 && (
+                  {allConsumables.length > 0 && (
                     <div className="mt-3">
-                      <h4 className="font-semibold text-gray-600">Consumables (Payable Items):</h4>
+                      <h4 className="font-semibold text-gray-600">Consumables:</h4>
                       <ul className="list-decimal list-inside ml-4 text-xs text-gray-500">
-                        {billData.charges.consumables_items.map((item, i) => (
+                        {allConsumables.map((item, i) => (
                           <li key={i}>
-                            {item.item_name} (x{item.actual_consumed}) - {formatCurrency(item.total_charge)}
-                            {item.complimentary_limit > 0 && (
+                            <span className={item.total_charge === 0 ? "text-green-600 font-medium" : ""}>
+                              {item.item_name} (x{item.actual_consumed})
+                              {item.total_charge > 0 ? ` - ${formatCurrency(item.total_charge)}` : " - Complimentary"}
+                            </span>
+                            {item.complimentary_limit > 0 && item.total_charge > 0 && (
                               <span className="text-xs text-gray-400 ml-1">
                                 (Limit: {item.complimentary_limit} free)
                               </span>
@@ -1508,11 +1519,11 @@ const Billing = () => {
                     </div>
                   )}
 
-                  {billData.charges.inventory_usage && billData.charges.inventory_usage.length > 0 && (
+                  {payableInventory.length > 0 && (
                     <div className="mt-3">
-                      <h4 className="font-semibold text-gray-600">Inventory Usage (Amenities / Stock Issued):</h4>
+                      <h4 className="font-semibold text-gray-600">Inventory/Rental Usage:</h4>
                       <ul className="list-disc list-inside ml-4 text-xs text-gray-500">
-                        {billData.charges.inventory_usage.map((item, i) => (
+                        {payableInventory.map((item, i) => (
                           <li key={i}>
                             <span className="font-medium text-gray-700">{item.item_name}</span>
                             {item.quantity > 0 && ` (x${item.quantity} ${item.unit})`}

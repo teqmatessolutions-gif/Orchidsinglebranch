@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { formatCurrency } from "../utils/currency";
+import { getQuantityStep, normalizeQuantity } from "../utils/quantityValidation";
 import DashboardLayout from "../layout/DashboardLayout";
 import API from "../services/api";
 import { useNavigate } from "react-router-dom";
@@ -274,7 +275,10 @@ const AddExtraAllocationModal = ({
 
   // Helper to fetch stock for a specific item and cache it
   const ensureItemStock = async (itemId) => {
-    if (!itemId || itemStockCache[itemId]) return;
+    if (!itemId) return;
+
+    // Only skip if we have actual stock data cached (not just an empty object)
+    if (itemStockCache[itemId] && Object.keys(itemStockCache[itemId]).length > 0) return;
 
     try {
       const res = await API.get(`/inventory/items/${itemId}/stocks`, authHeader());
@@ -287,6 +291,147 @@ const AddExtraAllocationModal = ({
       setItemStockCache(prev => ({ ...prev, [itemId]: stockMap }));
     } catch (error) {
       console.error(`Error fetching stock for item ${itemId}:`, error);
+      // Set empty object to prevent repeated failed requests
+      setItemStockCache(prev => ({ ...prev, [itemId]: {} }));
+    }
+  };
+
+  // Handle Damaged Asset Reporting
+  const handleReportDamage = async (item) => {
+    if (!confirm(`Are you sure you want to report damage for ${item.item_name || 'this item'}? This will remove it from inventory and add a charge to the bill.`)) return;
+
+    const baseAmount = parseFloat(item.selling_price || item.unit_price || item.rental_price || 0);
+    const amountStr = prompt(`Enter damage charge amount for ${item.item_name || 'Item'}:`, baseAmount);
+
+    if (amountStr === null) return;
+
+    const finalCharge = parseFloat(amountStr);
+    if (isNaN(finalCharge) || finalCharge < 0) {
+      alert("Invalid amount. Please enter a positive number.");
+      return;
+    }
+
+    try {
+      // 1. Resolve Room and Location
+      const mainRoom = booking.rooms && booking.rooms[0] ? booking.rooms[0] : null;
+      const roomId = mainRoom?.room_id || mainRoom?.id;
+      const roomNumber = mainRoom?.number || mainRoom?.room?.number;
+
+      if (!roomId) {
+        alert("Could not determine Room ID.");
+        return;
+      }
+
+      // 2. Resolve Location ID - Priority: Object property -> API Search
+      let locationId = mainRoom?.room?.inventory_location_id || mainRoom?.inventory_location_id;
+
+      if (!locationId) {
+        try {
+          // Fallback: Fetch locations to find match
+          const locRes = await API.get(`/inventory/locations?limit=10000`);
+          const roomLoc = locRes.data.find(l =>
+            (l.name === `Room ${roomNumber}`) ||
+            (l.room_area === `Room ${roomNumber}`)
+          );
+          if (roomLoc) locationId = roomLoc.id;
+        } catch (e) {
+          console.error("Error resolving location:", e);
+        }
+      }
+
+      if (!locationId) {
+        console.warn(`Location ID not found for Room ${roomNumber}. Inventory deduction may fail.`);
+      }
+
+      // 2. Create Waste Log (Remove from Inventory)
+      // Only if we found a location and have an item ID
+      if (locationId && item.item_id) {
+        try {
+          const wasteFormData = new FormData();
+          wasteFormData.append('item_id', item.item_id);
+          wasteFormData.append('location_id', locationId);
+          wasteFormData.append('quantity', 1);
+          wasteFormData.append('unit', item.unit || "pcs");
+          wasteFormData.append('reason_code', "Damaged by Guest");
+          wasteFormData.append('action_taken', "Billed to Guest");
+          wasteFormData.append('notes', `Damaged by guest in Room ${roomNumber}. Billed charge: ${finalCharge}`);
+
+          await API.post(`/inventory/waste-logs`, wasteFormData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+
+        } catch (wasteError) {
+          console.error("Error creating waste log:", wasteError);
+          alert("Warning: Failed to update inventory records. Billing will continue.");
+        }
+      } else {
+        console.warn("Skipping inventory update: Missing Location ID or Item ID");
+      }
+
+      // 3. Billing Logic (Find or Create "Asset Damage" Service)
+      let serviceId = null;
+      try {
+        const svcs = await API.get(`/services/?limit=1000`);
+        const damageSvc = svcs.data.find(s => s.name === "Asset Damage");
+        if (damageSvc) {
+          serviceId = damageSvc.id;
+        } else {
+          const formData = new FormData();
+          formData.append('name', "Asset Damage");
+          formData.append('description', "Charges for damaged assets");
+          formData.append('charges', 0);
+          formData.append('is_visible_to_guest', 'true');
+
+          const newSvc = await API.post(`/services`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+          });
+          serviceId = newSvc.data.id;
+        }
+      } catch (svcError) {
+        console.error("Error creating/finding service:", svcError);
+        alert("Failed to initialize damage service.");
+        return;
+      }
+
+      // 4. Resolve Employee
+      let employeeId = null;
+      try {
+        const emps = await API.get('/employees/?limit=1');
+        if (emps.data && emps.data.length > 0) {
+          employeeId = emps.data[0].id;
+        }
+      } catch (e) { console.error(e); }
+
+      if (!employeeId) {
+        alert("No employees found to assign service.");
+        return;
+      }
+
+      // 5. Assign Service with Override Charge and Explicit Billing Status
+      const payload = {
+        service_id: serviceId,
+        employee_id: employeeId,
+        room_id: roomId,
+        override_charges: finalCharge,
+        billing_status: "unbilled"  // Explicitly set to ensure it appears in bill
+      };
+
+      const assignRes = await API.post(`/services/assign`, payload);
+
+      // 6. Mark as Completed (but keep billing_status as unbilled)
+      await API.patch(`/services/assigned/${assignRes.data.id}`, {
+        status: "completed",
+        billing_status: "unbilled"  // Ensure it remains unbilled
+      });
+
+      alert("Damage reported: Item removed from inventory and charge added to bill.");
+
+      // 7. Update Local State (Remove item from list)
+      setCurrentRoomItems(prev => prev.filter(i => i.item_id !== item.item_id));
+
+    } catch (error) {
+      console.error("Damage report error:", error);
+      alert("Failed to report damage: " + (error.response?.data?.detail || error.message));
     }
   };
 
@@ -1007,10 +1152,115 @@ const AddExtraAllocationModal = ({
                   </div>
                 )}
 
-                {/* Fixed Assets Section - Always Visible */}
+                {/* Fixed Assets Section */}
+                <div className="mb-8">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3 ml-1">Fixed Assets / Room Inventory</h4>
+                  <div className="overflow-x-auto border rounded-lg bg-white">
+                    {currentRoomItems.filter(i => i.type === 'asset' && !(i.rental_price > 0 || i.is_rentable)).length === 0 ? (
+                      <div className="text-center py-6 text-gray-500 text-sm">No fixed assets assigned.</div>
+                    ) : (
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Asset Name</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Serial / Tag</th>
+                            <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Qty</th>
+                            <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Present</th>
+                            <th className="px-3 py-2 text-center text-xs font-medium text-gray-500 uppercase">Damaged</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Condition</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                            <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {currentRoomItems.filter(i => i.type === 'asset' && !(i.rental_price > 0 || i.is_rentable)).map((item, index) => {
+                            const actualIndex = currentRoomItems.indexOf(item);
+                            return (
+                              <tr key={index} className={`hover:bg-gray-50 ${item.is_damaged ? 'bg-red-50' : ''}`}>
+                                <td className="px-3 py-2 text-sm">
+                                  <span className="font-medium text-gray-900">{item.item_name}</span>
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-600 font-mono">
+                                  {item.serial_number || item.asset_tag || '-'}
+                                </td>
+                                <td className="px-3 py-2 text-sm text-gray-900 font-medium text-center">
+                                  {item.location_stock || 1}
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={item.is_present !== false}
+                                    onChange={(e) => {
+                                      const updated = [...currentRoomItems];
+                                      updated[actualIndex] = { ...updated[actualIndex], is_present: e.target.checked };
+                                      setCurrentRoomItems(updated);
+                                    }}
+                                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={item.is_damaged || false}
+                                    onChange={(e) => {
+                                      const updated = [...currentRoomItems];
+                                      updated[actualIndex] = { ...updated[actualIndex], is_damaged: e.target.checked };
+                                      setCurrentRoomItems(updated);
+                                    }}
+                                    className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
+                                  />
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  {item.is_damaged ? (
+                                    <input
+                                      type="text"
+                                      placeholder="Damage notes..."
+                                      value={item.damage_notes || ''}
+                                      onChange={(e) => {
+                                        const updated = [...currentRoomItems];
+                                        updated[actualIndex] = { ...updated[actualIndex], damage_notes: e.target.value };
+                                        setCurrentRoomItems(updated);
+                                      }}
+                                      className="w-full px-2 py-1 text-xs border border-red-300 rounded bg-red-50 focus:ring-2 focus:ring-red-500 outline-none"
+                                    />
+                                  ) : (
+                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${(item.status || 'active').toLowerCase() === 'active'
+                                      ? 'bg-green-100 text-green-800'
+                                      : 'bg-yellow-100 text-yellow-800'
+                                      }`}>
+                                      {item.status || 'Active'}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  <span className="text-gray-500 text-xs">{item.source || '-'}</span>
+                                </td>
+                                <td className="px-3 py-2 text-sm">
+                                  {item.is_damaged ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleReportDamage(item)}
+                                      className="bg-red-100 text-red-700 hover:bg-red-200 px-2 py-1 rounded text-xs font-semibold"
+                                    >
+                                      Charge Damage
+                                    </button>
+                                  ) : (
+                                    <span className="text-gray-400 text-xs">-</span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
+
+                {/* Rentable Assets Section */}
                 <div>
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold text-gray-700 ml-1">Fixed Assets / Room Inventory</h4>
+                    <h4 className="text-sm font-semibold text-blue-700 ml-1">Rentable Assets</h4>
                     <button
                       type="button"
                       onClick={() => {
@@ -1021,6 +1271,7 @@ const AddExtraAllocationModal = ({
                           type: 'asset',
                           location_stock: 1,
                           is_rentable: true,
+                          is_new: true, // Mark as new for UI logic
                           rental_price: 0,
                           is_present: true,
                           is_damaged: false,
@@ -1029,7 +1280,7 @@ const AddExtraAllocationModal = ({
                         };
                         setCurrentRoomItems([...currentRoomItems, newAsset]);
                       }}
-                      className="px-3 py-1.5 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 flex items-center gap-1.5"
+                      className="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 flex items-center gap-1.5"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1038,10 +1289,9 @@ const AddExtraAllocationModal = ({
                     </button>
                   </div>
                   <div className="overflow-x-auto border rounded-lg bg-white">
-                    {currentRoomItems.filter(i => i.type === 'asset').length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        <p className="text-sm">No fixed assets or rentable items assigned yet.</p>
-                        <p className="text-xs mt-1">Click "Add Rentable Asset" to add chargeable items like laundry.</p>
+                    {currentRoomItems.filter(i => i.type === 'asset' && (i.rental_price > 0 || i.is_rentable)).length === 0 ? (
+                      <div className="text-center py-6 text-gray-500 text-sm">
+                        No rentable assets assigned. Click "Add Rentable Asset" to add items like laundry or extra beds.
                       </div>
                     ) : (
                       <table className="min-w-full divide-y divide-gray-200">
@@ -1059,12 +1309,12 @@ const AddExtraAllocationModal = ({
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {currentRoomItems.filter(i => i.type === 'asset').map((item, index) => {
-                            const actualIndex = currentRoomItems.findIndex(i => i === item);
+                          {currentRoomItems.filter(i => i.type === 'asset' && (i.rental_price > 0 || i.is_rentable)).map((item, index) => {
+                            const actualIndex = currentRoomItems.indexOf(item);
                             return (
                               <tr key={index} className={`hover:bg-blue-50 ${item.is_damaged ? 'bg-red-50' : ''}`}>
                                 <td className="px-3 py-2 text-sm">
-                                  {item.is_rentable ? (
+                                  {item.is_new ? (
                                     <select
                                       value={item.item_id || ''}
                                       onChange={(e) => {
@@ -1079,12 +1329,14 @@ const AddExtraAllocationModal = ({
                                             rental_price: selectedItem.selling_price || 0
                                           };
                                           setCurrentRoomItems(updated);
+                                          // Fetch stock for this item
+                                          ensureItemStock(selectedId);
                                         }
                                       }}
                                       className="w-full px-2 py-1 text-sm border border-indigo-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
                                     >
                                       <option value="">Select Rentable Asset...</option>
-                                      {inventoryItems.filter(inv => inv.is_asset_fixed || inv.track_laundry_cycle || (!inv.is_sellable_to_guest && !inv.is_perishable)).map(inv => (
+                                      {inventoryItems.filter(inv => inv.is_asset_fixed || inv.track_laundry_cycle || !inv.is_perishable).map(inv => (
                                         <option key={inv.id} value={inv.id}>{inv.name}</option>
                                       ))}
                                     </select>
@@ -1145,47 +1397,71 @@ const AddExtraAllocationModal = ({
                                   )}
                                 </td>
                                 <td className="px-3 py-2 text-sm">
-                                  {item.is_rentable || (item.payable_qty > 0) ? (
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      step="0.01"
-                                      value={item.rental_price || item.selling_price || 0}
-                                      onChange={(e) => {
-                                        const updated = [...currentRoomItems];
-                                        updated[actualIndex] = { ...updated[actualIndex], rental_price: parseFloat(e.target.value) || 0 };
-                                        setCurrentRoomItems(updated);
-                                      }}
-                                      className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
-                                    />
-                                  ) : (
-                                    <span className="text-gray-400 text-xs">-</span>
-                                  )}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.01"
+                                    value={item.rental_price || item.selling_price || 0}
+                                    disabled={!item.is_new}
+                                    onChange={(e) => {
+                                      const updated = [...currentRoomItems];
+                                      updated[actualIndex] = { ...updated[actualIndex], rental_price: parseFloat(e.target.value) || 0 };
+                                      setCurrentRoomItems(updated);
+                                    }}
+                                    className={`w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none ${!item.is_new ? 'bg-gray-100 text-gray-500' : ''}`}
+                                  />
                                 </td>
                                 <td className="px-3 py-2 text-sm">
-                                  {item.is_rentable ? (
+                                  {item.is_new ? (
                                     <select
                                       value={item.source_location_id || ''}
                                       onChange={(e) => {
+                                        const selectedLocationId = e.target.value;
+
+                                        // Check if stock is available at selected location
+                                        if (item.item_id && selectedLocationId) {
+                                          const stock = itemStockCache[item.item_id]?.[selectedLocationId];
+                                          const qty = item.location_stock || 1;
+
+                                          if (stock !== undefined && stock < qty) {
+                                            alert(`Insufficient stock at selected location!\n\nAvailable: ${stock}\nRequired: ${qty}\n\nPlease select a different location or reduce quantity.`);
+                                            return; // Don't update if stock is insufficient
+                                          }
+                                        }
+
                                         const updated = [...currentRoomItems];
-                                        updated[actualIndex] = { ...updated[actualIndex], source_location_id: e.target.value };
+                                        updated[actualIndex] = { ...updated[actualIndex], source_location_id: selectedLocationId };
                                         setCurrentRoomItems(updated);
                                       }}
-                                      className="w-32 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500 outline-none"
+                                      className={`w-48 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-indigo-500 outline-none ${item.item_id && item.source_location_id &&
+                                          (itemStockCache[item.item_id]?.[item.source_location_id] || 0) < (item.location_stock || 1)
+                                          ? 'border-red-500 bg-red-50'
+                                          : 'border-gray-300'
+                                        }`}
                                     >
                                       <option value="">Select Source</option>
                                       {inventoryLocations
-                                        .filter(loc => loc.is_inventory_point || ['WAREHOUSE', 'STORE', 'BRANCH_STORE', 'CENTRAL_WAREHOUSE'].includes(String(loc.location_type || '').toUpperCase()))
-                                        .map(loc => (
-                                          <option key={loc.id} value={loc.id}>{loc.name}</option>
-                                        ))}
+                                        .filter(loc => loc.is_inventory_point === true || ['WAREHOUSE', 'STORE', 'BRANCH_STORE', 'CENTRAL_WAREHOUSE', 'STORAGE'].includes(String(loc.location_type || '').toUpperCase()))
+                                        .map(loc => {
+                                          // Get stock for this item at this location
+                                          const stock = item.item_id ? (itemStockCache[item.item_id]?.[loc.id]) : null;
+                                          const stockDisplay = stock !== undefined && stock !== null
+                                            ? ` (Stock: ${stock})`
+                                            : (item.item_id ? ' (Stock: ...)' : '');
+
+                                          return (
+                                            <option key={loc.id} value={loc.id}>
+                                              {loc.name}{stockDisplay}
+                                            </option>
+                                          );
+                                        })}
                                     </select>
                                   ) : (
                                     <span className="text-gray-500 text-xs">{item.source || '-'}</span>
                                   )}
                                 </td>
                                 <td className="px-3 py-2 text-sm">
-                                  {item.is_rentable ? (
+                                  {item.is_new ? (
                                     <button
                                       type="button"
                                       onClick={() => {
@@ -1194,6 +1470,14 @@ const AddExtraAllocationModal = ({
                                       className="text-red-600 hover:text-red-800 text-xs underline"
                                     >
                                       Remove
+                                    </button>
+                                  ) : item.is_damaged ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleReportDamage(item)}
+                                      className="bg-red-100 text-red-700 hover:bg-red-200 px-2 py-1 rounded text-xs font-semibold"
+                                    >
+                                      Charge Damage
                                     </button>
                                   ) : (
                                     <span className="text-gray-400 text-xs">-</span>
@@ -1207,8 +1491,8 @@ const AddExtraAllocationModal = ({
                     )}
                   </div>
 
-                  {/* Save Assets Button */}
-                  {currentRoomItems.some(i => i.type === 'asset' && i.is_rentable && i.item_id) && (
+                  {/* Save Rentable Assets Button */}
+                  {currentRoomItems.some(i => i.is_new && i.type === 'asset' && i.is_rentable && i.item_id) && (
                     <div className="mt-4 flex justify-end">
                       <button
                         type="button"
@@ -1238,8 +1522,8 @@ const AddExtraAllocationModal = ({
                               return;
                             }
 
-                            // Get rentable assets that have been selected
-                            const rentableAssets = currentRoomItems.filter(i => i.type === 'asset' && i.is_rentable && i.item_id);
+                            // Get rentable assets that have been selected (ONLY NEW ONES)
+                            const rentableAssets = currentRoomItems.filter(i => i.is_new && i.type === 'asset' && i.is_rentable && i.item_id);
 
                             if (rentableAssets.length === 0) {
                               alert("No rentable assets to save");
@@ -1433,11 +1717,10 @@ const AddExtraAllocationModal = ({
                         onChange={(e) =>
                           updateAllocationItem(index, "source_location_id", parseInt(e.target.value))
                         }
-                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                          (item.item_id && (itemStockCache[item.item_id]?.[item.source_location_id || getDefaultSourceLocationId()] || 0) < item.quantity)
-                            ? "border-red-500 bg-red-50 text-red-900"
-                            : "border-gray-300"
-                        }`}
+                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${(item.item_id && (itemStockCache[item.item_id]?.[item.source_location_id || getDefaultSourceLocationId()] || 0) < item.quantity)
+                          ? "border-red-500 bg-red-50 text-red-900"
+                          : "border-gray-300"
+                          }`}
                       >
                         {inventoryLocations
                           .filter((loc) => {
@@ -1448,12 +1731,16 @@ const AddExtraAllocationModal = ({
                             );
                           })
                           .map((loc) => {
-                            // Show stock avaiability in this source if item is selected
-                            const stock = item.item_id ? (itemStockCache[item.item_id]?.[loc.id] !== undefined ? itemStockCache[item.item_id][loc.id] : '-') : null;
+                            // Show stock availability in this source if item is selected
+                            const stock = item.item_id ? (itemStockCache[item.item_id]?.[loc.id]) : null;
+                            const stockDisplay = stock !== undefined && stock !== null
+                              ? ` - Stock: ${stock}`
+                              : (item.item_id ? ' - Stock: ...' : '');
+
                             return (
                               <option key={loc.id} value={loc.id}>
                                 {loc.name} {loc.building && loc.room_area ? `(${loc.building} - ${loc.room_area})` : ""}
-                                {stock !== null && stock !== '-' ? ` - Avail: ${stock}` : ""}
+                                {stockDisplay}
                               </option>
                             );
                           })}
@@ -1465,21 +1752,24 @@ const AddExtraAllocationModal = ({
                       </label>
                       <input
                         type="number"
-                        min="0.01"
-                        step="0.01"
                         value={item.quantity}
-                        onChange={(e) =>
-                          updateAllocationItem(
-                            index,
-                            "quantity",
-                            parseFloat(e.target.value) || 0,
-                          )
-                        }
-                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${
-                          (item.item_id && (itemStockCache[item.item_id]?.[item.source_location_id || getDefaultSourceLocationId()] || 0) < item.quantity)
-                            ? "border-red-500 bg-red-50 text-red-900"
-                            : "border-gray-300"
-                        }`}
+                        onChange={(e) => {
+                          const selectedItem = inventoryItems.find(i => i.id == item.item_id);
+                          const normalizedValue = normalizeQuantity(e.target.value, selectedItem?.unit);
+                          updateAllocationItem(index, "quantity", normalizedValue);
+                        }}
+                        onBlur={(e) => {
+                          // Ensure value is normalized on blur
+                          const selectedItem = inventoryItems.find(i => i.id == item.item_id);
+                          const normalizedValue = normalizeQuantity(item.quantity, selectedItem?.unit);
+                          if (normalizedValue !== item.quantity) {
+                            updateAllocationItem(index, "quantity", normalizedValue);
+                          }
+                        }}
+                        className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${(item.item_id && (itemStockCache[item.item_id]?.[item.source_location_id || getDefaultSourceLocationId()] || 0) < item.quantity)
+                          ? "border-red-500 bg-red-50 text-red-900"
+                          : "border-gray-300"
+                          }`}
                       />
                       {(item.item_id && (itemStockCache[item.item_id]?.[item.source_location_id || getDefaultSourceLocationId()] || 0) < item.quantity) && (
                         <p className="text-xs text-red-600 mt-1 font-medium">Insufficient Stock!</p>

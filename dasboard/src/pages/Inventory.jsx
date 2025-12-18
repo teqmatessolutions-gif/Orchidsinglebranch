@@ -5,6 +5,7 @@ import { toast } from "react-hot-toast";
 import API from "../services/api";
 import { formatCurrency, formatIndianCurrencyCompact } from "../utils/currency";
 import { getApiBaseUrl } from "../utils/env";
+import { normalizeQuantity } from "../utils/quantityValidation";
 import {
   formatDateIST,
   formatDateTimeIST,
@@ -50,7 +51,7 @@ import ItemHistoryModal from "./inventory/modals/ItemHistoryModal";
 
 
 // Location Stock Details Modal
-const LocationStockDetailsModal = ({ locationData, onClose }) => {
+function LocationStockDetailsModal({ locationData, onClose }) {
   if (!locationData) return null;
 
   const visibleItems = locationData.items?.filter(item => (item.location_stock || 0) > 0) || [];
@@ -460,14 +461,14 @@ const LocationStockDetailsModal = ({ locationData, onClose }) => {
 };
 
 // Transaction Details Modal
-const TransactionDetailsModal = ({
+function TransactionDetailsModal({
   transaction,
   items,
   foodItems,
   categories,
   purchases,
   onClose,
-}) => {
+}) {
   if (!transaction) return null;
 
   const item =
@@ -774,6 +775,11 @@ const Inventory = () => {
   const [showLocationDetails, setShowLocationDetails] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [showAssetDetails, setShowAssetDetails] = useState(false);
+
+  // Unassign Modal State
+  const [showUnassignModal, setShowUnassignModal] = useState(false);
+  const [unassignTargetId, setUnassignTargetId] = useState(null);
+  const [unassignDestination, setUnassignDestination] = useState("");
 
   // History state
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
@@ -2090,19 +2096,30 @@ const Inventory = () => {
     }
   };
 
-  const handleUnassignAsset = async (mappingId) => {
-    if (!window.confirm("Are you sure you want to unassign this asset?"))
-      return;
+  const handleUnassignAsset = (mappingId) => {
+    setUnassignTargetId(mappingId);
+    setUnassignDestination(""); // Reset
+    setShowUnassignModal(true);
+  };
+
+  const confirmUnassignAsset = async () => {
     try {
-      await API.delete(`/inventory/asset-mappings/${mappingId}`);
-      alert("Asset unassigned successfully!");
+      let url = `/inventory/asset-mappings/${unassignTargetId}`;
+      if (unassignDestination) {
+        url += `?destination_location_id=${unassignDestination}`;
+      }
+
+      await API.delete(url);
+      addNotification({ title: "Success", message: "Asset unassigned successfully!", type: "success" });
+      setShowUnassignModal(false);
       fetchData();
     } catch (error) {
       console.error("Error unassigning asset:", error);
-      alert(
-        "Failed to unassign asset: " +
-        (error.response?.data?.detail || error.message),
-      );
+      addNotification({
+        title: "Error",
+        message: "Failed to unassign asset: " + (error.response?.data?.detail || error.message),
+        type: "error"
+      });
     }
   };
 
@@ -2231,8 +2248,15 @@ const Inventory = () => {
         {/* Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
           <SummaryCard
-            label="Total Items"
-            value={summary.totalItems}
+            label="Total Products"
+            value={
+              <div className="flex flex-col items-start bg-blue-50/50 p-1 rounded">
+                <span className="font-bold text-2xl text-gray-800">{summary.totalItems} SKUs</span>
+                <span className="text-sm font-medium text-blue-600">
+                  Stock: {items.reduce((sum, item) => sum + (parseFloat(item.current_stock) || 0), 0)} units
+                </span>
+              </div>
+            }
             icon={<Package className="w-5 h-5" />}
             color="blue"
           />
@@ -3428,125 +3452,23 @@ const Inventory = () => {
         </div>
       </div>
 
-      {/* Requisition Form Modal */}
-      {showRequisitionForm && (
-        <RequisitionFormModal
-          form={requisitionForm}
-          setForm={setRequisitionForm}
-          items={items}
-          foodItems={foodItems}
-          onSubmit={handleRequisitionSubmit}
-          onAddDetail={() => {
-            setRequisitionForm({
-              ...requisitionForm,
-              details: [
-                ...requisitionForm.details,
-                {
-                  item_id: "",
-                  requested_quantity: 0,
-                  approved_quantity: null,
-                  unit: "pcs",
-                  notes: "",
-                },
-              ],
-            });
-          }}
-          onRemoveDetail={(index) => {
-            setRequisitionForm({
-              ...requisitionForm,
-              details: requisitionForm.details.filter((_, i) => i !== index),
-            });
-          }}
-          onClose={() => {
-            setShowRequisitionForm(false);
-            setRequisitionForm({
-              destination_department: "",
-              date_needed: "",
-              priority: "normal",
-              notes: "",
-              details: [
-                {
-                  item_id: "",
-                  requested_quantity: 0,
-                  approved_quantity: null,
-                  unit: "pcs",
-                  notes: "",
-                },
-              ],
-            });
-          }}
-        />
-      )}
 
-      {/* Waste Log Form Modal */}
-      {showWasteForm && (
-        <WasteLogFormModal
-          form={wasteForm}
-          setForm={setWasteForm}
-          items={items}
-          foodItems={foodItems}
-          locations={locations || []}
-          onSubmit={handleWasteSubmit}
-          onClose={() => {
-            setShowWasteForm(false);
-            setWasteForm({
-              item_id: "",
-              batch_number: "",
-              expiry_date: "",
-              quantity: 0,
-              unit: "pcs",
-              reason: "",
-              notes: "",
-              photo: null,
-            });
-          }}
-        />
-      )}
 
-      {/* Location Form Modal */}
-      {showLocationForm && (
-        <LocationFormModal
-          form={locationForm}
-          setForm={setLocationForm}
-          onSubmit={handleLocationSubmit}
-          onClose={() => {
-            setShowLocationForm(false);
-            setLocationForm({
-              name: "",
-              location_type: "",
-              building: "",
-              floor: "",
-              room_area: "",
-              parent_location_id: "",
-              is_inventory_point: false,
-              description: "",
-              is_active: true,
-            });
-          }}
-        />
-      )}
+      {/* Unassign Asset Modal */}
+      <UnassignAssetModal
+        isOpen={showUnassignModal}
+        onClose={() => setShowUnassignModal(false)}
+        onConfirm={confirmUnassignAsset}
+        destination={unassignDestination}
+        setDestination={setUnassignDestination}
+        locations={locations}
+      />
 
-      {/* Asset Mapping Form Modal */}
-      {showAssetMappingForm && (
-        <AssetMappingFormModal
-          form={assetMappingForm}
-          setForm={setAssetMappingForm}
-          items={items}
-          foodItems={foodItems}
-          locations={locations}
-          categories={categories}
-          onSubmit={handleAssetMappingSubmit}
-          onClose={() => {
-            setShowAssetMappingForm(false);
-            setAssetMappingForm({
-              item_id: "",
-              location_id: "",
-              serial_number: "",
-              notes: "",
-            });
-          }}
-        />
-      )}
+
+
+
+
+
 
       {/* Unit Form Modal */}
       {showUnitForm && (
@@ -4015,7 +3937,6 @@ const Inventory = () => {
           setForm={setRecipeForm}
           foodItems={foodItems}
           items={items}
-          foodItems={foodItems}
           editingRecipe={editingRecipe}
           onSubmit={async (formData) => {
             try {
@@ -4638,7 +4559,7 @@ const SmartTransactionsTab = ({
 };
 
 // Category Form Modal - GST Friendly
-const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
+function CategoryFormModal({ form, setForm, onSubmit, onClose }) {
   // Indian States list for dropdown
   const indianStates = [
     "Andhra Pradesh",
@@ -5090,7 +5011,7 @@ const CategoryFormModal = ({ form, setForm, onSubmit, onClose }) => {
 };
 
 // Vendor Form Modal - GST Friendly
-const VendorFormModal = ({ form, setForm, onSubmit, onClose, isEditing }) => {
+function VendorFormModal({ form, setForm, onSubmit, onClose, isEditing }) {
   // Indian States list
   const indianStates = [
     "Andhra Pradesh",
@@ -6057,7 +5978,7 @@ const VendorFormModal = ({ form, setForm, onSubmit, onClose, isEditing }) => {
 };
 
 // Purchase Form Modal - Smart Purchase Entry Flow
-const PurchaseFormModal = ({
+function PurchaseFormModal({
   form,
   setForm,
   items,
@@ -6069,7 +5990,7 @@ const PurchaseFormModal = ({
   onAddDetail,
   onRemoveDetail,
   onClose,
-}) => {
+}) {
   // Auto-generate PO Number
   const generatePONumber = () => {
     const today = new Date();
@@ -6179,7 +6100,15 @@ const PurchaseFormModal = ({
 
   const updateDetail = (index, field, value) => {
     const newDetails = [...form.details];
-    newDetails[index] = { ...newDetails[index], [field]: value };
+    
+    // Normalize quantity based on item unit
+    if (field === "quantity") {
+      const itemId = newDetails[index].item_id;
+      const selectedItem = items.find((item) => item.id === parseInt(itemId));
+      newDetails[index][field] = normalizeQuantity(value, selectedItem?.unit);
+    } else {
+      newDetails[index] = { ...newDetails[index], [field]: value };
+    }
 
     // If tax_inclusive changes, recalculate
     if (
@@ -6648,7 +6577,7 @@ const PurchaseFormModal = ({
 
 // Unit Form Modal
 // Purchase Details Modal - Shows all purchase information
-const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
+function PurchaseDetailsModal({ purchase, onClose, onUpdate }) {
   const [updatingStatus, setUpdatingStatus] = useState(false);
   const [updatingPaymentStatus, setUpdatingPaymentStatus] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(
@@ -7330,7 +7259,7 @@ const PurchaseDetailsModal = ({ purchase, onClose, onUpdate }) => {
 
 
 // Requisition Form Modal
-const IssueFormModal = ({
+function IssueFormModal({
   form,
   setForm,
   items,
@@ -7340,7 +7269,7 @@ const IssueFormModal = ({
   onAddDetail,
   onRemoveDetail,
   onClose,
-}) => {
+}) {
   return ReactDOM.createPortal(
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -7575,8 +7504,6 @@ const IssueFormModal = ({
                               <div>
                                 <input
                                   type="number"
-                                  min="0.01"
-                                  step="0.01"
                                   max={maxStock}
                                   value={detail.issued_quantity}
                                   onChange={(e) => {
@@ -7585,17 +7512,14 @@ const IssueFormModal = ({
                                       toast.error(`Only ${maxStock} available`);
                                     }
                                     const newDetails = [...form.details];
-                                    newDetails[index].issued_quantity =
-                                      parseFloat(e.target.value) || 0;
+                                    newDetails[index] = { ...newDetails[index], issued_quantity: val || 0 };
                                     setForm({ ...form, details: newDetails });
                                   }}
-                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-indigo-500"
-                                  required
+                                  className={`w-full px-3 py-2 border rounded-lg ${detail.issued_quantity > maxStock ? 'border-red-500' : 'border-gray-300'}`}
+                                  placeholder="0"
                                 />
-                                {selectedItem && (
-                                  <span className="text-[10px] text-gray-500 block mt-1">
-                                    Max: {selectedItem.current_stock}
-                                  </span>
+                                {detail.issued_quantity > maxStock && (
+                                  <p className="text-xs text-red-600 mt-1">Exceeds available stock!</p>
                                 )}
                               </div>
                             );
@@ -7690,7 +7614,7 @@ const IssueFormModal = ({
   );
 };
 
-const RequisitionFormModal = ({
+function RequisitionFormModal({
   form,
   setForm,
   items,
@@ -7698,7 +7622,7 @@ const RequisitionFormModal = ({
   onAddDetail,
   onRemoveDetail,
   onClose,
-}) => {
+}) {
   const departments = [
     "Kitchen Main",
     "Housekeeping",
@@ -7958,7 +7882,7 @@ const RequisitionFormModal = ({
 };
 
 // Waste Log Form Modal
-const WasteLogFormModal = ({
+function WasteLogFormModal({
   form,
   setForm,
   items = [],
@@ -7966,7 +7890,7 @@ const WasteLogFormModal = ({
   locations = [],
   onSubmit,
   onClose,
-}) => {
+}) {
   const wasteReasons = ["Expired", "Damaged", "Spilled", "Theft", "Taste Test"];
 
   return (
@@ -8215,7 +8139,7 @@ const WasteLogFormModal = ({
 };
 
 // Location Form Modal
-const LocationFormModal = ({ form, setForm, locations, onSubmit, onClose }) => {
+function LocationFormModal({ form, setForm, locations, onSubmit, onClose }) {
   const locationTypes = [
     { value: "GUEST_ROOM", label: "Guest Room" },
     { value: "WAREHOUSE", label: "Warehouse" },
@@ -8416,10 +8340,10 @@ const LocationFormModal = ({ form, setForm, locations, onSubmit, onClose }) => {
       </div>
     </div>
   );
-};
+}
 
 // Asset Mapping Form Modal
-const AssetMappingFormModal = ({
+function AssetMappingFormModal({
   form,
   setForm,
   items,
@@ -8428,7 +8352,7 @@ const AssetMappingFormModal = ({
   onSubmit,
   onClose,
   isEditing,
-}) => {
+}) {
   // Filter items to show only fixed assets
   const fixedAssets = items.filter((item) => {
     const category = categories.find((c) => c.id === item.category_id);
@@ -8478,6 +8402,22 @@ const AssetMappingFormModal = ({
   };
 
   const updateAssetRow = (index, field, value) => {
+    // Validation: Check if item is available at the selected location
+    if (field === "source_location_id" || field === "item_id") {
+      const currentAsset = (form.assets || [])[index];
+      const itemId = field === "item_id" ? value : currentAsset.item_id;
+      const sourceId = field === "source_location_id" ? value : currentAsset.source_location_id;
+
+      // If we have both an item and a specific location selected
+      if (itemId && sourceId) {
+        const stock = getStockForLocation(itemId, sourceId);
+        if (stock <= 0) {
+          alert("Item is not available at selected location");
+          return; // Do not proceed
+        }
+      }
+    }
+
     const newAssets = [...(form.assets || [])];
     newAssets[index] = { ...newAssets[index], [field]: value };
     setForm({ ...form, assets: newAssets });
@@ -8547,36 +8487,6 @@ const AssetMappingFormModal = ({
                   key={index}
                   className="flex flex-col sm:flex-row gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200 items-start sm:items-start relative group transition-all hover:shadow-sm"
                 >
-                  <div className="w-full sm:w-48">
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
-                      Source (Optional)
-                    </label>
-                    <select
-                      value={asset.source_location_id || ""}
-                      onChange={(e) =>
-                        updateAssetRow(index, "source_location_id", e.target.value)
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
-                      disabled={isEditing}
-                    >
-                      <option value="">Default (Warehouse) {(() => {
-                        if (!asset.item_id) return "";
-                        const warehouse = locations.find(l => l.location_type === "Warehouse" || l.name?.toLowerCase().includes("warehouse"));
-                        if (warehouse) {
-                          return `(Stock: ${getStockForLocation(asset.item_id, warehouse.id)})`;
-                        }
-                        return "";
-                      })()}</option>
-                      {locations
-                        .filter((loc) => loc.is_inventory_point)
-                        .map((loc) => (
-                          <option key={loc.id} value={loc.id}>
-                            {loc.name || `${loc.building} - ${loc.room_area}`}
-                            {asset.item_id ? ` (Stock: ${getStockForLocation(asset.item_id, loc.id)})` : ""}
-                          </option>
-                        ))}
-                    </select>
-                  </div>
                   <div className="flex-1 w-full">
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">
                       Asset Item *
@@ -8599,6 +8509,34 @@ const AssetMappingFormModal = ({
                           </option>
                         );
                       })}
+                    </select>
+                  </div>
+
+                  <div className="w-full sm:w-48">
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">
+                      Source (Optional)
+                    </label>
+                    <select
+                      value={asset.source_location_id || ""}
+                      onChange={(e) =>
+                        updateAssetRow(index, "source_location_id", e.target.value)
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 text-sm"
+                      disabled={isEditing}
+                    >
+                      <option value="">Default (Global) {(() => {
+                        if (!asset.item_id) return "";
+                        // For Default/Global, show Main Warehouse/Global stock
+                        return `(Stock: ${getStockForLocation(asset.item_id, null)})`;
+                      })()}</option>
+                      {locations
+                        .filter((loc) => loc.is_inventory_point)
+                        .map((loc) => (
+                          <option key={loc.id} value={loc.id}>
+                            {loc.name || `${loc.building} - ${loc.room_area}`}
+                            {asset.item_id ? ` (Stock: ${getStockForLocation(asset.item_id, loc.id)})` : ""}
+                          </option>
+                        ))}
                     </select>
                   </div>
 
@@ -8675,19 +8613,19 @@ const AssetMappingFormModal = ({
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-6 border-t">
+          <div className="flex justify-end gap-4 pt-6 border-t mt-4">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium"
+              className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm"
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium shadow-sm transition-all transform hover:scale-[1.02]"
             >
-              Assign Assets
+              {isEditing ? "Update Assignment" : "Assign Assets"}
             </button>
           </div>
         </form>
@@ -8696,8 +8634,99 @@ const AssetMappingFormModal = ({
   );
 };
 
+// Unassign Asset Modal
+function UnassignAssetModal({
+  isOpen,
+  onClose,
+  onConfirm,
+  destination,
+  setDestination,
+  locations
+}) {
+  if (!isOpen) return null;
+
+  // Filter for warehouse locations to suggest as return destinations
+  const warehouses = locations.filter(l =>
+    l.location_type.toLowerCase().includes('warehouse') ||
+    l.location_type.toLowerCase().includes('store') ||
+    l.is_inventory_point
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[11000] p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 relative">
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        <div className="text-center mb-6">
+          <div className="bg-red-100 text-red-600 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertTriangle className="w-6 h-6" />
+          </div>
+          <h3 className="text-xl font-bold text-gray-800">Unassign Asset</h3>
+          <p className="text-sm text-gray-500 mt-2">
+            This will remove the asset from its current location.
+            Please select where it should be moved to.
+          </p>
+        </div>
+
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Return to Location (Destination)
+          </label>
+          <select
+            value={destination}
+            onChange={(e) => setDestination(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="">Select Destination (Optional - Defaults to Main Warehouse)</option>
+            <optgroup label="Warehouses & Stores">
+              {warehouses.map(loc => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name} ({loc.location_type})
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Other Locations">
+              {locations
+                .filter(l => !warehouses.includes(l))
+                .map(loc => (
+                  <option key={loc.id} value={loc.id}>
+                    {loc.name}
+                  </option>
+                ))
+              }
+            </optgroup>
+          </select>
+          <p className="text-xs text-gray-500 mt-2 text-left">
+            * If no location is selected, the system will attempt to return it to the default Central Warehouse.
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+          >
+            Confirm Unassign
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Requisition Details Modal
-const RequisitionDetailsModal = ({ requisition, items, onClose }) => {
+function RequisitionDetailsModal({ requisition, items, onClose }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -8858,7 +8887,7 @@ const RequisitionDetailsModal = ({ requisition, items, onClose }) => {
 };
 
 // Issue Details Modal
-const IssueDetailsModal = ({ issue, items, locations, onClose }) => {
+function IssueDetailsModal({ issue, items, locations, onClose }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000] p-2 sm:p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
@@ -9003,7 +9032,7 @@ const IssueDetailsModal = ({ issue, items, locations, onClose }) => {
 };
 
 // Waste Log Details Modal
-const WasteLogDetailsModal = ({ wasteLog, items, locations, onClose }) => {
+function WasteLogDetailsModal({ wasteLog, items, locations, onClose }) {
   const item = items?.find((i) => i.id === wasteLog.item_id);
   const location = locations?.find((l) => l.id === wasteLog.location_id);
 
@@ -9153,7 +9182,7 @@ const WasteLogDetailsModal = ({ wasteLog, items, locations, onClose }) => {
 };
 
 // Location Details Modal
-const LocationDetailsModal = ({ location, locations, onClose }) => {
+function LocationDetailsModal({ location, locations, onClose }) {
   const parentLocation = locations?.find(
     (l) => l.id === location.parent_location_id,
   );
@@ -9289,7 +9318,7 @@ const LocationDetailsModal = ({ location, locations, onClose }) => {
 };
 
 // Asset Details Modal
-const AssetDetailsModal = ({ asset, items, locations, onClose }) => {
+function AssetDetailsModal({ asset, items, locations, onClose }) {
   const item = items?.find((i) => i.id === asset.item_id);
   const location = locations?.find((l) => l.id === asset.current_location_id);
 
@@ -9314,31 +9343,26 @@ const AssetDetailsModal = ({ asset, items, locations, onClose }) => {
                 Asset Tag ID
               </label>
               <p className="text-sm font-semibold text-gray-900 mt-1">
-                {asset.asset_tag_id || `AST-${asset.id}`}
+                {asset.asset_tag_id || "N/A"}
               </p>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500">Item</label>
-              <p className="text-sm text-gray-900 mt-1">
-                {item?.name || asset.item_name || "N/A"}
+              <label className="text-xs font-medium text-gray-500">
+                Item Name
+              </label>
+              <p className="text-sm font-semibold text-gray-900 mt-1">
+                {item?.name || "Unknown Item"}
               </p>
             </div>
-            {asset.serial_number && (
-              <div>
-                <label className="text-xs font-medium text-gray-500">
-                  Serial Number
-                </label>
-                <p className="text-sm text-gray-900 mt-1">
-                  {asset.serial_number}
-                </p>
-              </div>
-            )}
             <div>
               <label className="text-xs font-medium text-gray-500">
                 Current Location
               </label>
               <p className="text-sm text-gray-900 mt-1">
-                {location?.name || asset.location_name || "-"}
+                {location?.name ||
+                  (location
+                    ? `${location.building} - ${location.room_area}`
+                    : "Unknown Location")}
               </p>
             </div>
             <div>
@@ -9347,19 +9371,21 @@ const AssetDetailsModal = ({ asset, items, locations, onClose }) => {
               </label>
               <p className="mt-1">
                 {(() => {
-                  const status = asset.status || (asset.is_active ? "Active" : "Inactive");
+                  let statusColor = "bg-gray-100 text-gray-800";
+                  if (asset.status === "in_use")
+                    statusColor = "bg-green-100 text-green-800";
+                  else if (asset.status === "maintenance")
+                    statusColor = "bg-yellow-100 text-yellow-800";
+                  else if (asset.status === "retired")
+                    statusColor = "bg-red-100 text-red-800";
+
                   return (
                     <span
-                      className={`px-2 py-1 text-xs rounded-full ${status === "Active"
-                        ? "bg-green-100 text-green-800"
-                        : status === "In Repair"
-                          ? "bg-yellow-100 text-yellow-800"
-                          : status === "Damaged"
-                            ? "bg-red-100 text-red-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
+                      className={`px-2 py-1 text-xs font-semibold rounded-full ${statusColor}`}
                     >
-                      {status}
+                      {asset.status
+                        ? asset.status.replace("_", " ").toUpperCase()
+                        : "UNKNOWN"}
                     </span>
                   );
                 })()}
@@ -9401,9 +9427,7 @@ const AssetDetailsModal = ({ asset, items, locations, onClose }) => {
                   Next Maintenance Due
                 </label>
                 <p className="text-sm text-gray-900 mt-1">
-                  {new Date(
-                    asset.next_maintenance_due_date,
-                  ).toLocaleDateString()}
+                  {new Date(asset.next_maintenance_due_date).toLocaleDateString()}
                 </p>
               </div>
             )}
@@ -9439,7 +9463,7 @@ const AssetDetailsModal = ({ asset, items, locations, onClose }) => {
 };
 
 // Recipe Form Modal
-const RecipeFormModal = ({
+function RecipeFormModal({
   form,
   setForm,
   foodItems,
@@ -9447,7 +9471,7 @@ const RecipeFormModal = ({
   editingRecipe,
   onSubmit,
   onClose,
-}) => {
+}) {
   const addIngredient = () => {
     setForm({
       ...form,
@@ -9616,7 +9640,7 @@ const RecipeFormModal = ({
             </div>
             {form.ingredients.length === 0 ? (
               <p className="text-sm text-gray-500 italic">
-                No ingredients added. Click "Add Ingredient" to add one.
+                No ingredients added. Click "Add Ingredients" to add one.
               </p>
             ) : (
               <div className="space-y-2">
@@ -9740,5 +9764,3 @@ const RecipeFormModal = ({
 };
 
 export default Inventory;
-
-

@@ -413,8 +413,9 @@ def create_assigned_service(db: Session, assigned: AssignedServiceCreate):
             db_assigned = AssignedService(
                 service_id=assigned_dict['service_id'],
                 employee_id=assigned_dict['employee_id'],
-                room_id=assigned_dict['room_id']
-                # status and billing_status will use defaults from model
+                room_id=assigned_dict['room_id'],
+                override_charges=assigned_dict.get('override_charges'),
+                billing_status=assigned_dict.get('billing_status', 'unbilled')  # Explicitly set billing status
             )
             print(f"[DEBUG] AssignedService object created, status={db_assigned.status}, billing_status={db_assigned.billing_status}")
             db.add(db_assigned)
@@ -620,6 +621,11 @@ def update_assigned_service_status(db: Session, assigned_id: int, update_data: A
     else:
         # If no status update, use current status
         new_status = old_status.value if hasattr(old_status, 'value') else str(old_status)
+    
+    # Handle billing_status update if provided
+    if update_data.billing_status is not None:
+        assigned.billing_status = update_data.billing_status
+        print(f"[DEBUG] Updated billing_status for service {assigned_id}: {assigned.billing_status}")
     
     # If status changed to completed, set completed time and handle inventory returns
     if new_status == "completed" and str(old_status) != "completed":
