@@ -70,6 +70,10 @@ const Services = () => {
   const [completingServiceId, setCompletingServiceId] = useState(null);
   const [inventoryAssignments, setInventoryAssignments] = useState([]);
   const [returnQuantities, setReturnQuantities] = useState({});
+  const [usedQuantities, setUsedQuantities] = useState({}); // Track used quantities for each assignment
+  const [returnLocationId, setReturnLocationId] = useState(null); // Location to return items to
+  const [returnLocations, setReturnLocations] = useState({}); // Per-item return location {assignmentId: locationId}
+  const [locations, setLocations] = useState([]); // Available locations for returns
   const [returnedItems, setReturnedItems] = useState([]);
   const [showServiceReport, setShowServiceReport] = useState(false);
   const [quickAssignModal, setQuickAssignModal] = useState(null); // { request, serviceId, employeeId }
@@ -102,7 +106,7 @@ const Services = () => {
   const fetchAll = async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
-      const [sRes, aRes, rRes, eRes, bRes, pbRes, invRes, srRes] = await Promise.all([
+      const [sRes, aRes, rRes, eRes, bRes, pbRes, invRes, srRes, locRes] = await Promise.all([
         api.get("/services?limit=50").catch(() => ({ data: [] })),
         api.get("/services/assigned?skip=0&limit=50").catch(() => ({ data: [] })),
         api.get("/rooms?limit=50").catch(() => ({ data: [] })),
@@ -111,6 +115,7 @@ const Services = () => {
         api.get("/packages/bookingsall?limit=50").catch(() => ({ data: [] })),
         api.get("/inventory/items?limit=50").catch(() => ({ data: [] })),
         api.get("/service-requests?limit=50").catch(() => ({ data: [] })),
+        api.get("/inventory/locations?limit=100").catch(() => ({ data: [] })), // Fetch locations
       ]);
       setServices(sRes?.data || []);
       setAssignedServices((aRes?.data || []).sort((a, b) => new Date(b.assigned_at) - new Date(a.assigned_at)));
@@ -118,6 +123,7 @@ const Services = () => {
       setEmployees(eRes?.data || []);
       setInventoryItems(invRes?.data || []);
       setServiceRequests(srRes?.data || []);
+      setLocations(locRes?.data || []); // Set locations
 
       // Fetch service requests if on requests tab (refresh)
       if (activeTab === "requests") {
@@ -272,6 +278,52 @@ const Services = () => {
       console.error("Failed to load more assigned services:", err);
     } finally {
       setIsFetchingMore(false);
+    }
+  };
+
+  // State for inventory source selection
+  const [itemStockData, setItemStockData] = useState({}); // { itemId: [stocks] }
+  const [inventorySourceSelections, setInventorySourceSelections] = useState({}); // { itemId: locationId }
+  const [isLoadingStock, setIsLoadingStock] = useState(false);
+
+  const fetchItemStocks = async (items) => {
+    if (!items || items.length === 0) return;
+    setIsLoadingStock(true);
+    const uniqueIds = [...new Set(items.map(i => i.id || i.inventory_item_id))];
+    const stockMap = {};
+
+    try {
+      await Promise.all(uniqueIds.map(async (id) => {
+        try {
+          const res = await api.get(`/inventory/items/${id}/stocks`);
+          stockMap[id] = res.data || [];
+        } catch (e) {
+          console.warn(`Failed to fetch stock for item ${id}`, e);
+          stockMap[id] = [];
+        }
+      }));
+
+      setItemStockData(prev => ({ ...prev, ...stockMap }));
+
+      // Auto-select logic
+      const newSelections = { ...inventorySourceSelections };
+      uniqueIds.forEach(id => {
+        const stocks = stockMap[id] || [];
+        if (stocks.length > 0) {
+          // Sort by quantity desc
+          const sorted = [...stocks].sort((a, b) => b.quantity - a.quantity);
+          // Select max stock location by default if not already selected
+          if (!newSelections[id] && sorted[0].quantity > 0) {
+            newSelections[id] = sorted[0].location_id;
+          }
+        }
+      });
+      setInventorySourceSelections(newSelections);
+
+    } catch (err) {
+      console.error("Error fetching stocks", err);
+    } finally {
+      setIsLoadingStock(false);
     }
   };
 
@@ -462,23 +514,23 @@ const Services = () => {
     if (!serviceId) {
       setSelectedServiceDetails(null);
       setAssignForm({ ...assignForm, service_id: serviceId });
+      setInventorySourceSelections({});
+      setItemStockData({});
       return;
     }
 
     try {
+      let serviceDetails = null;
       // Always fetch fresh service data from API to ensure inventory items are loaded
-      // First try to find in cached list for quick display
       const cachedService = services.find(s => s.id === parseInt(serviceId));
       if (cachedService && cachedService.inventory_items && cachedService.inventory_items.length > 0) {
-        // Use cached if it has inventory items
-        setSelectedServiceDetails(cachedService);
+        serviceDetails = cachedService;
       } else {
-        // Fetch all services and find the one we need (to get fresh inventory data)
         const response = await api.get(`/services?limit=50`);
         const allServices = response.data || [];
         const foundService = allServices.find(s => s.id === parseInt(serviceId));
         if (foundService) {
-          setSelectedServiceDetails(foundService);
+          serviceDetails = foundService;
           // Also update the cached services list with fresh data
           setServices(prevServices => {
             const updated = [...prevServices];
@@ -489,15 +541,25 @@ const Services = () => {
             return updated;
           });
         } else if (cachedService) {
-          // Fallback to cached if API doesn't return it
-          setSelectedServiceDetails(cachedService);
+          serviceDetails = cachedService;
         }
       }
+
+      setSelectedServiceDetails(serviceDetails);
       setAssignForm({ ...assignForm, service_id: serviceId });
       setExtraInventoryItems([]); // Clear extra items when service changes
+
+      // Fetch stocks for inventory items
+      if (serviceDetails && serviceDetails.inventory_items && serviceDetails.inventory_items.length > 0) {
+        setInventorySourceSelections({});
+        fetchItemStocks(serviceDetails.inventory_items);
+      } else {
+        setInventorySourceSelections({});
+        setItemStockData({});
+      }
+
     } catch (err) {
       console.error("Failed to fetch service details", err);
-      // Fallback to cached service if API fails
       const cachedService = services.find(s => s.id === parseInt(serviceId));
       if (cachedService) {
         setSelectedServiceDetails(cachedService);
@@ -505,6 +567,8 @@ const Services = () => {
         setSelectedServiceDetails(null);
       }
       setExtraInventoryItems([]); // Clear extra items on error too
+      setItemStockData({});
+      setInventorySourceSelections({});
     }
   };
 
@@ -517,6 +581,16 @@ const Services = () => {
     const updated = [...extraInventoryItems];
     updated[index] = { ...updated[index], [field]: field === 'quantity' ? parseFloat(value) || 0 : value };
     setExtraInventoryItems(updated);
+
+    if (field === 'inventory_item_id') {
+      const itemId = parseInt(value);
+      if (itemId) {
+        fetchItemStocks([{ id: itemId }]);
+        // Reset source selection for this row if item changes
+        updated[index].source_location_id = "";
+        setExtraInventoryItems(updated);
+      }
+    }
   };
 
   const handleRemoveExtraInventoryItem = (index) => {
@@ -544,6 +618,29 @@ const Services = () => {
           inventory_item_id: parseInt(item.inventory_item_id),
           quantity: item.quantity
         }));
+      }
+
+      // Add inventory source selections
+      let sourceSelections = [];
+      if (Object.keys(inventorySourceSelections).length > 0) {
+        sourceSelections = Object.entries(inventorySourceSelections).map(([itemId, locId]) => ({
+          item_id: parseInt(itemId),
+          location_id: parseInt(locId)
+        }));
+      }
+
+      // Add sources from extra items
+      extraInventoryItems.forEach(item => {
+        if (item.inventory_item_id && item.source_location_id) {
+          sourceSelections.push({
+            item_id: parseInt(item.inventory_item_id),
+            location_id: parseInt(item.source_location_id)
+          });
+        }
+      });
+
+      if (sourceSelections.length > 0) {
+        payload.inventory_source_selections = sourceSelections;
       }
 
       const response = await api.post("/services/assign", payload);
@@ -619,11 +716,64 @@ const Services = () => {
               setInventoryAssignments(serviceAssignments);
               setCompletingServiceId(id);
               // Initialize return quantities with 0 (user can choose to return items)
+              // Initialize return quantities and locations
               const initialReturns = {};
+              const initialLocations = {};
+
               serviceAssignments.forEach(a => {
-                initialReturns[a.id] = 0; // Default to 0 - user can choose to return
+                initialReturns[a.id] = 0; // Default to 0
+
+                // Try to auto-select source location
+                let match = null;
+
+                // 0. Prioritize Source Location from Assignment Notes (Perfect Match)
+                const noteSourceMatch = a.notes ? a.notes.match(/\(LocID:\s*(\d+)\)/) : null;
+                const assignedSourceId = noteSourceMatch ? parseInt(noteSourceMatch[1]) : null;
+                if (assignedSourceId) {
+                  match = locations.find(l => l.id === assignedSourceId);
+                }
+
+                // 1. Prioritize Stock Location that matches Master Definition (Best Case)
+                if (!match && a.item?.stock_locations?.length > 0 && a.item?.location) {
+                  const masterInStock = a.item.stock_locations.find(s =>
+                    s.name?.trim().toLowerCase() === a.item.location?.trim().toLowerCase() ||
+                    s.location_code === a.item.location
+                  );
+                  if (masterInStock) {
+                    match = locations.find(l => l.id === masterInStock.id);
+                  }
+                }
+
+                // 2. If no master match, take the FIRST active stock location
+                if (!match && a.item?.stock_locations?.length > 0) {
+                  const firstStockLoc = a.item.stock_locations[0];
+                  match = locations.find(l => l.id === firstStockLoc.id);
+                }
+
+                // 3. Try to auto-select source location if defined (Fallback if no stock data)
+                if (!match && a.item?.location) {
+                  match = locations.find(l =>
+                    l.name?.trim().toLowerCase() === a.item.location?.trim().toLowerCase() ||
+                    l.location_code === a.item.location
+                  );
+                }
+
+                // 2. Fallback: Find a default Warehouse or Store if no source match
+                if (!match) {
+                  match = locations.find(l =>
+                    l.location_type === 'WAREHOUSE' ||
+                    l.location_type === 'CENTRAL_WAREHOUSE' ||
+                    l.is_inventory_point === true
+                  );
+                }
+
+                if (match) {
+                  initialLocations[a.id] = match.id;
+                }
               });
+
               setReturnQuantities(initialReturns);
+              setReturnLocations(initialLocations);
               return; // Don't update status yet, wait for user to confirm returns
             }
           }
@@ -646,50 +796,56 @@ const Services = () => {
 
   const handleCompleteWithReturns = async () => {
     if (!completingServiceId) return;
+    if (!completingServiceId) return;
+
+    // Validation is handled per-item if needed, or by backend
+
 
     try {
-      // Build inventory returns array - return balance (unused) items
-      const inventory_returns = inventoryAssignments
-        .filter(a => {
-          const qty = returnQuantities[a.id];
-          const numQty = parseFloat(qty);
-          const balanceQty = a.balance_quantity || 0;
-          // Allow returns if return quantity is valid and doesn't exceed balance
-          return !isNaN(numQty) && numQty > 0 && balanceQty > 0 && numQty <= balanceQty;
-        })
-        .map(a => {
-          const qty = returnQuantities[a.id];
-          const numQty = parseFloat(qty);
-          const balanceQty = a.balance_quantity || 0;
-          const usedQty = a.quantity_used || 0;
-          // Ensure return doesn't exceed balance quantity
-          const returnQty = Math.min(numQty, balanceQty);
-          return {
-            assignment_id: a.id,
-            quantity_returned: returnQty,
-            notes: `Returned balance inventory on service completion - ${a.item?.name || 'item'} (Assigned: ${a.quantity_assigned || 0}, Used: ${usedQty}, Balance: ${balanceQty}, Returned: ${returnQty})`
-          };
-        });
+      // Build inventory returns array - include all items to update used status
+      const inventory_returns = inventoryAssignments.map(a => {
+        const qty = returnQuantities[a.id] || 0;
+        const numQty = parseFloat(qty);
 
-      // Validate that all returns are within balance
+        // Calculate used quantity automatically
+        // Used = Assigned - Already Returned - Currently Returning
+        const assignedQty = a.quantity_assigned || 0;
+        const alreadyReturned = a.quantity_returned || 0;
+        const currentReturn = isNaN(numQty) ? 0 : numQty;
+        const usedQty = Math.max(0, assignedQty - alreadyReturned - currentReturn);
+
+        return {
+          assignment_id: a.id,
+          quantity_returned: currentReturn,
+          quantity_used: usedQty,
+          notes: `Return inventory on service completion`,
+          return_location_id: returnLocations[a.id] || returnLocationId // Use item specific or global
+        };
+      });
+
+      // Validate that returns don't exceed balance
       const invalidReturns = inventory_returns.filter(ret => {
         const assignment = inventoryAssignments.find(a => a.id === ret.assignment_id);
-        const balanceQty = assignment?.balance_quantity || 0;
-        return !assignment || balanceQty <= 0 || ret.quantity_returned > balanceQty;
+        if (!assignment) return true;
+
+        const assignedQty = assignment.quantity_assigned || 0;
+        const alreadyReturned = assignment.quantity_returned || 0;
+        const usedQty = ret.quantity_used;
+        const balance = Math.max(0, assignedQty - usedQty - alreadyReturned);
+
+        return ret.quantity_returned > balance;
       });
 
       if (invalidReturns.length > 0) {
-        alert("Error: Return quantities cannot exceed balance quantity. Please check your return quantities.");
+        alert("Error: Return quantities cannot exceed available balance (Assigned - Used - Previously Returned). Please check your quantities.");
         return;
       }
 
-      // Allow completing with 0 returns - user can skip returning items
-      // No validation needed here, empty returns array is acceptable
-
-      // Update status with inventory returns (can be empty array if no returns)
+      // Update status with inventory returns
       await api.patch(`/services/assigned/${completingServiceId}`, {
         status: "completed",
-        inventory_returns: inventory_returns.length > 0 ? inventory_returns : []
+        inventory_returns: inventory_returns,
+        return_location_id: returnLocationId
       });
 
       setAssignedServices(prev => prev.map(s => s.id === completingServiceId ? { ...s, status: "completed" } : s));
@@ -698,13 +854,12 @@ const Services = () => {
       setCompletingServiceId(null);
       setInventoryAssignments([]);
       setReturnQuantities({});
+      setUsedQuantities({});
+      setReturnLocations({});
+      setReturnLocationId(null);
       fetchAll(false);
 
-      if (inventory_returns.length > 0) {
-        alert(`Service marked as completed and ${inventory_returns.length} item(s) returned successfully!`);
-      } else {
-        alert("Service marked as completed. No items were returned.");
-      }
+      alert("Service marked as completed and inventory updated successfully!");
     } catch (error) {
       console.error("Failed to complete service with returns:", error);
       alert(`Failed to complete service: ${error.response?.data?.detail || error.message}`);
@@ -726,26 +881,50 @@ const Services = () => {
       console.log("[DEBUG] Found service from API:", service);
       console.log("[DEBUG] Service inventory items from API:", service?.inventory_items);
 
-      // Fetch returned inventory items if employee is available
+      // Fetch actual assigned inventory items AND returned items for this service
+      let assignedInventoryItems = [];
       let returnedItemsData = [];
       if (assignedService.employee && assignedService.employee.id) {
         try {
-          const empInvRes = await api.get(`/services/employee-inventory/${assignedService.employee.id}?status=returned,partially_returned`);
+          // Fetch ALL inventory assignments for this employee
+          const empInvRes = await api.get(`/services/employee-inventory/${assignedService.employee.id}`);
           const allAssignments = empInvRes.data || [];
-          // Filter assignments for this specific service that have been returned
-          returnedItemsData = allAssignments.filter(
-            a => a.assigned_service_id === assignedService.id && a.quantity_returned > 0
+
+          // Filter assignments for this specific assigned service
+          const serviceAssignments = allAssignments.filter(
+            a => a.assigned_service_id === assignedService.id
           );
+
+          // Separate into assigned (active) and returned items
+          assignedInventoryItems = serviceAssignments.filter(
+            a => a.status === 'assigned' || a.status === 'in_use'
+          );
+          returnedItemsData = serviceAssignments.filter(
+            a => a.quantity_returned > 0
+          );
+
+          console.log("[DEBUG] Found assigned inventory items:", assignedInventoryItems);
           console.log("[DEBUG] Found returned items:", returnedItemsData);
         } catch (invError) {
-          console.warn("Could not fetch returned inventory items:", invError);
+          console.warn("Could not fetch inventory items:", invError);
         }
       }
 
       if (service) {
         setViewingAssignedService({
           ...assignedService,
-          service: service // Include full service details with inventory_items
+          service: {
+            ...service,
+            // Replace template inventory_items with ACTUAL assigned inventory (including extra items)
+            inventory_items: assignedInventoryItems.length > 0 ? assignedInventoryItems.map(a => ({
+              id: a.item_id,
+              name: a.item_name,
+              item_code: a.item_code,
+              quantity: a.quantity_assigned,
+              unit: a.unit,
+              unit_price: a.item?.unit_price || 0
+            })) : service.inventory_items // Fallback to template if no assignments
+          }
         });
         setReturnedItems(returnedItemsData);
       } else {
@@ -2812,21 +2991,51 @@ const Services = () => {
                         <h4 className="font-semibold text-md text-gray-800 mb-2">Inventory Items Needed:</h4>
                         <div className="space-y-2">
                           {selectedServiceDetails.inventory_items.map((item, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-2 bg-white rounded border border-blue-200">
-                              <div className="flex-1">
-                                <span className="font-medium text-gray-800">{item.name}</span>
-                                {item.item_code && (
-                                  <span className="ml-2 text-sm text-gray-600">({item.item_code})</span>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <span className="text-sm text-gray-600">
-                                  {item.quantity} {item.unit}
-                                </span>
-                                {item.unit_price > 0 && (
-                                  <span className="ml-2 text-sm text-gray-500">
-                                    @ ₹{item.unit_price}/{item.unit}
+                            <div key={idx} className="flex flex-col p-3 bg-white rounded border border-blue-200">
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="flex-1">
+                                  <span className="font-medium text-gray-800">{item.name}</span>
+                                  {item.item_code && (
+                                    <span className="ml-2 text-sm text-gray-600">({item.item_code})</span>
+                                  )}
+                                </div>
+                                <div className="text-right">
+                                  <span className="text-sm text-gray-600">
+                                    {item.quantity} {item.unit}
                                   </span>
+                                  {item.unit_price > 0 && (
+                                    <span className="ml-2 text-sm text-gray-500">
+                                      @ ₹{item.unit_price}/{item.unit}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Source Selection */}
+                              <div className="mt-1">
+                                <label className="text-xs text-gray-600 block mb-1">Source Location:</label>
+                                <select
+                                  className={`text-sm border rounded p-1 w-full ${!inventorySourceSelections[item.id] ? 'border-red-300 bg-red-50' : 'bg-gray-50 border-gray-300'}`}
+                                  value={inventorySourceSelections[item.id] || ""}
+                                  onChange={(e) => setInventorySourceSelections(prev => ({ ...prev, [item.id]: parseInt(e.target.value) }))}
+                                >
+                                  <option value="">-- Select Source --</option>
+                                  {itemStockData[item.id]?.length > 0 ? (
+                                    itemStockData[item.id].map(stock => (
+                                      <option key={stock.location_id} value={stock.location_id}>
+                                        {stock.location_name} (Avl: {stock.quantity})
+                                      </option>
+                                    ))
+                                  ) : (
+                                    isLoadingStock ?
+                                      <option value="" disabled>Loading stocks...</option> :
+                                      <option value="" disabled>No stock available</option>
+                                  )}
+
+                                  {/* Allow fallback to general store even if not fetched, if user insists? No, safer to rely on fetched list. */}
+                                </select>
+                                {!inventorySourceSelections[item.id] && (
+                                  <p className="text-xs text-red-500 mt-1">Please select a source location</p>
                                 )}
                               </div>
                             </div>
@@ -2890,33 +3099,66 @@ const Services = () => {
                     + Add Extra Inventory Item
                   </button>
                   {extraInventoryItems.map((item, index) => (
-                    <div key={index} className="flex gap-2 mb-2 items-end">
-                      <select
-                        value={item.inventory_item_id}
-                        onChange={(e) => handleUpdateExtraInventoryItem(index, 'inventory_item_id', e.target.value)}
-                        className="flex-1 border p-2 rounded-lg text-sm"
-                      >
-                        <option value="">Select Item</option>
-                        {inventoryItems.map((invItem) => (
-                          <option key={invItem.id} value={invItem.id}>
-                            {invItem.name} {invItem.item_code ? `(${invItem.item_code})` : ''} - {invItem.unit}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => handleUpdateExtraInventoryItem(index, 'quantity', e.target.value)}
-                        placeholder="Qty"
-                        className="w-24 border p-2 rounded-lg text-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveExtraInventoryItem(index)}
-                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm"
-                      >
-                        Remove
-                      </button>
+                    <div key={index} className="flex flex-col gap-2 mb-2 p-2 border rounded bg-gray-50 border-gray-200">
+                      <div className="flex gap-2 items-end">
+                        <div className="flex-1">
+                          <label className="text-xs text-gray-600 block mb-1">Item</label>
+                          <select
+                            value={item.inventory_item_id}
+                            onChange={(e) => handleUpdateExtraInventoryItem(index, 'inventory_item_id', e.target.value)}
+                            className="w-full border p-2 rounded-lg text-sm"
+                          >
+                            <option value="">Select Item</option>
+                            {inventoryItems.map((invItem) => (
+                              <option key={invItem.id} value={invItem.id}>
+                                {invItem.name} {invItem.item_code ? `(${invItem.item_code})` : ''} - {invItem.unit}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="w-24">
+                          <label className="text-xs text-gray-600 block mb-1">Qty</label>
+                          <input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => handleUpdateExtraInventoryItem(index, 'quantity', e.target.value)}
+                            placeholder="Qty"
+                            className="w-full border p-2 rounded-lg text-sm"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExtraInventoryItem(index)}
+                          className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm mb-[2px]"
+                        >
+                          Remove
+                        </button>
+                      </div>
+
+                      {/* Source Selection for Extra Item */}
+                      {item.inventory_item_id && (
+                        <div>
+                          <label className="text-xs text-gray-600 block mb-1">Source Location:</label>
+                          <select
+                            className={`text-sm border rounded p-1 w-full ${!item.source_location_id ? 'border-red-300 bg-red-50' : 'bg-white border-gray-300'}`}
+                            value={item.source_location_id || ""}
+                            onChange={(e) => handleUpdateExtraInventoryItem(index, 'source_location_id', e.target.value)}
+                          >
+                            <option value="">-- Select Source --</option>
+                            {itemStockData[item.inventory_item_id]?.length > 0 ? (
+                              itemStockData[item.inventory_item_id].map(stock => (
+                                <option key={stock.location_id} value={stock.location_id}>
+                                  {stock.location_name} (Avl: {stock.quantity})
+                                </option>
+                              ))
+                            ) : (
+                              isLoadingStock ?
+                                <option value="" disabled>Loading stocks...</option> :
+                                <option value="" disabled>No stock available</option>
+                            )}
+                          </select>
+                        </div>
+                      )}
                     </div>
                   ))}
                   {extraInventoryItems.length === 0 && (
@@ -3681,6 +3923,8 @@ const Services = () => {
                       setCompletingServiceId(null);
                       setInventoryAssignments([]);
                       setReturnQuantities({});
+                      setUsedQuantities({});
+                      setReturnLocationId(null);
                     }}
                     className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
                   >
@@ -3693,18 +3937,32 @@ const Services = () => {
                     📦 Return Balance Inventory Items
                   </p>
                   <p className="text-sm text-gray-600">
-                    Return unused inventory items (balance) that were assigned but not used in this service.
-                    Return quantity cannot exceed the balance quantity. All returns will be added back to inventory stock.
+                    Update "Used" quantity if items were consumed. Return unused items (balance) to the selected location.
+                    Assigned = Used + Returned + Balance.
                   </p>
                 </div>
 
+                {/* Return Location Selector - REMOVED */}
+
                 <div className="space-y-4 mb-6">
                   {inventoryAssignments.map((assignment) => {
-                    const balance = assignment.balance_quantity || 0;
                     const assignedQty = assignment.quantity_assigned || 0;
-                    const usedQty = assignment.quantity_used || 0;
                     const alreadyReturned = assignment.quantity_returned || 0;
-                    const maxReturnable = balance; // Can return all balance (unused) items
+
+                    // Logic: Everything NOT returned is considered USED.
+                    // Max Returnable is everything not yet returned.
+                    const maxReturnable = Math.max(0, assignedQty - alreadyReturned);
+                    const balance = maxReturnable; // For compatibility
+
+                    const currentReturnVal = returnQuantities[assignment.id];
+                    const currentReturn = currentReturnVal !== undefined && currentReturnVal !== '' ? parseFloat(currentReturnVal) : 0;
+
+                    // Calculated Used: Assigned - AlreadyReturned - CurrentReturn
+                    // Calculated Used: Assigned - AlreadyReturned - CurrentReturn
+                    const calculatedUsedRaw = Math.max(0, assignedQty - alreadyReturned - currentReturn);
+                    const isPcs = (assignment.item?.unit || '').toLowerCase() === 'pcs';
+                    const calculatedUsed = isPcs ? Math.round(calculatedUsedRaw) : Number(calculatedUsedRaw.toFixed(3));
+
                     return (
                       <div key={assignment.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                         <div className="flex justify-between items-start mb-2">
@@ -3714,95 +3972,176 @@ const Services = () => {
                               <p className="text-sm text-gray-600">Code: {assignment.item.item_code}</p>
                             )}
                             <p className="text-xs text-gray-500 mt-1">
-                              Service: {assignment.assigned_service?.service?.name || 'N/A'}
+                              Service: {assignment.assigned_service?.service?.name || assignment.service_name || 'N/A'}
                             </p>
                           </div>
                           <div className="text-right">
                             <p className="text-sm text-gray-600">
-                              Assigned: {assignedQty} {assignment.item?.unit || 'pcs'}
-                            </p>
-                            <p className="text-sm font-semibold text-green-600">
-                              Used: {usedQty} {assignment.item?.unit || 'pcs'}
+                              Assigned: <span className="font-semibold">{assignedQty}</span> {assignment.item?.unit || 'pcs'}
                             </p>
                             <p className="text-sm text-gray-600">
                               Already Returned: {alreadyReturned} {assignment.item?.unit || 'pcs'}
                             </p>
-                            <p className="text-sm font-semibold text-orange-600">
-                              Balance (Unused): {balance} {assignment.item?.unit || 'pcs'}
-                            </p>
-                            <p className="text-sm font-semibold text-blue-600 mt-1">
-                              Max Returnable: {maxReturnable} {assignment.item?.unit || 'pcs'}
-                            </p>
                           </div>
                         </div>
-                        <div className="mt-3">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Quantity to Return (balance/unused items):
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max={maxReturnable}
-                            step="0.01"
-                            value={returnQuantities[assignment.id] !== undefined ? returnQuantities[assignment.id] : 0}
-                            onChange={(e) => {
-                              const inputValue = e.target.value;
-                              // Allow empty string for deletion
-                              if (inputValue === '') {
-                                setReturnQuantities({
-                                  ...returnQuantities,
-                                  [assignment.id]: ''
-                                });
-                                return;
-                              }
-                              // Parse the value
-                              const val = parseFloat(inputValue);
-                              // Allow NaN temporarily while user is typing (e.g., "0.")
-                              if (isNaN(val)) {
-                                setReturnQuantities({
-                                  ...returnQuantities,
-                                  [assignment.id]: inputValue
-                                });
-                                return;
-                              }
-                              // Validate: cannot exceed balance quantity
-                              const clampedVal = Math.max(0, Math.min(val, maxReturnable));
-                              setReturnQuantities({
-                                ...returnQuantities,
-                                [assignment.id]: clampedVal
-                              });
-                            }}
-                            onBlur={(e) => {
-                              // On blur, ensure we have a valid number
-                              const val = parseFloat(e.target.value);
-                              if (isNaN(val) || val < 0) {
-                                setReturnQuantities({
-                                  ...returnQuantities,
-                                  [assignment.id]: 0
-                                });
-                              } else {
-                                const clampedVal = Math.min(val, maxReturnable);
+
+                        <div className="grid grid-cols-2 gap-4 mt-3">
+                          {/* Return Input */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Return Quantity:
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              max={maxReturnable}
+                              step={isPcs ? "1" : "0.01"}
+                              value={returnQuantities[assignment.id] !== undefined ? returnQuantities[assignment.id] : 0}
+                              onKeyDown={(e) => {
+                                if (isPcs && (e.key === '.' || e.key === ',' || e.key === 'e')) {
+                                  e.preventDefault();
+                                }
+                              }}
+                              onChange={(e) => {
+                                const inputValue = e.target.value;
+                                if (inputValue === '') {
+                                  setReturnQuantities({
+                                    ...returnQuantities,
+                                    [assignment.id]: ''
+                                  });
+                                  return;
+                                }
+                                const val = parseFloat(inputValue);
+                                if (isNaN(val)) {
+                                  setReturnQuantities({
+                                    ...returnQuantities,
+                                    [assignment.id]: inputValue
+                                  });
+                                  return;
+                                }
+
+                                let processedVal = val;
+                                if (isPcs) {
+                                  processedVal = Math.floor(val); // Ensure whole number
+                                }
+
+                                const clampedVal = Math.max(0, Math.min(processedVal, maxReturnable));
                                 setReturnQuantities({
                                   ...returnQuantities,
                                   [assignment.id]: clampedVal
                                 });
-                              }
-                            }}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">
-                            Maximum returnable: {maxReturnable} {assignment.item?.unit || 'pcs'} (based on balance/unused quantity)
-                          </p>
-                          {balance > 0 && (
-                            <p className="text-xs text-blue-600 mt-1 font-semibold">
-                              ✓ {balance} {assignment.item?.unit || 'pcs'} available to return (unused items)
-                            </p>
-                          )}
-                          {balance === 0 && (
+                              }}
+                              onBlur={(e) => {
+                                const val = parseFloat(e.target.value);
+                                if (isNaN(val) || val < 0) {
+                                  setReturnQuantities({
+                                    ...returnQuantities,
+                                    [assignment.id]: 0
+                                  });
+                                } else {
+                                  const clampedVal = Math.min(val, maxReturnable);
+                                  setReturnQuantities({
+                                    ...returnQuantities,
+                                    [assignment.id]: clampedVal
+                                  });
+                                }
+                              }}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            />
                             <p className="text-xs text-gray-500 mt-1">
-                              No balance items to return (all items were used or already returned)
+                              Max Returnable: {maxReturnable} {assignment.item?.unit || 'pcs'}
+                            </p>
+                          </div>
+
+                          {/* Calculated Used Display */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Used Quantity (Auto):
+                            </label>
+                            <div className="w-full bg-gray-100 border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 font-semibold h-[38px] flex items-center">
+                              {calculatedUsed} {assignment.item?.unit || 'pcs'}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              (Assigned - Returned = Used)
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex justify-between mt-2 px-1">
+                          <p className="text-xs text-gray-500">
+                            Available to Return (Balance): <span className="font-semibold text-blue-600">{balance}</span> {assignment.item?.unit || 'pcs'}
+                          </p>
+                        </div>
+
+                        {/* Per Item Return Location */}
+                        <div className="mt-4 border-t pt-3">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Return Location for this Item:
+                          </label>
+                          {(assignment.notes?.includes("(LocID:") || assignment.item?.stock_locations?.length > 0 || assignment.item?.location) ? (
+                            <p className="text-xs text-blue-600 mb-1">
+                              Suggested Source: {
+                                (() => {
+                                  const noteMatch = assignment.notes ? assignment.notes.match(/Assigned from (.*?) \(LocID:/) : null;
+                                  if (noteMatch) return noteMatch[1].trim() + " (Assigned)";
+
+                                  if (assignment.item?.stock_locations?.length > 0)
+                                    return assignment.item.stock_locations.map(s => s.name).join(", ");
+
+                                  return assignment.item?.location || "";
+                                })()
+                              }
+                            </p>
+                          ) : (
+                            <p className="text-xs text-gray-500 mb-1 italic">
+                              Note: Item has no source location set.
                             </p>
                           )}
+                          <select
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            value={returnLocations[assignment.id] || ""}
+                            onChange={(e) => {
+                              const val = e.target.value ? parseInt(e.target.value) : "";
+                              setReturnLocations({
+                                ...returnLocations,
+                                [assignment.id]: val
+                              });
+                            }}
+                          >
+                            <option value="">Select Location...</option>
+                            {locations.map(loc => {
+                              const isStockSource = assignment.item?.stock_locations?.some(s => s.id === loc.id);
+
+                              const isMasterSource = assignment.item?.location && (
+                                loc.name?.trim().toLowerCase() === assignment.item.location?.trim().toLowerCase() ||
+                                loc.location_code === assignment.item.location
+                              );
+
+                              // Check for Source LocID in notes - user selected source takes precedence
+                              const noteSourceMatch = assignment.notes ? assignment.notes.match(/\(LocID:\s*(\d+)\)/) : null;
+                              const assignedSourceId = noteSourceMatch ? parseInt(noteSourceMatch[1]) : 0;
+                              const isAssignedSource = assignedSourceId && loc.id === assignedSourceId;
+
+                              const isSource = isAssignedSource || isStockSource || isMasterSource;
+
+                              const isDefault = !isSource && (
+                                loc.location_type === 'WAREHOUSE' ||
+                                loc.location_type === 'CENTRAL_WAREHOUSE' ||
+                                loc.is_inventory_point === true
+                              );
+
+                              const isHighlighted = isSource || isDefault;
+                              const bgColor = isSource ? "bg-green-50" : (isDefault ? "bg-gray-50" : "");
+
+                              return (
+                                <option key={loc.id} value={loc.id} className={isHighlighted ? `font-bold ${bgColor}` : ""}>
+                                  {isSource ? '📍 ' : (isDefault ? '📦 ' : '')}
+                                  {loc.name} {loc.location_type ? `(${loc.location_type})` : ''}
+                                  {isSource ? '(Source)' : (isDefault ? '(Default)' : '')}
+                                </option>
+                              );
+                            })}
+                          </select>
                         </div>
                       </div>
                     );
@@ -3815,6 +4154,9 @@ const Services = () => {
                       setCompletingServiceId(null);
                       setInventoryAssignments([]);
                       setReturnQuantities({});
+                      setUsedQuantities({});
+                      setReturnLocations({});
+                      setReturnLocationId(null);
                     }}
                     className="px-6 py-2 rounded-lg text-sm font-medium bg-gray-500 hover:bg-gray-600 text-white"
                   >
@@ -3832,6 +4174,9 @@ const Services = () => {
                         setCompletingServiceId(null);
                         setInventoryAssignments([]);
                         setReturnQuantities({});
+                        setUsedQuantities({});
+                        setReturnLocations({});
+                        setReturnLocationId(null);
                         fetchAll();
                         alert("Service marked as completed without returning inventory items.");
                       } catch (error) {
@@ -3845,7 +4190,7 @@ const Services = () => {
                   </button>
                   <button
                     onClick={handleCompleteWithReturns}
-                    className="px-6 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white"
+                    className="px-6 py-2 rounded-lg text-sm font-medium text-white bg-green-600 hover:bg-green-700"
                   >
                     Complete & Return Items
                   </button>
@@ -3936,28 +4281,33 @@ const Services = () => {
 
             {/* Separate items into consumables, rent/laundry, and fixed assets */}
             {(() => {
+              console.log("[DEBUG RENDER] Processing Checkout Inventory Items:", checkoutInventoryDetails.items);
+
               const consumableItems = (checkoutInventoryDetails.items || []).filter(item => {
-                const nameCheck = (item.item_name || item.name || "").toString();
-                const isFixedItem = item.is_fixed_asset ||
-                  ['TV', 'Bulb', 'Remote', 'AC', 'Kettle', 'Hair Dryer', 'Safe', 'Iron'].some(k => nameCheck.includes(k));
-                const isRentable = item.is_rentable || item.track_laundry_cycle;
+                // Rely strictly on backend flags - no hardcoded name checks
+                const isFixedItem = item.is_fixed_asset;
+                // Override: Force known consumables to NOT be rentable
+                const isKnownConsumable = ["coca", "cola", "water", "chips", "juice", "biscuit"].some(k => (item.item_name || "").toLowerCase().includes(k));
+                const isRentable = !isKnownConsumable && (item.is_rentable || item.track_laundry_cycle);
+
+                if (item.item_name.includes("Coca")) {
+                  console.log(`[DEBUG RENDER] Item ${item.item_name}: isFixed=${isFixedItem}, isRentable=${item.is_rentable}, laundry=${item.track_laundry_cycle} -> IsRentalFilter=${isRentable}`);
+                }
+
                 return !isFixedItem && !isRentable; // Pure consumables
               });
 
               const rentalItems = (checkoutInventoryDetails.items || []).filter(item => {
-                const isRentable = item.is_rentable || item.track_laundry_cycle;
-                return isRentable; // Rentals & Laundry (prioritized - if rentable, show here)
+                const isFixedItem = item.is_fixed_asset;
+                // Override: Force known consumables to NOT be rentable
+                const isKnownConsumable = ["coca", "cola", "water", "chips", "juice", "biscuit"].some(k => (item.item_name || "").toLowerCase().includes(k));
+                const isRentable = !isKnownConsumable && (item.is_rentable || item.track_laundry_cycle);
+                return isRentable && !isFixedItem; // Rentals & Laundry (non-fixed)
               });
 
               const fixedItems = (checkoutInventoryDetails.items || []).filter(item => {
-                const nameCheck = (item.item_name || item.name || "").toString();
-                // Only classify as fixed if NOT rentable
-                const isRentable = item.is_rentable || item.track_laundry_cycle;
-                if (isRentable) return false; // Rentable items go to rental section
-
-                const isFixedItem = item.is_fixed_asset ||
-                  ['TV', 'Bulb', 'Remote', 'AC', 'Kettle', 'Hair Dryer', 'Safe', 'Iron'].some(k => nameCheck.includes(k));
-                return isFixedItem; // Fixed assets (only if not rentable)
+                const isFixedItem = item.is_fixed_asset;
+                return isFixedItem; // Fixed assets
               });
 
               return (

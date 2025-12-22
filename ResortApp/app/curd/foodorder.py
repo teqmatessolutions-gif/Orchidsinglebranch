@@ -185,7 +185,9 @@ def update_food_order_status(db: Session, order_id: int, status: str):
             try:
                 from app.curd.inventory import process_food_order_usage
                 process_food_order_usage(db, order.id)
+                db.commit()
             except Exception as e:
+                db.rollback()
                 print(f"Failed to process inventory usage: {e}")
         
         # Notification system removed for performance

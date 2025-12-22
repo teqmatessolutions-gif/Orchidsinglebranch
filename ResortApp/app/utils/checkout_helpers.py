@@ -170,7 +170,7 @@ def trigger_linen_cycle(db: Session, room_id: int, checkout_id: int):
         # Create transaction to track linen movement to laundry
         transaction = InventoryTransaction(
             item_id=item.id,
-            transaction_type="out",  # Out from room
+            transaction_type="transfer_out",  # Out from room (Transfer, not Usage)
             quantity=1.0,  # Assuming 1 set per room
             unit_price=0.0,  # No cost, just tracking
             reference_number=f"LAUNDRY-{checkout_id}",

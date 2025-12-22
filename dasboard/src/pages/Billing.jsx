@@ -3,7 +3,7 @@ import DashboardLayout from "../layout/DashboardLayout";
 import BannerMessage from "../components/BannerMessage";
 import axios from "axios"; // We need axios to create the api service object
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { DollarSign, BedDouble, Users, Utensils, Package, Hash, Calendar, CreditCard, X, Search, Filter, XCircle } from 'lucide-react';
+import { DollarSign, BedDouble, Users, Utensils, Package, Hash, Calendar, CreditCard, X, Search, Filter, XCircle, RefreshCw } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { useNavigate } from "react-router-dom";
 import autoTable from 'jspdf-autotable';
@@ -1629,7 +1629,19 @@ const Billing = () => {
         {/* All Checkouts Report */}
         <div className="bg-white p-3 sm:p-6 rounded-xl shadow-md w-full max-w-7xl mx-auto">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-4 gap-3">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Completed Checkouts</h2>
+            <div className="flex items-center gap-3">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-800">Completed Checkouts</h2>
+              <button
+                onClick={() => {
+                  setLoading(true);
+                  fetchInitialData().finally(() => setLoading(false));
+                }}
+                className="p-2 bg-indigo-50 text-indigo-600 rounded-full hover:bg-indigo-100 transition-colors"
+                title="Refresh Checkouts"
+              >
+                <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+              </button>
+            </div>
             {activeFiltersCount > 0 && (
               <div className="flex items-center gap-2 text-sm text-gray-600">
                 <span>Showing {filteredCheckouts.length} of {checkouts.length} checkouts</span>

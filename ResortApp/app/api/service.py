@@ -816,6 +816,7 @@ def get_employee_inventory_assignments(
     try:
         from app.models.employee_inventory import EmployeeInventoryAssignment
         from app.schemas.employee_inventory import EmployeeInventoryAssignmentOut
+        from app.models.inventory import LocationStock, Location
         
         query = db.query(EmployeeInventoryAssignment).filter(
             EmployeeInventoryAssignment.employee_id == employee_id
@@ -837,6 +838,22 @@ def get_employee_inventory_assignments(
         
         result = []
         for assignment in assignments:
+            # Fetch active stock locations
+            stock_locations = []
+            if assignment.item_id:
+                active_stocks = db.query(LocationStock).join(Location).filter(
+                    LocationStock.item_id == assignment.item_id,
+                    LocationStock.quantity > 0
+                ).all()
+                
+                stock_locations = [
+                    {
+                        "id": stock.location.id,
+                        "name": stock.location.name,
+                        "location_code": stock.location.location_code
+                    } for stock in active_stocks if stock.location
+                ]
+
             result.append({
                 "id": assignment.id,
                 "employee_id": assignment.employee_id,
@@ -847,6 +864,8 @@ def get_employee_inventory_assignments(
                     "name": assignment.item.name if assignment.item else "Unknown",
                     "item_code": assignment.item.item_code if assignment.item else None,
                     "unit": assignment.item.unit if assignment.item else "pcs",
+                    "location": assignment.item.location if assignment.item else None,
+                    "stock_locations": stock_locations,
                 } if assignment.item else None,
                 "item_name": assignment.item.name if assignment.item else "Unknown",
                 "item_code": assignment.item.item_code if assignment.item else None,

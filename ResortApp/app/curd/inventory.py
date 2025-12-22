@@ -1561,27 +1561,67 @@ def process_food_order_usage(db: Session, order_id: int):
                 else:
                     ingredient_usage[ingredient.inventory_item_id] = qty_needed
     
+    # Find Kitchen/Consumption Location
+    # Strategy:
+    # 1. Look for a location named "Main Kitchen" or containing "Kitchen" (preferred).
+    # 2. Look for a location matching the item's category parent_department (e.g. "Restaurant").
+    
+    from app.models.inventory import Location, LocationStock
+    
+    kitchen_loc = db.query(Location).filter(
+        Location.name.ilike("%Main Kitchen%"),
+        Location.is_active == True
+    ).first()
+    
+    if not kitchen_loc:
+        # Fallback to any kitchen
+        kitchen_loc = db.query(Location).filter(
+            Location.name.ilike("%Kitchen%"),
+            Location.is_active == True
+        ).first()
+
     # Deduct stock and create transactions
     for item_id, quantity in ingredient_usage.items():
         item = get_item_by_id(db, item_id)
         if not item:
             continue
             
-        # Deduct stock
-        item.current_stock -= quantity
+        # 1. Deduct Global Stock (Total Assets Owned)
+        current = item.current_stock or 0.0
+        item.current_stock = current - quantity
         
+        # 2. Deduct Location Stock (Physical consumption from Kitchen)
+        if kitchen_loc:
+             loc_stock = db.query(LocationStock).filter(
+                 LocationStock.location_id == kitchen_loc.id,
+                 LocationStock.item_id == item_id
+             ).first()
+             
+             if loc_stock:
+                 loc_stock.quantity -= quantity
+                 loc_stock.last_updated = datetime.utcnow()
+             else:
+                 # Create negative stock to track deficit/usage if not transferred yet
+                 new_stock = LocationStock(
+                     location_id=kitchen_loc.id,
+                     item_id=item_id,
+                     quantity=-quantity,
+                     last_updated=datetime.utcnow()
+                 )
+                 db.add(new_stock)
+
         # Create transaction
         transaction = InventoryTransaction(
             item_id=item_id,
-            transaction_type="out", # Using 'out' as it is standard in this system
+            transaction_type="out", # Standard consumption
             quantity=quantity,
             unit_price=item.unit_price,
             total_amount=item.unit_price * quantity if item.unit_price else None,
             reference_number=f"ORD-{order_id}",
             department=item.category.parent_department if item.category else "Restaurant",
-            notes=f"Food Order #{order_id} Consumption",
-            created_by=order.assigned_employee_id
+            notes=f"Food Order #{order_id} Consumption from {kitchen_loc.name if kitchen_loc else 'Global Stock'}",
+            created_by=None 
         )
         db.add(transaction)
     
-    db.commit()
+    # db.commit() removed to allow atomic transaction in caller

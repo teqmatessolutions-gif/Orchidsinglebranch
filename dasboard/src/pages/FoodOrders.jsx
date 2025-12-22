@@ -911,7 +911,7 @@ export default function FoodOrders() {
   const fetchAll = async () => {
     try {
       // Fetch initial page of orders, rooms, bookings, and other data
-      const [ordersRes, roomsRes, employeesRes, foodItemsRes, bookingsRes, packageBookingsRes] = await Promise.all([
+      const [ordersRes, roomsRes, employeesRes, foodItemsRes, bookingsRes, packageBookingsRes, inventoryRes] = await Promise.all([
         api.get("/food-orders/?skip=0&limit=20"),
         api.get("/rooms?limit=1000").catch(err => {
           console.error("Error fetching rooms:", err);
@@ -933,11 +933,21 @@ export default function FoodOrders() {
           console.error("Error fetching package bookings:", err);
           return { data: [] };
         }),
+        api.get("/inventory/items?limit=10000").catch(err => {
+          console.error("Error fetching inventory items:", err);
+          return { data: [] };
+        })
       ]);
       setOrders(ordersRes.data);
       setHasMore(ordersRes.data.length === 20);
       setEmployees(employeesRes.data);
       setFoodItems(foodItemsRes.data);
+      setInventoryItemsList(inventoryRes.data || []);
+
+      // Fetch recipes for profitability calculation
+      if (foodItemsRes.data && foodItemsRes.data.length > 0) {
+        fetchRecipesForInventory(foodItemsRes.data);
+      }
 
       // Filter rooms to only show checked-in rooms (similar to Services page)
       const allRooms = roomsRes.data;
@@ -2313,7 +2323,7 @@ export default function FoodOrders() {
                         {order.status === "completed" && (() => {
                           let orderCost = 0;
                           order.items?.forEach(item => {
-                            const recipe = recipesCache[item.food_item_id]?.[0];
+                            const recipe = recipesCache[item.food_item_id]?.[0] || recipesData[item.food_item_id];
                             if (recipe && recipe.ingredients) {
                               const servings = recipe.servings || 1;
                               const multiplier = (item.quantity || 0) / servings;

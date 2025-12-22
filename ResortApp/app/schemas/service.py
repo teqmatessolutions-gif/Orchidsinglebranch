@@ -79,16 +79,25 @@ class AssignedServiceBase(BaseModel):
 class AssignedServiceCreate(AssignedServiceBase):
     override_charges: Optional[float] = None
     billing_status: Optional[str] = "unbilled"  # Explicitly track billing status
+    extra_inventory_items: Optional[List[ServiceInventoryItemBase]] = []  # Additional items beyond service template
+    inventory_source_selections: Optional[List["InventorySourceSelection"]] = []  # Explicit source for items
+
+class InventorySourceSelection(BaseModel):
+    item_id: int
+    location_id: int
 
 class InventoryReturnItem(BaseModel):
     assignment_id: int
     quantity_returned: float
+    quantity_used: Optional[float] = 0.0  # Allow updating used quantity
     notes: Optional[str] = None
+    return_location_id: Optional[int] = None  # Location to return item to
 
 class AssignedServiceUpdate(BaseModel):
     status: Optional[ServiceStatus] = None
     employee_id: Optional[int] = None  # Allow employee reassignment
     inventory_returns: Optional[List[InventoryReturnItem]] = None  # Optional inventory items to return when completing
+    return_location_id: Optional[int] = None  # Location to return items to
     billing_status: Optional[str] = None  # Allow updating billing status
 
 class AssignedServiceOut(BaseModel):
