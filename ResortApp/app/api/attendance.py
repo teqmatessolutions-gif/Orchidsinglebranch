@@ -165,13 +165,28 @@ def get_monthly_report(employee_id: int, year: int, month: int, db: Session = De
     start_of_month = date(year, month, 1)
     end_of_month = date(year, month, total_days_in_month)
 
-    # --- Attendance Calculation ---
-    present_days_query = db.query(WorkingLog.date).filter(
+    # Calculate present days based on duration (>= 4 hours)
+    working_logs = db.query(WorkingLog).filter(
         WorkingLog.employee_id == employee_id,
         WorkingLog.date >= start_of_month,
         WorkingLog.date <= end_of_month
-    ).distinct()
-    present_days = present_days_query.count()
+    ).all()
+    
+    daily_hours = {}
+    for log in working_logs:
+        duration = 0
+        if log.check_in_time and log.check_out_time:
+             # Calculate duration
+             start_dt = datetime.combine(log.date, log.check_in_time)
+             end_dt = datetime.combine(log.date, log.check_out_time)
+             if end_dt > start_dt:
+                 duration = (end_dt - start_dt).total_seconds() / 3600
+        
+        d_str = str(log.date)
+        daily_hours[d_str] = daily_hours.get(d_str, 0) + duration
+        
+    # Count days with at least 4 hours of work as "Present" (Half day or Full day)
+    present_days = sum(1 for hours in daily_hours.values() if hours >= 4)
 
     # --- Leave Calculation for the Month ---
     approved_leaves_month = db.query(Leave).filter(

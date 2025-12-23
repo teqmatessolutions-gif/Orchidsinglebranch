@@ -657,7 +657,14 @@ def assign_service(
         raise HTTPException(status_code=500, detail=error_detail)
 
 @router.get("/assigned", response_model=List[service_schema.AssignedServiceOut])
-def get_all_assigned_services(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), skip: int = 0, limit: int = 20):
+def get_all_assigned_services(
+    db: Session = Depends(get_db), 
+    current_user: User = Depends(get_current_user), 
+    skip: int = 0, 
+    limit: int = 20,
+    employee_id: Optional[int] = None,
+    status: Optional[str] = None
+):
     try:
         # Cap limit to prevent performance issues
         # Optimized for low network
@@ -665,7 +672,7 @@ def get_all_assigned_services(db: Session = Depends(get_db), current_user: User 
             limit = 200
         if limit < 1:
             limit = 50
-        assigned_services = service_crud.get_assigned_services(db, skip=skip, limit=limit)
+        assigned_services = service_crud.get_assigned_services(db, skip=skip, limit=limit, employee_id=employee_id, status=status)
         
         # Manually construct response to ensure proper serialization
         result = []

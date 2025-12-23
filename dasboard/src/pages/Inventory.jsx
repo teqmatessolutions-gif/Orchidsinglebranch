@@ -50,7 +50,7 @@ import ItemHistoryModal from "./inventory/modals/ItemHistoryModal";
 
 
 
-// Location Stock Details Modal
+// Location Stock Details Modal  
 function LocationStockDetailsModal({ locationData, onClose }) {
   if (!locationData) return null;
 
@@ -763,6 +763,13 @@ const Inventory = () => {
   const [showWasteForm, setShowWasteForm] = useState(false);
   const [showLocationForm, setShowLocationForm] = useState(false);
   const [showAssetMappingForm, setShowAssetMappingForm] = useState(false);
+  const [showAdjustmentForm, setShowAdjustmentForm] = useState(false);
+  const [adjustmentForm, setAdjustmentForm] = useState({
+    location_id: "",
+    item_id: "",
+    actual_stock: "",
+    notes: ""
+  });
 
   // Detail view states
   const [selectedRequisition, setSelectedRequisition] = useState(null);
@@ -1827,6 +1834,21 @@ const Inventory = () => {
     }
   };
 
+
+  const handleAdjustmentSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await API.post("/inventory/adjustments", adjustmentForm);
+      addNotification({ title: "Success", message: "Stock adjusted successfully", type: "success" });
+      setShowAdjustmentForm(false);
+      setAdjustmentForm({ location_id: "", item_id: "", actual_stock: "", notes: "" });
+      fetchData();
+    } catch (error) {
+      console.error(error);
+      addNotification({ title: "Error", message: "Failed to adjust stock " + (error.response?.data?.detail || ""), type: "error" });
+    }
+  };
+
   const handleRequisitionStatusChange = async (reqId, newStatus) => {
     try {
       await API.patch(`/inventory/requisitions/${reqId}`, { status: newStatus });
@@ -2253,7 +2275,7 @@ const Inventory = () => {
               <div className="flex flex-col items-start bg-blue-50/50 p-1 rounded">
                 <span className="font-bold text-2xl text-gray-800">{summary.totalItems} SKUs</span>
                 <span className="text-sm font-medium text-blue-600">
-                  Stock: {items.reduce((sum, item) => sum + (parseFloat(item.current_stock) || 0), 0)} units
+                  Stock: {parseFloat(items.reduce((sum, item) => sum + (parseFloat(item.current_stock) || 0), 0).toFixed(2))} units
                 </span>
               </div>
             }
@@ -2416,13 +2438,22 @@ const Inventory = () => {
                 </button>
               )}
               {activeTab === "issues" && (
-                <button
-                  onClick={() => setShowIssueForm(true)}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
-                >
-                  <Plus className="w-4 h-4" />
-                  New Issue
-                </button>
+                <>
+                  <button
+                    onClick={() => setShowIssueForm(true)}
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+                  >
+                    <Plus className="w-4 h-4" />
+                    New Issue
+                  </button>
+                  <button
+                    onClick={() => setShowAdjustmentForm(true)}
+                    className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 flex items-center gap-2 ml-2"
+                  >
+                    <Filter className="w-4 h-4" />
+                    Adjust Stock
+                  </button>
+                </>
               )}
               {activeTab === "waste" && (
                 <button
@@ -2550,9 +2581,11 @@ const Inventory = () => {
                               <span
                                 className={`px-2 py-1 text-xs rounded-full ${req.status === "approved"
                                   ? "bg-green-100 text-green-800"
-                                  : req.status === "rejected"
-                                    ? "bg-red-100 text-red-800"
-                                    : "bg-yellow-100 text-yellow-800"
+                                  : req.status === "issued"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : req.status === "rejected"
+                                      ? "bg-red-100 text-red-800"
+                                      : "bg-yellow-100 text-yellow-800"
                                   }`}
                               >
                                 {req.status}
@@ -2594,6 +2627,7 @@ const Inventory = () => {
                                 value={req.status}
                                 onChange={(e) => handleRequisitionStatusChange(req.id, e.target.value)}
                                 className={`w-full px-3 py-2 text-sm border rounded-lg ${req.status === 'approved' ? 'bg-green-50 text-green-700 border-green-200' :
+                                  req.status === 'issued' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                                   req.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
                                     req.status === 'completed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
                                       'bg-yellow-50 text-yellow-700 border-yellow-200'
@@ -2601,6 +2635,7 @@ const Inventory = () => {
                               >
                                 <option value="pending">Pending</option>
                                 <option value="approved">Approved</option>
+                                <option value="issued">Issued</option>
                                 <option value="rejected">Rejected</option>
                                 <option value="completed">Completed</option>
                               </select>
@@ -2685,9 +2720,11 @@ const Inventory = () => {
                                   <span
                                     className={`px-2 py-1 text-xs rounded-full ${req.status === "approved"
                                       ? "bg-green-100 text-green-800"
-                                      : req.status === "rejected"
-                                        ? "bg-red-100 text-red-800"
-                                        : "bg-yellow-100 text-yellow-800"
+                                      : req.status === "issued"
+                                        ? "bg-blue-100 text-blue-800"
+                                        : req.status === "rejected"
+                                          ? "bg-red-100 text-red-800"
+                                          : "bg-yellow-100 text-yellow-800"
                                       }`}
                                   >
                                     {req.status}
@@ -2705,15 +2742,18 @@ const Inventory = () => {
                                     onChange={(e) => handleRequisitionStatusChange(req.id, e.target.value)}
                                     className={`px-3 py-1 text-sm rounded border ${req.status === "approved"
                                       ? "bg-green-100 text-green-800 border-green-300"
-                                      : req.status === "rejected"
-                                        ? "bg-red-100 text-red-800 border-red-300"
-                                        : req.status === "completed"
-                                          ? "bg-blue-100 text-blue-800 border-blue-300"
-                                          : "bg-yellow-100 text-yellow-800 border-yellow-300"
+                                      : req.status === "issued"
+                                        ? "bg-blue-100 text-blue-800 border-blue-300"
+                                        : req.status === "rejected"
+                                          ? "bg-red-100 text-red-800 border-red-300"
+                                          : req.status === "completed"
+                                            ? "bg-blue-100 text-blue-800 border-blue-300"
+                                            : "bg-yellow-100 text-yellow-800 border-yellow-300"
                                       }`}
                                   >
                                     <option value="pending">Pending</option>
                                     <option value="approved">Approved</option>
+                                    <option value="issued">Issued</option>
                                     <option value="rejected">Rejected</option>
                                     <option value="completed">Completed</option>
                                   </select>
@@ -3731,6 +3771,17 @@ const Inventory = () => {
       )}
 
       {/* Issue Form Modal */}
+      {showAdjustmentForm && (
+        <AdjustmentFormModal
+          form={adjustmentForm}
+          setForm={setAdjustmentForm}
+          items={items}
+          locations={locations}
+          onSubmit={handleAdjustmentSubmit}
+          onClose={() => setShowAdjustmentForm(false)}
+        />
+      )}
+
       {showIssueForm && (
         <IssueFormModal
           form={issueForm}
@@ -6100,7 +6151,7 @@ function PurchaseFormModal({
 
   const updateDetail = (index, field, value) => {
     const newDetails = [...form.details];
-    
+
     // Normalize quantity based on item unit
     if (field === "quantity") {
       const itemId = newDetails[index].item_id;
@@ -7270,6 +7321,34 @@ function IssueFormModal({
   onRemoveDetail,
   onClose,
 }) {
+  const [sourceItems, setSourceItems] = useState([]);
+
+  useEffect(() => {
+    if (form.source_location_id) {
+      API.get(`/inventory/locations/${form.source_location_id}/items`)
+        .then(res => {
+          setSourceItems(res.data.items || []);
+        })
+        .catch(err => {
+          console.error("Failed to fetch location items", err);
+          setSourceItems([]);
+        });
+    } else {
+      setSourceItems([]);
+    }
+  }, [form.source_location_id]);
+
+  const getSourceStock = useCallback((itemId) => {
+    if (!form.source_location_id) return items.find(i => i.id === itemId)?.current_stock || 0;
+    const si = sourceItems.find(i => i.item_id === itemId);
+    return si && si.location_stock !== undefined ? si.location_stock : 0;
+  }, [form.source_location_id, items, sourceItems]);
+
+  const availableItems = useMemo(() => {
+    if (!form.source_location_id) return items;
+    return items.filter(i => getSourceStock(i.id) > 0);
+  }, [items, form.source_location_id, getSourceStock]);
+
   return ReactDOM.createPortal(
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
       <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto">
@@ -7489,9 +7568,9 @@ function IssueFormModal({
                             required
                           >
                             <option value="">Select Item</option>
-                            {items.map((item) => (
-                              <option key={item.id} value={item.id} disabled={!item.current_stock || item.current_stock <= 0}>
-                                {item.name} (Stock: {item.current_stock || 0})
+                            {availableItems.map((item) => (
+                              <option key={item.id} value={item.id} disabled={getSourceStock(item.id) <= 0}>
+                                {item.name} (Stock: {getSourceStock(item.id)})
                               </option>
                             ))}
                           </select>
@@ -9764,3 +9843,124 @@ function RecipeFormModal({
 };
 
 export default Inventory;
+
+function AdjustmentFormModal({
+  form,
+  setForm,
+  items,
+  locations,
+  onSubmit,
+  onClose,
+}) {
+  const [currentStock, setCurrentStock] = useState(null);
+  const [loadingStock, setLoadingStock] = useState(false);
+
+  useEffect(() => {
+    if (form.location_id && form.item_id) {
+      setLoadingStock(true);
+      API.get(`/inventory/locations/${form.location_id}/items`)
+        .then(res => {
+          const item = res.data.items?.find(i => (i.item_id || i.id) === parseInt(form.item_id));
+          setCurrentStock(item ? (item.location_stock || 0) : 0);
+        })
+        .catch(() => setCurrentStock(0))
+        .finally(() => setLoadingStock(false));
+    } else {
+      setCurrentStock(null);
+    }
+  }, [form.location_id, form.item_id]);
+
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10000]">
+      <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-gray-800">Adjust Stock</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+        <form onSubmit={onSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+            <select
+              value={form.location_id}
+              onChange={(e) => setForm({ ...form, location_id: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              required
+            >
+              <option value="">Select Location</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  {loc.name || `${loc.building} - ${loc.room_area}`}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Item</label>
+            <select
+              value={form.item_id}
+              onChange={(e) => setForm({ ...form, item_id: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              required
+            >
+              <option value="">Select Item</option>
+              {items.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="bg-blue-50 p-3 rounded-lg flex justify-between items-center">
+            <span className="text-sm text-blue-800 font-medium">Current Stock in System:</span>
+            <span className="text-lg font-bold text-blue-900">
+              {loadingStock ? "..." : currentStock !== null ? currentStock : "-"}
+            </span>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Actual Stock (Physical Count)</label>
+            <input
+              type="number"
+              step="any"
+              value={form.actual_stock}
+              onChange={(e) => setForm({ ...form, actual_stock: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500"
+              required
+              placeholder="Enter the actual count found"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Reason / Notes</label>
+            <textarea
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              rows="3"
+            />
+          </div>
+
+          <div className="flex justify-end pt-4 gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
+            >
+              Confirm Adjustment
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>,
+    document.body
+  );
+}

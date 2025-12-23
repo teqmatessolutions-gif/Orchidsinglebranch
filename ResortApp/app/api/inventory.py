@@ -19,7 +19,8 @@ from app.schemas.inventory import (
     WasteLogCreate, WasteLogOut,
     LocationCreate, LocationOut,
     AssetMappingCreate, AssetMappingOut, AssetMappingUpdate,
-    AssetRegistryCreate, AssetRegistryOut, AssetRegistryUpdate
+    AssetRegistryCreate, AssetRegistryOut, AssetRegistryUpdate,
+    StockAdjustmentCreate
 )
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
@@ -1696,8 +1697,10 @@ def get_location_items(
         raise HTTPException(status_code=404, detail="Location not found")
     
     # 1. Get items from LocationStock (Primary Source for bulk items)
+    # 1. Get items from LocationStock (Primary Source for bulk items)
     location_stocks = db.query(LocationStock).filter(
-        LocationStock.location_id == location_id
+        LocationStock.location_id == location_id,
+        LocationStock.quantity > 0
     ).all()
     
     # 2. Get items assigned to this location via asset mappings
@@ -2609,3 +2612,69 @@ def fix_item_stock(
         "department": category.parent_department if category else None,
         "is_low_stock": item.current_stock <= item.min_stock_level if item.min_stock_level else False
     }
+
+
+@router.post("/adjustments")
+def create_stock_adjustment(
+    adjustment: StockAdjustmentCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    from app.models.inventory import InventoryItem, LocationStock, InventoryTransaction
+    
+    item = db.query(InventoryItem).filter(InventoryItem.id == adjustment.item_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Item not found")
+        
+    loc_stock = db.query(LocationStock).filter(
+        LocationStock.location_id == adjustment.location_id,
+        LocationStock.item_id == adjustment.item_id
+    ).first()
+    
+    current_qty = loc_stock.quantity if loc_stock else 0.0
+    actual_qty = float(adjustment.actual_stock)
+    diff = actual_qty - current_qty
+    
+    if diff == 0:
+        return {"message": "No change in stock", "new_stock": actual_qty}
+        
+    # Transaction Type logic
+    if diff > 0:
+        trx_type = "adjustment" # Treated as positive/incoming in recalculate_stock
+        direction = "Increased"
+    else:
+        trx_type = "out" # Treated as negative/outgoing in recalculate_stock
+        direction = "Decreased"
+    
+    trx = InventoryTransaction(
+        item_id=adjustment.item_id,
+        transaction_type=trx_type,
+        quantity=abs(diff),
+        unit_price=item.unit_price,
+        total_amount=abs(diff) * (item.unit_price or 0) if item.unit_price else 0,
+        notes=f"Stock Adjustment by {current_user.name}: {direction} from {current_qty} to {actual_qty}. {adjustment.notes or ''}",
+        created_by=current_user.id,
+        reference_number=f"ADJ-{datetime.now().strftime('%Y%m%d%H%M')}"
+    )
+    db.add(trx)
+    
+    # Update Location Stock
+    if loc_stock:
+        loc_stock.quantity = actual_qty
+        loc_stock.updated_at = datetime.now()
+    else:
+        new_stock = LocationStock(
+            location_id=adjustment.location_id,
+            item_id=adjustment.item_id,
+            quantity=actual_qty
+        )
+        db.add(new_stock)
+        
+    # Update Global Stock
+    if item.current_stock is None:
+        item.current_stock = 0.0
+    item.current_stock += diff
+    
+    db.commit()
+    return {"message": "Stock adjusted successfully", "new_stock": actual_qty}
+

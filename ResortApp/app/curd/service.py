@@ -644,7 +644,7 @@ def create_assigned_service(db: Session, assigned: AssignedServiceCreate):
         print(traceback.format_exc())
         raise ValueError(error_msg) from e
 
-def get_assigned_services(db: Session, skip: int = 0, limit: int = 100):
+def get_assigned_services(db: Session, skip: int = 0, limit: int = 100, employee_id: Optional[int] = None, status: Optional[str] = None):
     """
     Get assigned services - ultra-simplified version for maximum performance.
     """
@@ -655,13 +655,23 @@ def get_assigned_services(db: Session, skip: int = 0, limit: int = 100):
         if limit < 1:
             limit = 20
         
-        # Ultra-simple query - minimal eager loading to avoid hangs
-        # Only load essential relationships
-        assigned_services = db.query(AssignedService).options(
+        # Start query with minimal eager loading
+        query = db.query(AssignedService).options(
             joinedload(AssignedService.service),
             joinedload(AssignedService.employee),
             joinedload(AssignedService.room)
-        ).order_by(AssignedService.id.desc()).offset(skip).limit(limit).all()
+        )
+
+        # Apply filters
+        if employee_id:
+            query = query.filter(AssignedService.employee_id == employee_id)
+        
+        if status:
+            # Handle enum vs string comparison if needed, though SQLAlchemy usually handles it if we pass the string value that matches the enum
+            query = query.filter(AssignedService.status == status)
+
+        # Execute query
+        assigned_services = query.order_by(AssignedService.id.desc()).offset(skip).limit(limit).all()
         
         return assigned_services
     except Exception as e:

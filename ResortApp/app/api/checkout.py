@@ -1618,22 +1618,34 @@ def repair_room_checkout_status(room_number: str, db: Session = Depends(get_db),
                     
                     if remaining:
                         warehouse = db.query(Location).filter(Location.location_type == "WAREHOUSE").first()
+                        laundry = db.query(Location).filter(
+                            (Location.location_type == "LAUNDRY") | 
+                            (Location.name.ilike("%Laundry%"))
+                        ).first()
+
                         if warehouse:
                             for item_stock in remaining:
                                 qty = item_stock.quantity
                                 item_name = item_stock.item.name if item_stock.item else f"Item #{item_stock.item_id}"
                                 
-                                wh_stock = db.query(LocationStock).filter(
-                                    LocationStock.location_id == warehouse.id,
+                                # Determine destination: Laundry or Warehouse
+                                target_location = warehouse
+                                if item_stock.item.track_laundry_cycle and laundry:
+                                    target_location = laundry
+                                    print(f"[CLEANUP] Item {item_name} is marked for Laundry. Redirecting to {laundry.name}")
+
+                                # Proceed with transfer to target_location
+                                dest_stock = db.query(LocationStock).filter(
+                                    LocationStock.location_id == target_location.id,
                                     LocationStock.item_id == item_stock.item_id
                                 ).first()
                                 
-                                if wh_stock:
-                                    wh_stock.quantity += qty
-                                    wh_stock.last_updated = datetime.utcnow()
+                                if dest_stock:
+                                    dest_stock.quantity += qty
+                                    dest_stock.last_updated = datetime.utcnow()
                                 else:
                                     db.add(LocationStock(
-                                        location_id=warehouse.id,
+                                        location_id=target_location.id,
                                         item_id=item_stock.item_id,
                                         quantity=qty,
                                         last_updated=datetime.utcnow()
@@ -1643,7 +1655,7 @@ def repair_room_checkout_status(room_number: str, db: Session = Depends(get_db),
                                     item_id=item_stock.item_id,
                                     transaction_type="transfer_out",
                                     quantity=-qty,
-                                    notes=f"Checkout cleanup - returned from Room {room.number} to {warehouse.name if warehouse else 'Warehouse'}",
+                                    notes=f"Checkout cleanup - returned from Room {room.number} to {target_location.name}",
                                     created_by=current_user.id if current_user else None
                                 ))
                                 

@@ -352,6 +352,14 @@ class PurchaseMasterOut(PurchaseMasterBase):
         from_attributes = True
 
 
+
+class StockAdjustmentCreate(BaseModel):
+    location_id: int
+    item_id: int
+    actual_stock: float
+    notes: Optional[str] = None
+
+
 # Transaction Schemas
 class InventoryTransactionOut(BaseModel):
     id: int
