@@ -732,9 +732,18 @@ def check_in_package_booking(
     booking_id: Union[str, int],
     id_card_image: UploadFile = File(...),
     guest_photo: UploadFile = File(...),
+    amenityAllocation: str = Form(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    try:
+        with open("debug_pkg_checkin.txt", "a") as f:
+            f.write(f"\n--- NEW REQUEST {datetime.now()} ---\n")
+            f.write(f"Booking ID: {booking_id}\n")
+            f.write(f"Amenity Allocation Raw: {amenityAllocation}\n")
+    except Exception as e:
+        print(f"Log error: {e}")
+
     # Parse display ID (PK-000001) or accept numeric ID
     numeric_id, booking_type = parse_display_id(str(booking_id))
     if numeric_id is None:
@@ -765,6 +774,163 @@ def check_in_package_booking(
             status_code=400,
             detail=f"Package booking {booking_id} cannot be checked in. Expected status 'booked', found '{booking.status}'."
         )
+
+    # PROCESS AMENITY ALLOCATION AND SCHEDULED FOOD ORDERS
+    if amenityAllocation:
+        try:
+            with open("C:/releasing/orchid/debug_checkin.log", "a") as f:
+                f.write(f"\n[{datetime.now()}] DEBUG: Received amenityAllocation: {amenityAllocation}\n")
+        except:
+            pass
+
+        print(f"DEBUG: Received amenityAllocation: {amenityAllocation}")
+        try:
+            import json
+            from app.models.foodorder import FoodOrder, FoodOrderItem
+            from app.models.food_item import FoodItem
+            from datetime import datetime, timedelta, date
+            
+            alloc_data = json.loads(amenityAllocation)
+            if not alloc_data:
+                print("DEBUG: alloc_data is empty or None")
+            else:
+                items = alloc_data.get("items", [])
+                
+                # Find the first room ID for assignment
+                room_id = None
+                if booking.rooms and len(booking.rooms) > 0:
+                    room_id = booking.rooms[0].room_id
+                
+                try:
+                    with open("C:/releasing/orchid/debug_checkin.log", "a") as f:
+                        f.write(f"[{datetime.now()}] DEBUG: Processing {len(items)} items for room_id {room_id}\n")
+                except:
+                    pass
+                
+                print(f"DEBUG: Processing {len(items)} items for room_id {room_id}")
+                
+                if items and room_id:
+                    check_in_date = date.today()
+                    
+                    for item in items:
+                        name = item.get("name")
+                        scheduled_time = item.get("scheduledTime")
+                        scheduled_date_str = item.get("scheduledDate")
+                        
+                        try:
+                            with open("C:/releasing/orchid/debug_checkin.log", "a") as f:
+                                f.write(f"[{datetime.now()}] DEBUG: Item {name}, Time: {scheduled_time}, Date: {scheduled_date_str}\n")
+                        except:
+                            pass
+                        
+                        print(f"DEBUG: Item {name}, Time: {scheduled_time}, Date: {scheduled_date_str}")
+                        
+                        # Only create Food Order if it has a specific schedule
+                        if name and scheduled_time:
+                            try:
+                                 # Construct datetime for the schedule
+                                 # scheduled_time is usually "HH:MM"
+                                 # Sanitize time string just in case
+                                 scheduled_time = scheduled_time.strip()
+                                 if " " in scheduled_time:
+                                     # Handle "07:20 PM" format if it comes up (though type='time' shouldn't send it)
+                                     try:
+                                         t = datetime.strptime(scheduled_time, "%I:%M %p")
+                                         sh, sm = t.hour, t.minute
+                                     except ValueError:
+                                         # Try standard fallback
+                                         sh, sm = map(int, scheduled_time.split(":")[:2])
+                                 else:
+                                     sh, sm = map(int, scheduled_time.split(":")[:2])
+                                 
+                                 if scheduled_date_str:
+                                     # Use provided date
+                                     s_year, s_month, s_day = map(int, scheduled_date_str.split("-"))
+                                     scheduled_dt = datetime(s_year, s_month, s_day, sh, sm)
+                                 else:
+                                     # Fallback to smart logic: today or tomorrow
+                                     now = datetime.now()
+                                     scheduled_dt = datetime.combine(check_in_date, datetime.min.time().replace(hour=sh, minute=sm))
+                                     if scheduled_dt < now:
+                                         scheduled_dt = scheduled_dt + timedelta(days=1)
+                                 
+                                 schedule_str = scheduled_dt.strftime("%Y-%m-%d %H:%M:%S")
+                                 
+                                 # Try to find a matching Food Item to link properly, otherwise just use note
+                                 food_item = db.query(FoodItem).filter(FoodItem.name.ilike(name)).first()
+                                 
+                                 new_order = FoodOrder(
+                                     room_id=room_id,
+                                     amount=0.0, # Complimentary package item
+                                     status="scheduled",
+                                     billing_status="unbilled",
+                                     order_type="room_service",
+                                     delivery_request=f"SCHEDULED_FOR: {schedule_str} -- Package Meal: {name}",
+                                     created_at=datetime.utcnow()
+                                 )
+                                 db.add(new_order)
+                                 db.flush() # Get ID
+                                 
+                                 try:
+                                    with open("C:/releasing/orchid/debug_checkin.log", "a") as f:
+                                        f.write(f"[{datetime.now()}] DEBUG: Created scheduled order {new_order.id}\n")
+                                 except:
+                                    pass
+
+                                 print(f"DEBUG: Created scheduled order {new_order.id}")
+                                 
+                                 # Logic for adding items to the order
+                                 specific_items = item.get("specificFoodItems", [])
+                                 items_added = False
+
+                                 if specific_items and len(specific_items) > 0:
+                                     print(f"DEBUG: Processing {len(specific_items)} specific food items for order {new_order.id}")
+                                     for spec_item in specific_items:
+                                         f_id = spec_item.get("foodItemId")
+                                         qty = spec_item.get("quantity", 1)
+                                         
+                                         if f_id:
+                                             f_item = db.query(FoodItem).filter(FoodItem.id == int(f_id)).first()
+                                             if f_item:
+                                                 order_item = FoodOrderItem(
+                                                     order_id=new_order.id,
+                                                     food_item_id=f_item.id,
+                                                     quantity=int(qty)
+                                                 )
+                                                 db.add(order_item)
+                                                 items_added = True
+                                 
+                                 # Fallback: if no specific items were added (or none selected), try to match the feature name
+                                 if not items_added:
+                                     # Try to find a matching Food Item to link properly
+                                     food_item = db.query(FoodItem).filter(FoodItem.name.ilike(name)).first()
+                                     if food_item:
+                                         order_item = FoodOrderItem(
+                                             order_id=new_order.id,
+                                             food_item_id=food_item.id,
+                                             quantity=item.get("complimentaryPerNight", 1) # Use daily qty
+                                         )
+                                         db.add(order_item)
+                                 
+                            except Exception as e:
+                                try:
+                                    with open("C:/releasing/orchid/debug_checkin.log", "a") as f:
+                                        f.write(f"[{datetime.now()}] Error creating scheduled order for {name}: {e}\n")
+                                except:
+                                    pass
+                                print(f"Error creating scheduled order for {name}: {e}")
+                                import traceback
+                                traceback.print_exc()
+                            
+        except Exception as e:
+            try:
+                with open("C:/releasing/orchid/debug_checkin.log", "a") as f:
+                    f.write(f"[{datetime.now()}] Error processing amenity allocation in check-in: {e}\n")
+            except:
+                pass
+            print(f"Error processing amenity allocation in check-in: {e}")
+            import traceback
+            traceback.print_exc()
 
     # Save ID card image
     id_card_filename = f"id_pkg_{booking_id}_{uuid.uuid4().hex}.jpg"

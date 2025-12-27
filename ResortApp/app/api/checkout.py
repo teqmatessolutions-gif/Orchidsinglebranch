@@ -2126,21 +2126,30 @@ def _calculate_bill_for_single_room(db: Session, room_number: str):
     billed_services = [ass for ass in all_assigned_services if ass.billing_status == "billed"]
     
     # Calculate charges: only unbilled items contribute to charges
-    charges.food_charges = sum(item.quantity * item.food_item.price for item in unbilled_food_order_items if item.food_item)
+    charges.food_charges = sum(
+        (item.quantity * item.food_item.price) 
+        if (item.food_item and (not item.order or item.order.amount > 0)) else 0 
+        for item in unbilled_food_order_items
+    )
     charges.service_charges = sum(ass.override_charges if ass.override_charges is not None else ass.service.charges for ass in unbilled_services)
     
     # Include ALL food items in the list with payment status
     charges.food_items = []
     
     # Add unbilled items with their actual amounts
+    # Add unbilled items with their actual amounts
     for item in unbilled_food_order_items:
         if item.food_item:
+            # Check if order is complimentary (amount is 0)
+            is_complimentary = item.order and item.order.amount == 0
+            item_amount = 0.0 if is_complimentary else (item.quantity * item.food_item.price)
+            
             charges.food_items.append({
                 "item_name": item.food_item.name, 
                 "quantity": item.quantity, 
-                "amount": item.quantity * item.food_item.price,
+                "amount": item_amount,
                 "is_paid": False,
-                "payment_status": "Unpaid"
+                "payment_status": "Complimentary" if is_complimentary else "Unpaid"
             })
     
     # Add paid items (paid at delivery) with payment details
@@ -2614,10 +2623,13 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
                            .all())
 
     # Separate billed and unbilled items
-    # Unbilled: billing_status is None, "unbilled", "unpaid", or anything other than "billed"
-    # Billed: billing_status is explicitly "billed"
+    # Unbilled: billing_status is None, "unbilled", "unpaid" (add to bill)
+    # Paid: billing_status is "paid" (show as paid, don't add to bill)
+    # Billed: billing_status is "billed" (already billed, show as paid)
     unbilled_food_order_items = [item for item in all_food_order_items 
-                                 if not item.order or item.order.billing_status != "billed"]
+                                 if not item.order or item.order.billing_status in ["unbilled", "unpaid"] or item.order.billing_status is None]
+    paid_food_order_items = [item for item in all_food_order_items 
+                            if item.order and item.order.billing_status == "paid"]
     billed_food_order_items = [item for item in all_food_order_items 
                                if item.order and item.order.billing_status == "billed"]
 
@@ -2631,7 +2643,11 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
     billed_services = [ass for ass in all_assigned_services if ass.billing_status == "billed"]
 
     # Calculate total food charges from the individual items (only unbilled items)
-    charges.food_charges = sum(item.quantity * item.food_item.price for item in unbilled_food_order_items if item.food_item)
+    charges.food_charges = sum(
+        (item.quantity * item.food_item.price) 
+        if (item.food_item and (not item.order or item.order.amount > 0)) else 0 
+        for item in unbilled_food_order_items
+    )
     charges.service_charges = sum(ass.override_charges if ass.override_charges is not None else ass.service.charges for ass in unbilled_services)
 
     # Populate detailed item lists for the bill summary - include ALL items
@@ -2639,12 +2655,32 @@ def _calculate_bill_for_entire_booking(db: Session, room_number: str):
     # Add unbilled items with their actual amounts
     for item in unbilled_food_order_items:
         if item.food_item:
+            # Check if order is complimentary (amount is 0)
+            is_complimentary = item.order and item.order.amount == 0
+            item_amount = 0.0 if is_complimentary else (item.quantity * item.food_item.price)
+            
             charges.food_items.append({
                 "item_name": item.food_item.name, 
                 "quantity": item.quantity, 
-                "amount": item.quantity * item.food_item.price,
-                "is_paid": False
+                "amount": item_amount,
+                "is_paid": False,
+                "payment_status": "Complimentary" if is_complimentary else "Unpaid"
             })
+    # Add paid items (paid at delivery) with payment details
+    for item in paid_food_order_items:
+        if item.food_item and item.order:
+            charges.food_items.append({
+                "item_name": item.food_item.name, 
+                "quantity": item.quantity, 
+                "amount": 0.0,  # Don't add to bill
+                "is_paid": True,
+                "payment_status": f"PAID ({item.order.payment_method or 'cash'})",
+                "payment_method": item.order.payment_method,
+                "payment_time": item.order.payment_time.isoformat() if item.order.payment_time else None,
+                "gst_amount": item.order.gst_amount,
+                "total_with_gst": item.order.total_with_gst
+            })
+
     # Add billed items with zero amount
     for item in billed_food_order_items:
         if item.food_item:

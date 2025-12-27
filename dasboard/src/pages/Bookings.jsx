@@ -1434,9 +1434,9 @@ const AddExtraAllocationModal = ({
                                         setCurrentRoomItems(updated);
                                       }}
                                       className={`w-48 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-indigo-500 outline-none ${item.item_id && item.source_location_id &&
-                                          (itemStockCache[item.item_id]?.[item.source_location_id] || 0) < (item.location_stock || 1)
-                                          ? 'border-red-500 bg-red-50'
-                                          : 'border-gray-300'
+                                        (itemStockCache[item.item_id]?.[item.source_location_id] || 0) < (item.location_stock || 1)
+                                        ? 'border-red-500 bg-red-50'
+                                        : 'border-gray-300'
                                         }`}
                                     >
                                       <option value="">Select Source</option>
@@ -2041,201 +2041,51 @@ const CheckInModal = ({
   const [guestPhoto, setGuestPhoto] = useState(null);
   const [idCardPreview, setIdCardPreview] = useState(null);
   const [guestPhotoPreview, setGuestPhotoPreview] = useState(null);
+  const [selectedFeatures, setSelectedFeatures] = useState({});
+  const [featureTimes, setFeatureTimes] = useState({});
+  const [featureDates, setFeatureDates] = useState({});
+  const [foodItems, setFoodItems] = useState([]);
+  const [featureMenuSelections, setFeatureMenuSelections] = useState({}); // { featureName: [{ foodItemId, quantity, name }] }
 
-  // Amenity configuration is editable: items, complimentary limits and payable toggle.
-  const [amenityConfig, setAmenityConfig] = useState(DEFAULT_AMENITIES);
-  const [packageInclusions, setPackageInclusions] = useState([]);
-
-  // Load package inclusions when booking changes
-  // Load package inclusions when booking changes
   useEffect(() => {
-    if (booking && booking.is_package && booking.package) {
-      // Parse package inclusions if they exist
-      let inclusions = [];
-
-      if (booking.package.inclusions) {
-        try {
-          // Try to parse if it's a JSON string
-          inclusions = typeof booking.package.inclusions === 'string'
-            ? JSON.parse(booking.package.inclusions)
-            : booking.package.inclusions;
-        } catch (e) {
-          console.error('Error parsing package inclusions:', e);
-          inclusions = [];
-        }
+    const fetchFoodItems = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await API.get("/food-items/", { headers: { Authorization: `Bearer ${token}` } });
+        setFoodItems(res.data || []);
+      } catch (err) {
+        console.error("Failed to fetch food items for check-in:", err);
       }
-
-      setPackageInclusions(inclusions);
-
-      // Convert package inclusions to amenity config format
-      if (inclusions && inclusions.length > 0) {
-        const amenitiesFromPackage = inclusions
-          .filter(inc => inc.type === 'Amenity' || inc.type === 'Complimentary')
-          .map((inc, index) => {
-            // Try to find matching inventory item if ID is missing
-            let matchedItemId = inc.item_id || null;
-            if (!matchedItemId && inc.name && inventoryItems.length > 0) {
-              const normalize = (s) => String(s).trim().toLowerCase();
-              const target = normalize(inc.name);
-              const match = inventoryItems.find(inv =>
-                normalize(inv.name) === target ||
-                normalize(inv.name).includes(target) ||
-                target.includes(normalize(inv.name))
-              );
-              if (match) matchedItemId = match.id;
-            }
-
-            return {
-              id: inc.id || `pkg_${index}`,
-              item_id: matchedItemId,
-              name: inc.name,
-              frequency: inc.schedule_type === 'Daily' ? 'PER_NIGHT' : 'PER_STAY',
-              complimentaryPerNight: inc.schedule_type === 'Daily' ? 1 : 0,
-              complimentaryPerStay: inc.schedule_type === 'Daily' ? 0 : 1,
-              extraPrice: 0,
-              is_payable: false,
-              is_package: true,
-            };
-          });
-
-        if (amenitiesFromPackage.length > 0) {
-          setAmenityConfig(amenitiesFromPackage);
-        } else {
-          // Fallback unique ID
-          setAmenityConfig([{
-            id: `custom_${Date.now()}`,
-            name: "",
-            frequency: "PER_STAY",
-            complimentaryPerNight: 0,
-            complimentaryPerStay: 0,
-            extraPrice: 0,
-            is_payable: false,
-          }]);
-        }
-      } else {
-        setAmenityConfig([{
-          id: `custom_${Date.now()}`,
-          name: "",
-          frequency: "PER_STAY",
-          complimentaryPerNight: 0,
-          complimentaryPerStay: 0,
-          extraPrice: 0,
-          is_payable: false,
-        }]);
-      }
-
-    } else {
-      // For non-package bookings or resets
-      setAmenityConfig([{
-        id: `custom_${Date.now()}`,
-        name: "",
-        frequency: "PER_STAY",
-        complimentaryPerNight: 0,
-        complimentaryPerStay: 0,
-        extraPrice: 0,
-        is_payable: false,
-      }]);
-    }
-  }, [booking, inventoryItems]);
-
-  // Retry matching when inventory items load (in case they loaded after booking)
-  useEffect(() => {
-    if (inventoryItems.length > 0) {
-      setAmenityConfig(prev => {
-        let hasChanges = false;
-        const next = prev.map(item => {
-          if (!item.item_id && item.name) {
-            const normalize = (s) => String(s).trim().toLowerCase();
-            const target = normalize(item.name);
-            const match = inventoryItems.find(inv =>
-              normalize(inv.name) === target ||
-              normalize(inv.name).includes(target) ||
-              target.includes(normalize(inv.name))
-            );
-
-            if (match) {
-              hasChanges = true;
-              return {
-                ...item,
-                item_id: match.id,
-                extraPrice: item.is_payable ? (Number(match.selling_price) || 0) : 0
-              };
-            }
-          }
-          return item;
-        });
-        return hasChanges ? next : prev;
-      });
-    }
-  }, [inventoryItems]);
-
-  const amenitySummary = useMemo(() => {
-    if (!booking) return null;
-
-    // Derive nights between check-in and check-out
-    let nights = 1;
-    if (booking.check_in && booking.check_out) {
-      const checkInDate = new Date(booking.check_in);
-      const checkOutDate = new Date(booking.check_out);
-      const diffMs = checkOutDate - checkInDate;
-      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
-      nights = Math.max(diffDays, 1);
-    }
-
-    // Try to infer a room type string from the booking (for future extension)
-    const firstRoom = (booking.rooms && booking.rooms[0]) || null;
-    const roomType =
-      (booking.is_package
-        ? firstRoom?.room?.type || firstRoom?.type
-        : firstRoom?.type) || "default";
-
-    return {
-      roomType,
-      nights,
-      items: amenityConfig.map((p) => {
-        let complimentaryTotal = 0;
-        if (p.frequency === "PER_NIGHT") {
-          complimentaryTotal = (p.complimentaryPerNight || 0) * nights;
-        } else {
-          complimentaryTotal = p.complimentaryPerStay || 0;
-        }
-        return {
-          id: p.id,
-          name: p.name,
-          frequency: p.frequency,
-          complimentaryTotal,
-          extraPrice: p.extraPrice || 0,
-          is_payable: Boolean(p.is_payable),
-        };
-      }),
     };
-  }, [booking, amenityConfig]);
+    fetchFoodItems();
+  }, []);
 
-  const handleAmenityChange = (index, field, value) => {
-    setAmenityConfig((prev) => {
-      const copy = [...prev];
-      copy[index] = { ...copy[index], [field]: value };
-      return copy;
+  const handleAddMenuItem = (featureName) => {
+    setFeatureMenuSelections(prev => {
+        const current = prev[featureName] || [];
+        return { ...prev, [featureName]: [...current, { foodItemId: "", quantity: 1 }] };
     });
   };
 
-  const handleAddAmenity = () => {
-    setAmenityConfig((prev) => [
-      ...prev,
-      {
-        id: `custom_${prev.length + 1}`,
-        name: "",
-        frequency: "PER_STAY",
-        complimentaryPerNight: 0,
-        complimentaryPerStay: 0,
-        extraPrice: 0,
-        is_payable: false,
-      },
-    ]);
+  const handleUpdateMenuItem = (featureName, index, field, value) => {
+    setFeatureMenuSelections(prev => {
+        const current = [...(prev[featureName] || [])];
+        if (field === "foodItemId") {
+            const selectedFood = foodItems.find(f => f.id === Number(value));
+            current[index] = { ...current[index], foodItemId: value, name: selectedFood ? selectedFood.name : "" };
+        } else {
+             current[index] = { ...current[index], [field]: value };
+        }
+        return { ...prev, [featureName]: current };
+    });
   };
 
-  const handleRemoveAmenity = (index) => {
-    setAmenityConfig((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveMenuItem = (featureName, index) => {
+    setFeatureMenuSelections(prev => {
+        const current = [...(prev[featureName] || [])];
+        current.splice(index, 1);
+        return { ...prev, [featureName]: current };
+    });
   };
 
   const handleFileChange = (e, type) => {
@@ -2265,28 +2115,58 @@ const CheckInModal = ({
       return;
     }
 
-    // Prepare amenity allocation payload so parent can create stock issues
-    const amenityAllocation = amenitySummary
-      ? {
-        nights: amenitySummary.nights,
-        items: amenityConfig
-          .filter(a => a.item_id || a.name) // Only include items that have an ID or Name
-          .map((a) => ({
-            item_id: a.item_id ? Number(a.item_id) : null,
-            name: a.name || "Custom Item",
-            frequency: a.frequency,
-            complimentaryPerNight: Number(a.complimentaryPerNight) || 0,
-            complimentaryPerStay: Number(a.complimentaryPerStay) || 0,
-            is_payable: Boolean(a.is_payable),
-          })),
+    // Prepare Package Features as "Amenity Allocation" for backend processing
+    let amenityAllocation = null;
+    if (booking.is_package && booking.package && booking.package.food_included) {
+      const features = [];
+      const includedList = booking.package.food_included.split(",");
+
+      includedList.forEach(f => {
+        const name = f.trim();
+        // If selectedFeatures[name] is explicitly false, skip. (Undefined means checked/default)
+        if (name && selectedFeatures[name] !== false) {
+          features.push({
+            name: name,
+            frequency: "PER_NIGHT",
+            complimentaryPerNight: (Number(booking.adults) || 1) + (Number(booking.children) || 0),
+            complimentaryPerStay: 0,
+            is_payable: false,
+            extraPrice: 0,
+            extraPrice: 0,
+            scheduledTime: featureTimes[name] || null,
+            extraPrice: 0,
+            scheduledTime: featureTimes[name] || null,
+            scheduledDate: featureDates[name] || null,
+            specificFoodItems: featureMenuSelections[name] || [] // Pass specific menu choices
+          });
+        }
+      });
+
+      if (features.length > 0) {
+        amenityAllocation = {
+          items: features,
+          nights: getNights()
+        };
       }
-      : null;
+    }
 
     onSave(booking.id, {
       id_card_image: idCardImage,
       guest_photo: guestPhoto,
-      amenityAllocation,
+      amenityAllocation: amenityAllocation
     });
+  };
+
+  // Calculate nights for display
+  const getNights = () => {
+    if (booking.check_in && booking.check_out) {
+      const checkInDate = new Date(booking.check_in);
+      const checkOutDate = new Date(booking.check_out);
+      const diffMs = checkOutDate - checkInDate;
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+      return Math.max(diffDays, 1);
+    }
+    return 1;
   };
 
   // Get room information
@@ -2324,7 +2204,7 @@ const CheckInModal = ({
               </h4>
               <div className="text-sm text-gray-700 space-y-1">
                 <p><strong>Rooms:</strong> {roomInfo}</p>
-                <p><strong>Duration:</strong> {amenitySummary?.nights} night(s)</p>
+                <p><strong>Duration:</strong> {getNights()} night(s)</p>
                 <p><strong>Guests:</strong> {booking.adults} Adults, {booking.children} Children</p>
               </div>
             </div>
@@ -2340,117 +2220,9 @@ const CheckInModal = ({
               </h4>
               <div className="text-sm text-gray-700 space-y-1">
                 <p><strong>Rooms:</strong> {roomInfo}</p>
-                <p><strong>Duration:</strong> {amenitySummary?.nights} night(s)</p>
+                <p><strong>Duration:</strong> {getNights()} night(s)</p>
                 <p><strong>Guests:</strong> {booking.adults} Adults, {booking.children} Children</p>
               </div>
-            </div>
-          )}
-
-          {/* Package Inclusions Display */}
-          {booking.is_package && packageInclusions && packageInclusions.length > 0 && (
-            <div className="bg-gradient-to-r from-purple-50 to-pink-50 p-6 rounded-lg mb-6 border border-purple-200">
-              <h4 className="font-bold text-purple-900 flex items-center gap-2 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                </svg>
-                Package Inclusions ({packageInclusions.length} items)
-              </h4>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Services */}
-                {packageInclusions.filter(inc => inc.type === 'Service').length > 0 && (
-                  <div className="bg-white p-4 rounded-lg border border-purple-100">
-                    <h5 className="font-semibold text-sm text-purple-800 mb-2 flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                      </svg>
-                      Services / Spa
-                    </h5>
-                    <ul className="space-y-1 text-sm">
-                      {packageInclusions.filter(inc => inc.type === 'Service').map((inc, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-purple-500 mt-1">•</span>
-                          <div>
-                            <span className="text-gray-700">{inc.name}</span>
-                            <span className="text-xs text-gray-500 ml-2">({inc.schedule_type})</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Food Items */}
-                {packageInclusions.filter(inc => inc.type === 'Food').length > 0 && (
-                  <div className="bg-white p-4 rounded-lg border border-orange-100">
-                    <h5 className="font-semibold text-sm text-orange-800 mb-2 flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                      Food & Beverages
-                    </h5>
-                    <ul className="space-y-1 text-sm">
-                      {packageInclusions.filter(inc => inc.type === 'Food').map((inc, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-orange-500 mt-1">•</span>
-                          <div>
-                            <span className="text-gray-700">{inc.name}</span>
-                            <span className="text-xs text-gray-500 ml-2">({inc.schedule_type})</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Amenities */}
-                {packageInclusions.filter(inc => inc.type === 'Amenity').length > 0 && (
-                  <div className="bg-white p-4 rounded-lg border border-blue-100">
-                    <h5 className="font-semibold text-sm text-blue-800 mb-2 flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                      </svg>
-                      Amenities
-                    </h5>
-                    <ul className="space-y-1 text-sm">
-                      {packageInclusions.filter(inc => inc.type === 'Amenity').map((inc, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-blue-500 mt-1">•</span>
-                          <div>
-                            <span className="text-gray-700">{inc.name}</span>
-                            <span className="text-xs text-gray-500 ml-2">({inc.schedule_type})</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Complimentary Items */}
-                {packageInclusions.filter(inc => inc.type === 'Complimentary').length > 0 && (
-                  <div className="bg-white p-4 rounded-lg border border-green-100">
-                    <h5 className="font-semibold text-sm text-green-800 mb-2 flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
-                      </svg>
-                      Complimentary
-                    </h5>
-                    <ul className="space-y-1 text-sm">
-                      {packageInclusions.filter(inc => inc.type === 'Complimentary').map((inc, idx) => (
-                        <li key={idx} className="flex items-start gap-2">
-                          <span className="text-green-500 mt-1">•</span>
-                          <div>
-                            <span className="text-gray-700">{inc.name}</span>
-                            <span className="text-xs text-gray-500 ml-2">({inc.schedule_type})</span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-              <p className="text-xs text-purple-600 mt-4 italic">
-                ✨ All these items are included in your package and will be provided as per the schedule
-              </p>
             </div>
           )}
 
@@ -2483,228 +2255,110 @@ const CheckInModal = ({
           <hr className="border-gray-200 mb-8" />
 
           {/* Amenity allocation editor for this stay (complimentary vs payable) */}
-          {
-            amenitySummary && (
-              <div className="mb-8">
-                <h4 className="text-lg font-bold text-gray-800 mb-2">
-                  Amenity Allocation for this Stay
-                </h4>
-                <p className="text-sm text-gray-500 mb-6">
-                  Based on room type <span className="font-semibold text-gray-700">{amenitySummary.roomType}</span> and {amenitySummary.nights} night(s).
-                  Quantities are defined by the package. You can adjust limits and add extra amenities here.
-                </p>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm text-left">
-                    <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200">
-                      <tr>
-                        <th className="px-4 py-3 w-1/3">Item</th>
-                        <th className="px-4 py-3 w-32">Type</th>
-                        <th className="px-4 py-3">Frequency</th>
-                        <th className="px-4 py-3 w-24">Qty / Night</th>
-                        <th className="px-4 py-3 w-24">Qty / Stay</th>
-                        <th className="px-4 py-3 w-32">Price (if Payable)</th>
-                        <th className="px-4 py-3 w-10"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {amenityConfig.map((item, index) => (
-                        <tr key={item.id} className="group hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-2">
-                            <div className="flex flex-col">
-                              {item.is_package ? (
-                                <div className="flex flex-col gap-1.5">
-                                  <div className="flex items-center gap-2">
-                                    <span className="bg-orange-100 text-orange-800 text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-wider">Package</span>
-                                    <span className="text-sm font-medium text-gray-900">{item.name}</span>
-                                  </div>
-                                  <div className="relative">
-                                    <select
-                                      value={item.item_id || ""}
-                                      onChange={(e) => {
-                                        const selectedId = e.target.value ? Number(e.target.value) : null;
-                                        const selectedItem = inventoryItems.find((inv) => inv.id === selectedId);
-                                        handleAmenityChange(index, "item_id", selectedId);
-
-                                        if (selectedItem) {
-                                          // Do NOT update name for package items, keep the description
-
-                                          // Only set price if it's payable
-                                          if (item.is_payable) {
-                                            handleAmenityChange(index, "extraPrice", Number(selectedItem.selling_price) || 0);
-                                          }
-                                        }
-                                      }}
-                                      className={`w-full text-xs py-1.5 pl-2 pr-8 border rounded-lg bg-gray-50 text-gray-600 hover:bg-white hover:border-gray-400 focus:ring-1 focus:ring-orange-500 outline-none transition-all cursor-pointer ${!item.item_id ? "border-orange-300 bg-orange-50 text-orange-800 font-medium" : "border-gray-200"}`}
-                                    >
-                                      <option value="">{item.item_id ? "Change Inventory Link" : "Link Inventory Item (Required)"}</option>
-                                      {(() => {
-                                        // Group items by category
-                                        const grouped = inventoryItems.reduce((acc, inv) => {
-                                          const categoryName = inv.category?.name || 'Uncategorized';
-                                          if (!acc[categoryName]) acc[categoryName] = [];
-                                          acc[categoryName].push(inv);
-                                          return acc;
-                                        }, {});
-
-                                        return Object.entries(grouped).map(([categoryName, items]) => (
-                                          <optgroup key={categoryName} label={categoryName}>
-                                            {items.map((inv) => (
-                                              <option key={inv.id} value={inv.id}>{inv.name}</option>
-                                            ))}
-                                          </optgroup>
-                                        ));
-                                      })()}
-                                    </select>
-                                  </div>
-                                </div>
-                              ) : (
-                                <select
-                                  value={item.item_id || ""}
-                                  onChange={(e) => {
-                                    const selectedId = e.target.value ? Number(e.target.value) : null;
-                                    const selectedItem = inventoryItems.find((inv) => inv.id === selectedId);
-                                    handleAmenityChange(index, "item_id", selectedId);
-                                    if (selectedItem) {
-                                      handleAmenityChange(index, "name", selectedItem.name || item.name);
-                                      // Only set price if it's payable
-                                      if (item.is_payable) {
-                                        handleAmenityChange(index, "extraPrice", Number(selectedItem.selling_price) || 0);
-                                      }
-                                    }
-                                  }}
-                                  className={`w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none ${!item.item_id ? "border-indigo-300 bg-indigo-50" : ""}`}
-                                >
-                                  <option value="">Select item from inventory</option>
-                                  {(() => {
-                                    // Group items by category
-                                    const grouped = inventoryItems.reduce((acc, inv) => {
-                                      const categoryName = inv.category?.name || 'Uncategorized';
-                                      if (!acc[categoryName]) acc[categoryName] = [];
-                                      acc[categoryName].push(inv);
-                                      return acc;
-                                    }, {});
-
-                                    return Object.entries(grouped).map(([categoryName, items]) => (
-                                      <optgroup key={categoryName} label={categoryName}>
-                                        {items.map((inv) => (
-                                          <option key={inv.id} value={inv.id}>{inv.name}</option>
-                                        ))}
-                                      </optgroup>
-                                    ));
-                                  })()}
-                                </select>
-                              )}
-
-                              {!item.item_id && item.name && !item.is_package && (
-                                <span className="text-xs text-orange-600 mt-1 font-medium flex items-center gap-1">
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                                  </svg>
-                                  Package Item: {item.name}
-                                </span>
-                              )}
+          {/* Package Features Allocation */}
+          {booking.is_package && booking.package && booking.package.food_included && (
+            <div className="bg-orange-50 p-4 rounded-lg mb-6 border border-orange-100">
+              <h4 className="font-bold text-orange-900 flex items-center gap-2 mb-3">
+                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+                Allocate Package Features
+              </h4>
+              <p className="text-xs text-orange-700 mb-3">
+                Select features to allocate/issue for this stay (Daily quantity: {booking.adults + booking.children}).
+                System will attempt to issue stock if items match inventory names.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {booking.package.food_included.split(",").map((feature) => {
+                  const featureName = feature.trim();
+                  if (!featureName) return null;
+                  const isChecked = selectedFeatures[featureName] !== false;
+                  return (
+                    <div key={featureName} className="flex flex-col gap-1 p-2 rounded hover:bg-orange-100 transition-colors">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={(e) => {
+                            setSelectedFeatures((prev) => ({
+                              ...prev,
+                              [featureName]: e.target.checked,
+                            }));
+                          }}
+                          className="w-4 h-4 text-orange-600 rounded border-gray-300 focus:ring-orange-500"
+                        />
+                        <span className="text-sm font-medium text-gray-800">{featureName}</span>
+                      </label>
+                      {isChecked && (
+                        <div className="ml-6 mt-2 space-y-2">
+                          <div className="flex gap-2">
+                            <div className="flex-1">
+                              <label className="text-xs text-gray-500 block mb-1">Date</label>
+                              <input
+                                type="date"
+                                value={featureDates[featureName] || ""}
+                                min={new Date().toISOString().split('T')[0]}
+                                onChange={(e) => setFeatureDates(prev => ({ ...prev, [featureName]: e.target.value }))}
+                                className="text-xs border border-gray-300 rounded px-2 py-1 w-full focus:ring-1 focus:ring-orange-500 outline-none"
+                              />
                             </div>
-                          </td>
-                          <td className="px-4 py-2">
-                            <select
-                              value={item.is_payable ? "payable" : "complimentary"}
-                              onChange={(e) => {
-                                const isPayable = e.target.value === "payable";
-                                handleAmenityChange(index, "is_payable", isPayable);
-                                if (!isPayable) {
-                                  handleAmenityChange(index, "extraPrice", 0);
-                                } else {
-                                  // If switching to payable, try to find price from inventory item
-                                  const selectedItem = inventoryItems.find((inv) => inv.id === item.item_id);
-                                  if (selectedItem) {
-                                    handleAmenityChange(index, "extraPrice", Number(selectedItem.selling_price) || 0);
-                                  }
-                                }
-                              }}
-                              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 outline-none font-medium ${item.is_payable
-                                ? "border-blue-300 bg-blue-50 text-blue-700 focus:ring-blue-500"
-                                : "border-green-300 bg-green-50 text-green-700 focus:ring-green-500"
-                                }`}
-                            >
-                              <option value="complimentary">Complimentary</option>
-                              <option value="payable">Payable</option>
-                            </select>
-                          </td>
-                          <td className="px-4 py-2">
-                            <select
-                              value={item.frequency}
-                              onChange={(e) => handleAmenityChange(index, "frequency", e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                            >
-                              <option value="PER_NIGHT">Per Night</option>
-                              <option value="PER_STAY">Per Stay</option>
-                            </select>
-                          </td>
-                          <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.complimentaryPerNight}
-                              onChange={(e) => handleAmenityChange(index, "complimentaryPerNight", Number(e.target.value) || 0)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                              disabled={item.frequency === "PER_STAY"}
-                            />
-                          </td>
-                          <td className="px-4 py-2">
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.complimentaryPerStay}
-                              onChange={(e) => handleAmenityChange(index, "complimentaryPerStay", Number(e.target.value) || 0)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                            />
-                          </td>
-                          <td className="px-4 py-2 relative">
-                            <span className={`absolute left-7 top-1/2 -translate-y-1/2 ${!item.is_payable ? "text-gray-400" : "text-gray-500"}`}>₹</span>
-                            <input
-                              type="number"
-                              min="0"
-                              value={item.extraPrice}
-                              onChange={(e) => handleAmenityChange(index, "extraPrice", Number(e.target.value) || 0)}
-                              className={`w-full pl-6 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none ${!item.is_payable ? "bg-gray-100 text-gray-400 cursor-not-allowed" : ""
-                                }`}
-                              disabled={!item.is_payable}
-                            />
-                          </td>
-                          <td className="px-4 py-2 text-center">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveAmenity(index)}
-                              className="text-gray-400 hover:text-red-500 transition-colors"
-                            >
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                            <div className="flex-1">
+                              <label className="text-xs text-gray-500 block mb-1">Time</label>
+                              <input
+                                type="time"
+                                value={featureTimes[featureName] || ""}
+                                onChange={(e) => setFeatureTimes(prev => ({ ...prev, [featureName]: e.target.value }))}
+                                className="text-xs border border-gray-300 rounded px-2 py-1 w-full focus:ring-1 focus:ring-orange-500 outline-none"
+                              />
+                            </div>
+                          </div>
 
-                <button
-                  type="button"
-                  onClick={handleAddAmenity}
-                  className="mt-4 px-4 py-2 border border-dashed border-indigo-300 text-indigo-600 rounded-lg hover:bg-indigo-50 font-medium flex items-center gap-2 transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                  Add Amenity
-                </button>
-
-                <p className="mt-4 text-xs text-gray-400 italic">
-                  These settings control only the allocation logic; actual stock and charges are handled from the Inventory & Billing modules.
-                </p>
+                          {/* Menu Item Selection for this Feature */}
+                          <div className="bg-white p-2 rounded border border-orange-200">
+                             <label className="text-xs font-bold text-orange-800 block mb-2">Menu Items (Optional)</label>
+                             {(featureMenuSelections[featureName] || []).map((item, idx) => (
+                                 <div key={idx} className="flex gap-2 mb-2 items-center">
+                                     <select
+                                         value={item.foodItemId}
+                                         onChange={(e) => handleUpdateMenuItem(featureName, idx, "foodItemId", e.target.value)}
+                                         className="text-xs border border-gray-300 rounded px-2 py-1 flex-1"
+                                     >
+                                         <option value="">Select Item...</option>
+                                         {foodItems.map(f => (
+                                             <option key={f.id} value={f.id}>{f.name}</option>
+                                         ))}
+                                     </select>
+                                     <input
+                                         type="number"
+                                         min="1"
+                                         value={item.quantity}
+                                         onChange={(e) => handleUpdateMenuItem(featureName, idx, "quantity", e.target.value)}
+                                         className="text-xs border border-gray-300 rounded px-2 py-1 w-16"
+                                         placeholder="Qty"
+                                     />
+                                     <button
+                                         onClick={() => handleRemoveMenuItem(featureName, idx)}
+                                         className="text-red-500 hover:text-red-700 font-bold"
+                                     >
+                                         &times;
+                                     </button>
+                                 </div>
+                             ))}
+                             <button
+                                 onClick={() => handleAddMenuItem(featureName)}
+                                 className="text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 px-2 py-1 rounded"
+                             >
+                                 + Add Item
+                             </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            )
-          }
+            </div>
+          )}
 
           {/* Bottom Actions */}
           <div className="flex gap-4 pt-4 border-t border-gray-100">
@@ -4239,6 +3893,11 @@ const Bookings = () => {
     const formData = new FormData();
     formData.append("id_card_image", images.id_card_image);
     formData.append("guest_photo", images.guest_photo);
+
+    // Explicitly append amenityAllocation if present so backend can process scheduled food orders
+    if (images.amenityAllocation) {
+      formData.append("amenityAllocation", JSON.stringify(images.amenityAllocation));
+    }
 
     // Use display ID for API call
     const displayId = generateBookingId(booking || bookingToCheckIn);

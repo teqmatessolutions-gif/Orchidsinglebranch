@@ -756,6 +756,14 @@ def check_in_booking(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    try:
+        with open("C:/releasing/orchid/debug_checkin.log", "a") as f:
+            from datetime import datetime
+            f.write(f"\n[{datetime.now()}] REGULAR CHECK-IN REQUEST: Booking ID: {booking_id}\n")
+            f.write(f"Amenity Allocation: {amenityAllocation}\n")
+    except:
+        pass
+
     # Parse display ID (BK-000001) or accept numeric ID
     numeric_id, booking_type = parse_display_id(str(booking_id))
     if numeric_id is None:
@@ -771,6 +779,113 @@ def check_in_booking(
     normalized_status = (booking.status or "").strip().lower().replace("_", "-").replace(" ", "-")
     if normalized_status != "booked":
         raise HTTPException(status_code=400, detail=f"Booking is not in 'booked' state. Current status: {booking.status}")
+
+    if normalized_status != "booked":
+        raise HTTPException(status_code=400, detail=f"Booking is not in 'booked' state. Current status: {booking.status}")
+
+    # PROCESS AMENITY ALLOCATION / SCHEDULED ORDERS FOR REGULAR BOOKINGS TOO
+    if amenityAllocation:
+        try:
+            import json
+            from app.models.foodorder import FoodOrder, FoodOrderItem
+            from app.models.food_item import FoodItem
+            from datetime import datetime, timedelta, date, time
+            
+            alloc_data = json.loads(amenityAllocation)
+            items = alloc_data.get("items", [])
+            
+            # Find first room ID
+            room_id = None
+            if booking.booking_rooms and len(booking.booking_rooms) > 0:
+                room_id = booking.booking_rooms[0].room_id
+            
+            if items and room_id:
+                check_in_date = date.today()
+                
+                for item in items:
+                    name = item.get("name")
+                    scheduled_time = item.get("scheduledTime")
+                    scheduled_date_str = item.get("scheduledDate")
+                    
+                    if name and scheduled_time:
+                        try:
+                             scheduled_time = scheduled_time.strip()
+                             # Handle time format with simple heuristics
+                             if " " in scheduled_time:
+                                 try:
+                                     t = datetime.strptime(scheduled_time, "%I:%M %p")
+                                     sh, sm = t.hour, t.minute
+                                 except ValueError:
+                                     sh, sm = map(int, scheduled_time.split(":")[:2])
+                             else:
+                                 sh, sm = map(int, scheduled_time.split(":")[:2])
+                                 
+                             if scheduled_date_str:
+                                 s_year, s_month, s_day = map(int, scheduled_date_str.split("-"))
+                                 scheduled_dt = datetime(s_year, s_month, s_day, sh, sm)
+                             else:
+                                 now = datetime.now()
+                                 scheduled_dt = datetime.combine(check_in_date, time(sh, sm))
+                                 if scheduled_dt < now:
+                                     scheduled_dt = scheduled_dt + timedelta(days=1)
+                             
+                             schedule_str = scheduled_dt.strftime("%Y-%m-%d %H:%M:%S")
+                             
+                             food_item = db.query(FoodItem).filter(FoodItem.name.ilike(name)).first()
+                             
+                             new_order = FoodOrder(
+                                 room_id=room_id,
+                                 amount=0.0,
+                                 status="scheduled",
+                                 billing_status="unbilled",
+                                 order_type="room_service",
+                                 delivery_request=f"SCHEDULED_FOR: {schedule_str} -- Package Meal: {name}",
+                                 created_at=datetime.utcnow()
+                             )
+                             db.add(new_order)
+                             db.flush()
+                             
+                             try:
+                                with open("C:/releasing/orchid/debug_checkin.log", "a") as f:
+                                    f.write(f"[{datetime.now()}] REGULAR: Created scheduled order {new_order.id}\n")
+                             except:
+                                pass
+
+                             # Logic for adding items to the order
+                             specific_items = item.get("specificFoodItems", [])
+                             items_added = False
+
+                             if specific_items and len(specific_items) > 0:
+                                 for spec_item in specific_items:
+                                     f_id = spec_item.get("foodItemId")
+                                     qty = spec_item.get("quantity", 1)
+                                     
+                                     if f_id:
+                                         f_item = db.query(FoodItem).filter(FoodItem.id == int(f_id)).first()
+                                         if f_item:
+                                             order_item = FoodOrderItem(
+                                                 order_id=new_order.id,
+                                                 food_item_id=f_item.id,
+                                                 quantity=int(qty)
+                                             )
+                                             db.add(order_item)
+                                             items_added = True
+                             
+                             # Fallback: if no specific items were added (or none selected), try to match the feature name
+                             if not items_added:
+                                 if food_item:
+                                     order_item = FoodOrderItem(
+                                         order_id=new_order.id,
+                                         food_item_id=food_item.id,
+                                         quantity=item.get("complimentaryPerNight", 1)
+                                     )
+                                     db.add(order_item)
+                                 
+                        except Exception as e:
+                            print(f"Error creating scheduled order for {name}: {e}")
+                            
+        except Exception as e:
+            print(f"Error processing amenity allocation in regular check-in: {e}")
 
     # CRITICAL: Check if any of the rooms are ALREADY occupied (Checked-in) by another booking
     # This prevents double check-ins for the same room

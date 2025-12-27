@@ -121,7 +121,9 @@ export default function FoodOrders() {
     pending: "bg-yellow-100 text-yellow-800",
     in_progress: "bg-blue-100 text-blue-800",
     completed: "bg-green-100 text-green-800",
+    completed: "bg-green-100 text-green-800",
     cancelled: "bg-red-100 text-red-800",
+    scheduled: "bg-orange-100 text-orange-800",
   };
 
   const token = localStorage.getItem("token");
@@ -2191,6 +2193,7 @@ export default function FoodOrders() {
                     <option value="in_progress">In Progress</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
+                    <option value="scheduled">Scheduled</option>
                   </select>
                 </div>
                 <div className="flex-1 min-w-[200px]">
@@ -2296,6 +2299,24 @@ export default function FoodOrders() {
                           </div>
                         )}
 
+                        {/* Scheduled Order Info */}
+                        {/* Scheduled Order Info */}
+                        {normalizedStatus === "scheduled" && order.delivery_request && order.delivery_request.includes("SCHEDULED_FOR:") && (
+                          <div className="mb-4 p-3 bg-amber-50 border-l-4 border-amber-500 rounded-r-lg shadow-sm">
+                            <div className="flex items-center gap-3">
+                              <div className="bg-amber-100 p-2 rounded-full">
+                                <span className="text-xl" role="img" aria-label="clock">⏰</span>
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-xs font-bold text-amber-600 uppercase tracking-wider mb-0.5">Scheduled Delivery</p>
+                                <p className="text-lg font-extrabold text-gray-800 font-mono">
+                                  {order.delivery_request.split("--")[0].replace("SCHEDULED_FOR:", "").trim()}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Order Items */}
                         <div className="mb-3">
                           <p className="text-xs font-semibold text-gray-700 mb-1">Items ({order.items?.length || 0}):</p>
@@ -2319,8 +2340,8 @@ export default function FoodOrders() {
                             <span className="text-lg font-bold text-indigo-600">₹{parseFloat(order.amount || 0).toLocaleString('en-IN')}</span>
                           </div>
                         </div>
-                        {/* Cost and Profit (for completed orders) */}
-                        {order.status === "completed" && (() => {
+                        {/* Cost and Profit (Estimated Cost for all orders) */}
+                        {(() => {
                           let orderCost = 0;
                           order.items?.forEach(item => {
                             const recipe = recipesCache[item.food_item_id]?.[0] || recipesData[item.food_item_id];
@@ -2343,32 +2364,18 @@ export default function FoodOrders() {
                               });
                             }
                           });
-                          const orderProfit = parseFloat(order.amount) - orderCost;
-                          const margin = parseFloat(order.amount) > 0 ? ((orderProfit / parseFloat(order.amount)) * 100) : 0;
-                          return (
-                            <div className="mb-3 p-2 bg-green-50 border border-green-200 rounded-lg">
-                              <p className="text-xs font-semibold text-gray-700 mb-2">Profitability:</p>
-                              <div className="grid grid-cols-3 gap-2 text-xs">
-                                <div>
-                                  <p className="text-gray-500">Cost</p>
-                                  <p className="font-semibold text-red-600">₹{orderCost.toFixed(0)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-gray-500">Profit</p>
-                                  <p className={`font-semibold ${orderProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    ₹{orderProfit.toFixed(0)}
-                                  </p>
-                                </div>
-                                <div>
-                                  <p className="text-gray-500">Margin</p>
-                                  <p className={`font-semibold ${margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                    {margin.toFixed(0)}%
-                                  </p>
-                                </div>
+
+                          if (orderCost > 0) {
+                            return (
+                              <div className="mt-2 text-xs text-gray-500 bg-gray-50 p-2 rounded border border-gray-100 flex justify-between">
+                                <span className="font-medium">Recipe Cost (Est):</span>
+                                <span className="font-bold text-gray-700">₹{orderCost.toFixed(2)}</span>
                               </div>
-                            </div>
-                          );
+                            );
+                          }
+                          return null;
                         })()}
+
 
                         {/* Actions */}
                         <div className="space-y-2">
@@ -2633,28 +2640,35 @@ export default function FoodOrders() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Payment Status *
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPaymentStatus("paid")}
-                      className={`p-3 border-2 rounded-xl transition-all ${paymentStatus === "paid"
-                        ? "border-green-500 bg-green-50 text-green-700"
-                        : "border-gray-300 hover:border-green-300 text-gray-700"
-                        }`}
-                    >
-                      <span className="font-semibold">Paid</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPaymentStatus("unpaid")}
-                      className={`p-3 border-2 rounded-xl transition-all ${paymentStatus === "unpaid"
-                        ? "border-red-500 bg-red-50 text-red-700"
-                        : "border-gray-300 hover:border-red-300 text-gray-700"
-                        }`}
-                    >
-                      <span className="font-semibold">Unpaid</span>
-                    </button>
-                  </div>
+                  {parseFloat(showCompleteModal.amount || 0) > 0 ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setPaymentStatus("paid")}
+                        className={`p-3 border-2 rounded-xl transition-all ${paymentStatus === "paid"
+                          ? "border-green-500 bg-green-50 text-green-700"
+                          : "border-gray-300 hover:border-green-300 text-gray-700"
+                          }`}
+                      >
+                        <span className="font-semibold">Paid</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPaymentStatus("unpaid")}
+                        className={`p-3 border-2 rounded-xl transition-all ${paymentStatus === "unpaid"
+                          ? "border-red-500 bg-red-50 text-red-700"
+                          : "border-gray-300 hover:border-red-300 text-gray-700"
+                          }`}
+                      >
+                        <span className="font-semibold">Unpaid</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-green-50 border border-green-200 rounded-xl text-center">
+                      <span className="font-semibold text-green-700">Complimentary / Package Included</span>
+                      <p className="text-xs text-green-600 mt-1">No payment required.</p>
+                    </div>
+                  )}
                 </div>
                 {showCompleteModal.order_type === "room_service" && (
                   <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">

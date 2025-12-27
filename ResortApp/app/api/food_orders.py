@@ -26,12 +26,54 @@ def _get_orders_impl(db: Session, skip: int = 0, limit: int = 20):
     limit = optimize_limit(limit, MAX_LIMIT_LOW_NETWORK)
     return crud.get_food_orders(db, skip=skip, limit=limit)
 
+def trigger_scheduled_orders(db: Session):
+    """
+    Check for scheduled orders and trigger them if within 30 minutes of scheduled time.
+    Parses 'delivery_request' to find 'SCHEDULED_FOR: YYYY-MM-DD HH:MM:SS'.
+    """
+    try:
+        from app.models.foodorder import FoodOrder
+        from datetime import datetime, timedelta
+        import re
+
+        # Find orders with status 'scheduled'
+        scheduled_orders = db.query(FoodOrder).filter(FoodOrder.status == 'scheduled').all()
+        
+        now = datetime.now()
+        
+        for order in scheduled_orders:
+            if not order.delivery_request:
+                continue
+                
+            # Parse scheduled time safely
+            # Format: "SCHEDULED_FOR: 2025-12-27 20:00:00 -- ..."
+            match = re.search(r"SCHEDULED_FOR: (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", order.delivery_request)
+            if match:
+                time_str = match.group(1)
+                try:
+                    scheduled_time = datetime.strptime(time_str, "%Y-%m-%d %H:%M:%S")
+                    trigger_time = scheduled_time - timedelta(minutes=30)
+                    
+                    if now >= trigger_time:
+                        order.status = "pending"
+                        print(f"Auto-triggered scheduled order {order.id} for {scheduled_time}")
+                except ValueError:
+                    pass
+        
+        if scheduled_orders:
+            db.commit()
+            
+    except Exception as e:
+        print(f"Error checking scheduled orders: {e}")
+
 @router.get("", response_model=List[FoodOrderOut])
 def get_orders(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), skip: int = 0, limit: int = 20):
+    trigger_scheduled_orders(db)
     return _get_orders_impl(db, skip, limit)
 
 @router.get("/", response_model=List[FoodOrderOut])  # Handle trailing slash
 def get_orders_slash(db: Session = Depends(get_db), current_user: User = Depends(get_current_user), skip: int = 0, limit: int = 20):
+    trigger_scheduled_orders(db)
     return _get_orders_impl(db, skip, limit)
 
 @router.delete("/{order_id}")
