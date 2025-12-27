@@ -1,0 +1,208 @@
+ADDING NEW FIELDS TO PACKAGE FORM - MANUAL INSTRUCTIONS
+========================================================
+
+✅ DATABASE: Migration complete - fields added to database
+✅ BACKEND MODEL: Package.py updated with new fields
+
+⏳ FRONTEND: Needs manual update to Package.jsx
+
+STEP-BY-STEP INSTRUCTIONS:
+---------------------------
+
+STEP 1: Update formData state (around line 53-60)
+--------------------------------------------------
+FIND THIS:
+```
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    price: 0,
+    booking_type: 'room_type',
+    selected_room_types: [],
+    images: []
+  });
+```
+
+REPLACE WITH:
+```
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    price: 0,
+    booking_type: 'room_type',
+    selected_room_types: [],
+    theme: '',
+    default_adults: 2,
+    default_children: 0,
+    max_stay_days: null,
+    food_included: [],
+    images: []
+  });
+```
+
+STEP 2: Update handleWizardSubmit (around line 134-137)
+--------------------------------------------------------
+FIND THIS (after room_types append, before images):
+```
+      }
+
+      // Images
+      selectedFiles.forEach(img => data.append("images", img));
+```
+
+REPLACE WITH:
+```
+      }
+
+      // New Fields
+      if (formData.theme) data.append("theme", formData.theme);
+      data.append("default_adults", formData.default_adults || 2);
+      data.append("default_children", formData.default_children || 0);
+      if (formData.max_stay_days) data.append("max_stay_days", formData.max_stay_days);
+      if (formData.food_included && formData.food_included.length > 0) {
+        data.append("food_included", formData.food_included.join(","));
+      }
+
+      // Images
+      selectedFiles.forEach(img => data.append("images", img));
+```
+
+STEP 3: Add fields to renderStep1 (after booking_type, before room types)
+--------------------------------------------------------------------------
+ADD THIS CODE after the Booking Type dropdown (around line 200):
+
+```jsx
+        {/* Theme */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Theme</label>
+          <select
+            value={formData.theme}
+            onChange={(e) => handleInputChange('theme', e.target.value)}
+            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+          >
+            <option value="">Select Theme (Optional)</option>
+            <option value="Romance">Romance</option>
+            <option value="Wellness">Wellness</option>
+            <option value="Adventure">Adventure</option>
+            <option value="Family">Family</option>
+            <option value="Business">Business</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        {/* Default Adults */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Default Adults</label>
+          <input
+            type="number"
+            min="1"
+            value={formData.default_adults}
+            onChange={(e) => handleInputChange('default_adults', parseInt(e.target.value) || 1)}
+            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">Suggested number of adults for this package</p>
+        </div>
+
+        {/* Default Children */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Default Children</label>
+          <input
+            type="number"
+            min="0"
+            value={formData.default_children}
+            onChange={(e) => handleInputChange('default_children', parseInt(e.target.value) || 0)}
+            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+          />
+          <p className="text-xs text-gray-500 mt-1">Suggested number of children for this package</p>
+        </div>
+
+        {/* Max Stay Days */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">Maximum Stay (Days)</label>
+          <input
+            type="number"
+            min="1"
+            value={formData.max_stay_days || ''}
+            onChange={(e) => handleInputChange('max_stay_days', e.target.value ? parseInt(e.target.value) : null)}
+            className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+            placeholder="Leave empty for unlimited"
+          />
+          <p className="text-xs text-gray-500 mt-1">Maximum number of days guests can book this package</p>
+        </div>
+
+        {/* Food Included */}
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Food Included</label>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {['Breakfast', 'Lunch', 'Dinner', 'Snacks'].map(meal => (
+              <label key={meal} className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  checked={formData.food_included.includes(meal)}
+                  onChange={(e) => {
+                    const newMeals = e.target.checked
+                      ? [...formData.food_included, meal]
+                      : formData.food_included.filter(m => m !== meal);
+                    handleInputChange('food_included', newMeals);
+                  }}
+                  className="rounded text-indigo-600"
+                />
+                <span className="text-sm">{meal}</span>
+              </label>
+            ))}
+          </div>
+          <p className="text-xs text-gray-500 mt-1">Select meals included in this package</p>
+        </div>
+```
+
+STEP 4: Update Edit button to load new fields (around line 425)
+----------------------------------------------------------------
+FIND THIS:
+```
+onClick={() => { 
+  setView('edit'); 
+  setFormData({ 
+    ...pkg, 
+    selected_room_types: pkg.room_types ? pkg.room_types.split(',') : [] 
+  }); 
+  setSelectedFiles([]);
+  setImagePreviews([]);
+}}
+```
+
+REPLACE WITH:
+```
+onClick={() => { 
+  setView('edit'); 
+  setFormData({ 
+    ...pkg, 
+    selected_room_types: pkg.room_types ? pkg.room_types.split(',') : [],
+    food_included: pkg.food_included ? pkg.food_included.split(',') : [],
+    theme: pkg.theme || '',
+    default_adults: pkg.default_adults || 2,
+    default_children: pkg.default_children || 0,
+    max_stay_days: pkg.max_stay_days || null
+  }); 
+  setSelectedFiles([]);
+  setImagePreviews([]);
+}}
+```
+
+STEP 5: Update backend API to accept new fields
+------------------------------------------------
+This is done automatically - the backend will accept these fields once you restart it.
+
+STEP 6: Restart backend server
+-------------------------------
+Stop and restart run_local.bat to pick up the new Package model fields.
+
+SUMMARY OF NEW FIELDS:
+----------------------
+1. Theme - Dropdown (Romance, Wellness, Adventure, Family, Business, Other)
+2. Default Adults - Number input (default: 2)
+3. Default Children - Number input (default: 0)
+4. Max Stay Days - Number input (optional, for limiting package duration)
+5. Food Included - Checkboxes (Breakfast, Lunch, Dinner, Snacks)
+
+All fields are now in the database and backend model.
+Just need to add them to the frontend form!

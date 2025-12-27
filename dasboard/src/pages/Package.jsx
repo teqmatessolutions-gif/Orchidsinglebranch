@@ -53,7 +53,9 @@ const Packages = ({ noLayout = false }) => {
     max_stay_days: null,
     food_included: [],
     food_timing: {},
-    images: []
+    food_timing: {},
+    images: [],
+    complimentary: ''
   });
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
@@ -124,6 +126,7 @@ const Packages = ({ noLayout = false }) => {
         // Send timing as JSON string
         data.append("food_timing", JSON.stringify(formData.food_timing));
       }
+      if (formData.complimentary) data.append("complimentary", formData.complimentary);
 
       selectedFiles.forEach(img => data.append("images", img));
 
@@ -156,6 +159,10 @@ const Packages = ({ noLayout = false }) => {
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
           <textarea value={formData.description} onChange={(e) => handleInputChange('description', e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" rows="3" placeholder="Describe what's included in this package..." />
+        </div>
+        <div className="md:col-span-2">
+          <label className="block text-sm font-medium text-gray-700 mb-1">Complimentary / Inclusions</label>
+          <textarea value={formData.complimentary} onChange={(e) => handleInputChange('complimentary', e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500" rows="2" placeholder="List complimentary items (e.g. Welcome Drink, Spa Access...)" />
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Theme</label>
@@ -350,7 +357,9 @@ const Packages = ({ noLayout = false }) => {
                             theme: pkg.theme || '',
                             default_adults: pkg.default_adults || 2,
                             default_children: pkg.default_children || 0,
-                            max_stay_days: pkg.max_stay_days || null
+                            default_children: pkg.default_children || 0,
+                            max_stay_days: pkg.max_stay_days || null,
+                            complimentary: pkg.complimentary || ''
                           });
                           setSelectedFiles([]);
                           setImagePreviews([]);

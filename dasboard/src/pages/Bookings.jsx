@@ -173,6 +173,43 @@ const BookingDetailsModal = ({
             <strong>Guests:</strong> {booking.adults} Adults, {booking.children}{" "}
             Children
           </p>
+
+          {booking.is_package && booking.package && (
+            <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
+              <h4 className="text-sm font-bold text-blue-800 mb-2 uppercase tracking-wide">Package Inclusions</h4>
+              <p className="text-sm text-gray-700 mb-1">
+                <span className="font-semibold">Package:</span> {booking.package.title}
+              </p>
+              {booking.package.complimentary && (
+                <p className="text-sm text-gray-700 mb-1">
+                  <span className="font-semibold">Complimentary:</span> {booking.package.complimentary}
+                </p>
+              )}
+              {booking.package.food_included && (
+                <p className="text-sm text-gray-700">
+                  <span className="font-semibold">Food & Dining:</span> {booking.package.food_included}
+                </p>
+              )}
+            </div>
+          )}
+
+          {(booking.is_package || booking.booking_type === 'package') && (booking.food_preferences || booking.special_requests) && (
+            <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+              <h4 className="text-sm font-bold text-amber-800 mb-2 uppercase tracking-wide">Guest Requests</h4>
+              {booking.food_preferences && (
+                <div className="mb-2">
+                  <strong className="block text-amber-900 text-xs uppercase mb-1">Food Preferences / Orders:</strong>
+                  <p className="text-sm text-gray-700">{booking.food_preferences}</p>
+                </div>
+              )}
+              {booking.special_requests && (
+                <div>
+                  <strong className="block text-amber-900 text-xs uppercase mb-1">Special Requests:</strong>
+                  <p className="text-sm text-gray-700">{booking.special_requests}</p>
+                </div>
+              )}
+            </div>
+          )}
           {booking.status === "checked-in" && booking.user && (
             <p>
               <strong>Checked-in By:</strong> {booking.user.name}

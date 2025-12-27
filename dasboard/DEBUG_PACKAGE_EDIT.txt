@@ -1,0 +1,54 @@
+IMMEDIATE STEPS TO TEST PACKAGE EDIT
+=====================================
+
+I've added debug logging to help us see what's happening.
+
+STEP 1: Open Browser Console
+-----------------------------
+1. Open your browser (http://localhost:3000)
+2. Press F12 to open Developer Tools
+3. Click on the "Console" tab
+4. Keep this open
+
+STEP 2: Try Editing the Package
+--------------------------------
+1. Go to Package Management page
+2. Click "Edit" on the honeymoon package
+3. Change the price from ₹10,000 to ₹15,000
+4. Go through all 4 steps
+5. On Step 4, click "Update Package"
+
+STEP 3: Check Console for Debug Messages
+-----------------------------------------
+Look for these messages in the console:
+- "[PACKAGE UPDATE] Updating package ID: 1"
+- "API Request: put /packages/1"
+
+STEP 4: Check for Errors
+-------------------------
+If you see any RED error messages in the console, copy them and share them with me.
+
+Common errors to look for:
+- "401 Unauthorized" = Auth token issue
+- "400 Bad Request" = Missing required fields
+- "404 Not Found" = Wrong API endpoint
+- "500 Internal Server Error" = Backend error
+
+STEP 5: Check Network Tab
+--------------------------
+1. In Developer Tools, click "Network" tab
+2. Try updating the package again
+3. Look for a request to "packages/1" with method "PUT"
+4. Click on it
+5. Check:
+   - Status code (should be 200)
+   - Request Headers (should have "Authorization: Bearer ...")
+   - Response (what the server returned)
+
+WHAT TO SHARE WITH ME:
+-----------------------
+1. Any console error messages (red text)
+2. The status code from the Network tab
+3. Whether you see the debug message "[PACKAGE UPDATE] Updating package ID: 1"
+
+This will help me identify exactly where the problem is!

@@ -1,0 +1,193 @@
+PACKAGE BOOKING VS ROOM BOOKING - COMPARISON
+=============================================
+
+SIMILARITIES
+------------
+Both package bookings and regular room bookings share:
+
+1. ✅ Guest Information
+   - Guest name, mobile, email
+   - Adults and children count
+   - Check-in and check-out dates
+
+2. ✅ Room Assignment
+   - Both assign specific rooms to guests
+   - Rooms are marked as "Booked" during the stay
+
+3. ✅ Check-in Process
+   - Both require ID card image and guest photo
+   - Status changes from "booked" to "checked-in"
+
+4. ✅ Billing & Checkout
+   - Both use the same checkout API (/api/checkout/{room_number})
+   - Both calculate room charges, food orders, services, inventory
+   - Both generate bills with GST
+   - Both create journal entries for accounting
+
+5. ✅ Food Orders & Services
+   - Guests can order food
+   - Guests can request services (spa, massage, etc.)
+   - All charges are added to the final bill
+
+KEY DIFFERENCES
+---------------
+
+1. PRICING MODEL
+   Regular Booking:
+   - Price = Room Price × Number of Nights
+   - Each room has its own price
+   - Total = Sum of all room charges
+
+   Package Booking:
+   - Two types:
+     a) "room_type" package: Price per room per night
+     b) "whole_property" package: Fixed price for entire stay
+   - Package price is set at package creation
+   - May include complimentary items (food, services, amenities)
+
+2. INCLUSIONS
+   Regular Booking:
+   - Only room rental
+   - Everything else is charged separately
+
+   Package Booking:
+   - Can include complimentary items:
+     * Food (breakfast, lunch, dinner)
+     * Services (spa, massage)
+     * Amenities (consumables)
+     * Complimentary items (extra bed, music system)
+   - Inclusions can be scheduled:
+     * Daily (every day of stay)
+     * Check-in (on arrival day)
+     * Check-out (on departure day)
+
+3. ROOM SELECTION
+   Regular Booking:
+   - Select specific rooms by room number
+   - Each room is individually selected
+
+   Package Booking:
+   - Two modes:
+     a) "room_type": Select by room type (Deluxe, Luxury, etc.)
+        - System assigns available rooms of that type
+     b) "whole_property": Books entire resort
+        - All rooms are assigned to this booking
+
+4. BOOKING CREATION
+   Regular Booking:
+   - API: POST /api/bookings
+   - Created from "Bookings" page
+   - Simple form with room selection
+
+   Package Booking:
+   - API: POST /api/packages/book
+   - Created from "Package Management" page
+   - Select a package, then book it
+   - Can also be booked by guests (public endpoint)
+
+5. DISPLAY ID FORMAT
+   Regular Booking:
+   - Format: BK-000001, BK-000002, etc.
+   - Prefix: "BK-"
+
+   Package Booking:
+   - Format: PK-000001, PK-000002, etc.
+   - Prefix: "PK-"
+
+6. CHECKOUT CALCULATION
+   Regular Booking:
+   - Room Charges = Room Price × Nights
+   - Package Charges = 0
+
+   Package Booking (room_type):
+   - Package Charges = Package Price × Nights
+   - Room Charges = 0
+
+   Package Booking (whole_property):
+   - Package Charges = Package Price (fixed)
+   - Room Charges = 0
+
+BILLING FLOW (SAME FOR BOTH)
+-----------------------------
+
+1. Guest checks in
+   ↓
+2. During stay:
+   - Order food → Added to bill
+   - Request services → Added to bill
+   - Use consumables → Added to bill
+   ↓
+3. Request checkout
+   ↓
+4. System calculates bill:
+   - Room/Package charges
+   - Food charges (with 5% GST)
+   - Service charges (with 18% GST)
+   - Inventory charges (with applicable GST)
+   - Total with GST
+   ↓
+5. Generate bill PDF/Text
+   ↓
+6. Process payment
+   ↓
+7. Mark as checked out
+   ↓
+8. Create journal entries for accounting
+
+EXAMPLE SCENARIOS
+-----------------
+
+SCENARIO 1: Regular Booking
+- Guest books Room 101 (₹5,000/night) for 2 nights
+- Orders food worth ₹1,000
+- Requests spa service worth ₹2,000
+- Final Bill:
+  * Room: ₹10,000 (5000 × 2)
+  * Food: ₹1,050 (1000 + 5% GST)
+  * Service: ₹2,360 (2000 + 18% GST)
+  * Total: ₹13,410
+
+SCENARIO 2: Package Booking (room_type)
+- Guest books "Honeymoon Package" (₹15,000/night) for 2 nights
+- Package includes: Breakfast, Spa (1 session)
+- Orders extra food worth ₹1,000
+- Final Bill:
+  * Package: ₹30,000 (15000 × 2)
+  * Breakfast: ₹0 (included)
+  * Spa: ₹0 (included, 1 session)
+  * Extra Food: ₹1,050 (1000 + 5% GST)
+  * Total: ₹31,050
+
+SCENARIO 3: Package Booking (whole_property)
+- Guest books "Wedding Package" (₹500,000 total) for 3 days
+- Entire resort is booked
+- Package includes: All meals, All rooms, Decorations
+- Final Bill:
+  * Package: ₹500,000 (fixed price)
+  * All inclusions: ₹0
+  * Total: ₹500,000
+
+WHICH TO USE WHEN?
+------------------
+
+Use REGULAR BOOKING when:
+- Guest wants specific rooms
+- Simple room rental
+- Pay-as-you-go for services
+- Short stays
+- Business travelers
+
+Use PACKAGE BOOKING when:
+- Offering special deals (honeymoon, anniversary, etc.)
+- Want to include complimentary items
+- Booking entire property for events
+- Want to simplify pricing
+- Vacation packages with meals included
+
+SUMMARY
+-------
+✅ Both use the same checkout and billing system
+✅ Both support food orders, services, and inventory
+✅ Main difference is pricing model and inclusions
+✅ Package bookings are more flexible for special offers
+✅ Regular bookings are simpler for standard stays

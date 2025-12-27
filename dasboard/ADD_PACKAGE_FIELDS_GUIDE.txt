@@ -1,0 +1,69 @@
+ADDING NEW PACKAGE FIELDS - COMPLETE GUIDE
+===========================================
+
+STEP 1: RUN DATABASE MIGRATION
+-------------------------------
+cd c:\releasing\orchid\ResortApp
+alembic upgrade head
+
+This will add these new columns to the packages table:
+- theme (String)
+- default_adults (Integer, default 2)
+- default_children (Integer, default 0)
+- max_stay_days (Integer)
+- food_included (String - comma-separated meals)
+
+STEP 2: RESTART BACKEND
+------------------------
+The backend server needs to be restarted to pick up the new Package model fields.
+
+1. Stop the backend (Ctrl+C in the terminal running run_local.bat)
+2. Start it again: .\run_local.bat
+
+STEP 3: UPDATE FRONTEND
+------------------------
+I've already updated the Package model in:
+- c:\releasing\orchid\ResortApp\app\models\Package.py
+
+Now I need to update:
+1. Frontend Package.jsx (to add form fields)
+2. Backend API (to accept and save the new fields)
+
+WHAT EACH FIELD DOES:
+----------------------
+
+1. THEME
+   - Dropdown: Romance, Wellness, Adventure, Family, Business, Other
+   - Helps categorize packages
+   - Optional field
+
+2. DEFAULT_ADULTS
+   - Number input (default: 2)
+   - Suggested number of adults for this package
+   - Used as default when booking
+
+3. DEFAULT_CHILDREN
+   - Number input (default: 0)
+   - Suggested number of children for this package
+   - Used as default when booking
+
+4. MAX_STAY_DAYS
+   - Number input
+   - Maximum number of days allowed for this package
+   - Optional (null = unlimited)
+   - Example: Honeymoon package might be max 7 days
+
+5. FOOD_INCLUDED
+   - Multi-select checkboxes: Breakfast, Lunch, Dinner, Snacks
+   - Stored as comma-separated string
+   - Shows what meals are included in the package
+   - Example: "Breakfast,Dinner"
+
+NEXT STEPS:
+-----------
+After running the migration, I will update:
+1. Package.jsx frontend to add these fields to the wizard
+2. Backend API endpoints to accept and save these fields
+3. CRUD functions to handle the new fields
+
+The fields will be added to Step 1 of the package wizard.

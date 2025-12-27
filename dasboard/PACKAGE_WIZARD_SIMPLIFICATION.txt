@@ -1,0 +1,89 @@
+PACKAGE WIZARD SIMPLIFICATION - REQUIRED CHANGES
+================================================
+
+PROBLEM:
+--------
+The frontend package wizard has 4 steps with many fields, but the backend
+only supports 6 fields:
+- title
+- description
+- price
+- booking_type
+- room_types
+- images
+
+All other fields (code, theme, revenue_split, inclusions, rules, etc.) are
+being sent to the backend but NOT SAVED, causing edits to not persist.
+
+SOLUTION:
+---------
+Simplify the package wizard to only 2 steps:
+
+STEP 1: Package Details
+- Package Name (title)
+- Description
+- Booking Type (room_type or whole_property)
+- Room Types (if room_type selected)
+
+STEP 2: Pricing & Images
+- Package Price
+- Images (at least 1 required)
+
+CHANGES NEEDED:
+---------------
+
+1. ✅ DONE: Simplified formData state (removed unsupported fields)
+2. ✅ DONE: Removed unsupported fields from handleWizardSubmit
+3. ⏳ TODO: Simplify renderStep1 (remove code, theme, default_adults, default_children)
+4. ⏳ TODO: Simplify renderStep2 (remove revenue_split, add images)
+5. ⏳ TODO: Remove renderStep3 (inclusions)
+6. ⏳ TODO: Remove renderStep4 (rules)
+7. ⏳ TODO: Update wizard navigation to only show 2 steps
+8. ⏳ TODO: Update step validation
+
+MANUAL STEPS REQUIRED:
+-----------------------
+Due to line ending issues preventing automated edits, please make these
+changes manually to c:\releasing\orchid\dasboard\src\pages\Package.jsx:
+
+CHANGE 1: Simplify renderStep1 (around line 580-665)
+Remove these fields from the form:
+- Rate Code (code)
+- Theme dropdown
+- Default Adults
+- Default Children
+
+Keep only:
+- Package Name (title)
+- Description
+- Booking Type
+- Room Types selection
+
+CHANGE 2: Simplify renderStep2 (around line 667-695)
+Remove:
+- Revenue Split section (lines 682-693)
+
+Add:
+- Image upload field (move from Step 4)
+
+CHANGE 3: Delete renderStep3 and renderStep4 entirely
+
+CHANGE 4: Update wizard navigation (around line 930-950)
+Change from 4 steps to 2 steps:
+- Step 1: "Details" (Settings icon)
+- Step 2: "Pricing & Images" (DollarSign icon)
+
+CHANGE 5: Update step navigation buttons (around line 945-955)
+Change: {step < 4 ? ... : ...}
+To:     {step < 2 ? ... : ...}
+
+ALTERNATIVE SOLUTION:
+---------------------
+If manual editing is too complex, I can create a completely new simplified
+Package.jsx file with only the supported features. This would be cleaner
+but would replace the entire file.
+
+Would you like me to:
+A) Create a new simplified Package.jsx file (recommended)
+B) Provide detailed line-by-line manual edit instructions
+C) Try to add the missing fields to the backend database (requires migration)

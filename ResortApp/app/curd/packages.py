@@ -9,7 +9,7 @@ from app.schemas.packages import PackageBookingCreate
 
 # ------------------- Packages -------------------
 
-def create_package(db: Session, title: str, description: str, price: float, image_urls: List[str], booking_type: str = "room_type", room_types: str = None, theme: str = None, default_adults: int = 2, default_children: int = 0, max_stay_days: int = None, food_included: str = None, food_timing: str = None):
+def create_package(db: Session, title: str, description: str, price: float, image_urls: List[str], booking_type: str = "room_type", room_types: str = None, theme: str = None, default_adults: int = 2, default_children: int = 0, max_stay_days: int = None, food_included: str = None, food_timing: str = None, complimentary: str = None):
     try:
         pkg = Package(
             title=title, 
@@ -22,7 +22,8 @@ def create_package(db: Session, title: str, description: str, price: float, imag
             default_children=default_children,
             max_stay_days=max_stay_days,
             food_included=food_included,
-            food_timing=food_timing
+            food_timing=food_timing,
+            complimentary=complimentary
         )
         db.add(pkg)
         db.commit()
@@ -270,6 +271,8 @@ def book_package(db: Session, booking: PackageBookingCreate):
         children=booking.children,
         status="booked",
         user_id=guest_user_id,  # Link booking to guest user
+        food_preferences=booking.food_preferences,
+        special_requests=booking.special_requests,
     )
     db.add(db_booking)
     db.commit()

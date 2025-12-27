@@ -25,6 +25,7 @@ class PackageOut(BaseModel):
     max_stay_days: Optional[int] = None
     food_included: Optional[str] = None
     food_timing: Optional[str] = None
+    complimentary: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -58,6 +59,8 @@ class PackageBookingBase(BaseModel):
     check_out: date
     adults: int = 2
     children: int = 0
+    food_preferences: Optional[str] = None
+    special_requests: Optional[str] = None
     class Config:
         from_attributes = True
 

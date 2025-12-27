@@ -48,12 +48,26 @@ except Exception as e:
 # Import inventory router separately to catch any import errors
 try:
     from app.api import inventory
-    print("✅ Inventory router imported successfully in app.main")
+    print("[OK] Inventory router imported successfully in app.main")
 except Exception as e:
-    print(f"❌ ERROR importing inventory router in app.main: {e}")
+    print(f"[ERROR] ERROR importing inventory router in app.main: {e}")
     import traceback
     traceback.print_exc()
     inventory = None
+
+# Import public router separately to catch any import errors
+# Force reload - public router should now work
+public_module = None
+try:
+    from app.api import public as public_module
+    print("[OK] Public router imported successfully in app.main")
+    print(f"   Router prefix: {public_module.router.prefix}")
+    print(f"   Number of routes: {len(public_module.router.routes)}")
+except Exception as e:
+    print(f"[ERROR] ERROR importing public router in app.main: {e}")
+    import traceback
+    traceback.print_exc()
+    public_module = None
 
 # Create DB tables
 Base.metadata.create_all(bind=engine)
@@ -77,6 +91,18 @@ os.makedirs("static/rooms", exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# Register Public Router (no authentication required)
+if public_module is not None:
+    try:
+        app.include_router(public_module.router, prefix="/api")
+        print(f"[OK] Public router registered with {len(public_module.router.routes)} routes")
+    except Exception as e:
+        print(f"[ERROR] ERROR registering public router: {e}")
+        import traceback
+        traceback.print_exc()
+else:
+    print("[ERROR] Public router not imported, skipping registration")
 
 # Register Routers with /api prefix to match nginx configuration
 app.include_router(auth.router, prefix="/api")

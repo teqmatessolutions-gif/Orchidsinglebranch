@@ -19,6 +19,7 @@ class Package(Base):
     max_stay_days = Column(Integer, nullable=True)  # Maximum number of days allowed for this package
     food_included = Column(String, nullable=True)  # Comma-separated list of included meals (e.g., "Breakfast,Lunch,Dinner")
     food_timing = Column(String, nullable=True)    # JSON string: {"Breakfast": "08:00", ...}
+    complimentary = Column(String, nullable=True)  # Free inclusions
 
     # Relationships
     images = relationship("PackageImage", back_populates="package", cascade="all, delete-orphan")
@@ -55,6 +56,8 @@ class PackageBooking(Base):
 
     status = Column(String)
     advance_deposit = Column(Float, default=0.0)  # Advance payment made during booking
+    food_preferences = Column(String, nullable=True)
+    special_requests = Column(String, nullable=True)
 
     # Relationships
     package = relationship("Package", back_populates="bookings")

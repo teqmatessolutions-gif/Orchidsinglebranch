@@ -76,6 +76,20 @@ except Exception as e:
     import traceback
     traceback.print_exc()
     comprehensive_reports = None
+
+# Import public router separately to catch any import errors
+public_module = None
+try:
+    from app.api import public as public_module
+    print("[OK] Public router imported successfully")
+    print(f"   Router prefix: {public_module.router.prefix}")
+    print(f"   Number of routes: {len(public_module.router.routes)}")
+except Exception as e:
+    print(f"[ERROR] ERROR importing public router: {e}")
+    import traceback
+    traceback.print_exc()
+    public_module = None
+
 from app.database import engine, Base
 
 # Create database tables
@@ -298,6 +312,18 @@ except Exception as e:
     print(f"[ERROR] ERROR importing/registering stock reconciliation router: {e}")
     import traceback
     traceback.print_exc()
+
+# Include public router if it was imported successfully
+if public_module is not None:
+    try:
+        app.include_router(public_module.router, prefix="/api", tags=["Public"])
+        print(f"[OK] Public router registered with {len(public_module.router.routes)} routes")
+    except Exception as e:
+        print(f"[ERROR] ERROR registering public router: {e}")
+        import traceback
+        traceback.print_exc()
+else:
+    print("[ERROR] Public router not imported, skipping registration")
 
 
 # Root route - Landing Page

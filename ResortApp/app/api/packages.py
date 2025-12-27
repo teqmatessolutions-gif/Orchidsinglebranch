@@ -36,6 +36,7 @@ async def create_package_api(
     max_stay_days: int = Form(None),
     food_included: str = Form(None),
     food_timing: str = Form(None),
+    complimentary: str = Form(None),
     images: List[UploadFile] = File([]),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -85,7 +86,7 @@ async def create_package_api(
             raise HTTPException(status_code=500, detail=f"Failed to upload images: {str(img_error)}")
 
         try:
-            return crud_package.create_package(db, title, description, price, image_urls, booking_type, room_types, theme, default_adults, default_children, max_stay_days, food_included, food_timing)
+            return crud_package.create_package(db, title, description, price, image_urls, booking_type, room_types, theme, default_adults, default_children, max_stay_days, food_included, food_timing, complimentary)
         except Exception as db_error:
             import traceback
             error_detail = f"Failed to create package in database: {str(db_error)}\n{traceback.format_exc()}"
@@ -127,6 +128,7 @@ async def create_package_api_slash(
     max_stay_days: int = Form(None),
     food_included: str = Form(None),
     food_timing: str = Form(None),
+    complimentary: str = Form(None),
     images: List[UploadFile] = File([]),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -177,7 +179,7 @@ async def create_package_api_slash(
             raise HTTPException(status_code=500, detail=f"Failed to upload images: {str(img_error)}")
 
         try:
-            return crud_package.create_package(db, title, description, price, image_urls, booking_type, room_types, theme, default_adults, default_children, max_stay_days, food_included, food_timing)
+            return crud_package.create_package(db, title, description, price, image_urls, booking_type, room_types, theme, default_adults, default_children, max_stay_days, food_included, food_timing, complimentary)
         except Exception as db_error:
             import traceback
             error_detail = f"Failed to create package in database: {str(db_error)}\n{traceback.format_exc()}"
@@ -220,6 +222,7 @@ async def update_package_api(
     max_stay_days: int = Form(None),
     food_included: str = Form(None),
     food_timing: str = Form(None),
+    complimentary: str = Form(None),
     images: List[UploadFile] = File([]),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -248,6 +251,7 @@ async def update_package_api(
     package.booking_type = booking_type
     package.room_types = room_types
     package.theme = theme
+    package.complimentary = complimentary
     package.default_adults = default_adults
     package.default_children = default_children
     package.max_stay_days = max_stay_days

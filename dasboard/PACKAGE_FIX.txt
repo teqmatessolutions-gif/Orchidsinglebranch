@@ -1,0 +1,33 @@
+INSTRUCTIONS TO FIX THE PACKAGE ERROR
+======================================
+
+The error "Cannot read properties of undefined (reading 'room')" is happening in Package.jsx
+
+LOCATION: c:\releasing\orchid\dasboard\src\pages\Package.jsx
+LINE: 727
+
+FIND THIS LINE (line 727):
+--------------------------
+              <input type="number" value={formData.revenue_split[field]} onChange={(e) => handleSplitChange(field, e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" />
+
+REPLACE WITH:
+-------------
+              <input type="number" value={formData.revenue_split?.[field] || 0} onChange={(e) => handleSplitChange(field, e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" />
+
+WHAT CHANGED:
+-------------
+Changed: formData.revenue_split[field]
+To:      formData.revenue_split?.[field] || 0
+
+This adds optional chaining (?.) and a default value (|| 0) to prevent the error when revenue_split is undefined.
+
+STEPS:
+------
+1. Open: c:\releasing\orchid\dasboard\src\pages\Package.jsx
+2. Press Ctrl+G and go to line 727
+3. Find the text: value={formData.revenue_split[field]}
+4. Replace with: value={formData.revenue_split?.[field] || 0}
+5. Save the file (Ctrl+S)
+6. Refresh the browser (Ctrl+R)
+
+The error should be fixed!

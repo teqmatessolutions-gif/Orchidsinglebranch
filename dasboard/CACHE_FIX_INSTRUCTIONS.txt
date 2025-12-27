@@ -1,0 +1,24 @@
+// CACHE-BUSTING FIX FOR PACKAGE.JSX
+// ==================================
+// 
+// FIND LINE 470 in c:\releasing\orchid\dasboard\src\pages\Package.jsx
+// 
+// CHANGE FROM:
+//         api.get("/packages/"),
+// 
+// CHANGE TO:
+//         api.get(`/packages/?_t=${Date.now()}`),
+// 
+// This adds a timestamp parameter that prevents browser caching.
+// After this change, package updates will show immediately without needing to clear cache.
+
+// FULL CONTEXT (lines 469-476):
+// 
+//       const [packageRes, roomRes, bookingRes, itemsRes, servicesRes, foodRes] = await Promise.all([
+//         api.get(`/packages/?_t=${Date.now()}`),  // <-- CHANGE THIS LINE
+//         api.get("/rooms/"),
+//         api.get("/packages/bookingsall"),
+//         api.get("/inventory/items?limit=1000").catch(() => ({ data: [] })),
+//         api.get("/services").catch(() => ({ data: [] })),
+//         api.get("/food-items/").catch(() => ({ data: [] }))
+//       ]);
