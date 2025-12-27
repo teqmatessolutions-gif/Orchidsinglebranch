@@ -186,7 +186,9 @@ const BookingDetailsModal = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {booking.id_card_image_url &&
                   (() => {
-                    const imageUrl = `${API.defaults.baseURL.replace(/\/$/, "")}/${booking.is_package ? "packages/booking/checkin-image" : "bookings/checkin-image"}/${booking.id_card_image_url}`;
+                    // Use API base URL for image endpoints
+                    const imageUrl = `${API.defaults.baseURL}/${booking.is_package ? "packages/booking/checkin-image" : "bookings/checkin-image"}/${booking.id_card_image_url}`;
+                    console.log("ID Card Image URL:", imageUrl);
                     return (
                       <div className="text-center">
                         <p className="text-sm font-medium text-gray-600 mb-1">
@@ -197,13 +199,19 @@ const BookingDetailsModal = ({
                           alt="ID Card"
                           className="w-full h-auto rounded-lg border shadow-sm cursor-pointer"
                           onClick={() => onImageClick(imageUrl)}
+                          onError={(e) => {
+                            console.error("Failed to load ID card image:", imageUrl);
+                            e.target.src = 'https://placehold.co/400x300/e2e8f0/a0aec0?text=Image+Not+Found';
+                          }}
                         />
                       </div>
                     );
                   })()}
                 {booking.guest_photo_url &&
                   (() => {
-                    const imageUrl = `${API.defaults.baseURL.replace(/\/$/, "")}/${booking.is_package ? "packages/booking/checkin-image" : "bookings/checkin-image"}/${booking.guest_photo_url}`;
+                    // Use API base URL for image endpoints
+                    const imageUrl = `${API.defaults.baseURL}/${booking.is_package ? "packages/booking/checkin-image" : "bookings/checkin-image"}/${booking.guest_photo_url}`;
+                    console.log("Guest Photo URL:", imageUrl);
                     return (
                       <div className="text-center">
                         <p className="text-sm font-medium text-gray-600 mb-1">
@@ -214,6 +222,10 @@ const BookingDetailsModal = ({
                           alt="Guest"
                           className="w-full h-auto rounded-lg border shadow-sm cursor-pointer"
                           onClick={() => onImageClick(imageUrl)}
+                          onError={(e) => {
+                            console.error("Failed to load guest photo:", imageUrl);
+                            e.target.src = 'https://placehold.co/400x300/e2e8f0/a0aec0?text=Image+Not+Found';
+                          }}
                         />
                       </div>
                     );
@@ -2062,29 +2074,29 @@ const CheckInModal = ({
 
   const handleAddMenuItem = (featureName) => {
     setFeatureMenuSelections(prev => {
-        const current = prev[featureName] || [];
-        return { ...prev, [featureName]: [...current, { foodItemId: "", quantity: 1 }] };
+      const current = prev[featureName] || [];
+      return { ...prev, [featureName]: [...current, { foodItemId: "", quantity: 1 }] };
     });
   };
 
   const handleUpdateMenuItem = (featureName, index, field, value) => {
     setFeatureMenuSelections(prev => {
-        const current = [...(prev[featureName] || [])];
-        if (field === "foodItemId") {
-            const selectedFood = foodItems.find(f => f.id === Number(value));
-            current[index] = { ...current[index], foodItemId: value, name: selectedFood ? selectedFood.name : "" };
-        } else {
-             current[index] = { ...current[index], [field]: value };
-        }
-        return { ...prev, [featureName]: current };
+      const current = [...(prev[featureName] || [])];
+      if (field === "foodItemId") {
+        const selectedFood = foodItems.find(f => f.id === Number(value));
+        current[index] = { ...current[index], foodItemId: value, name: selectedFood ? selectedFood.name : "" };
+      } else {
+        current[index] = { ...current[index], [field]: value };
+      }
+      return { ...prev, [featureName]: current };
     });
   };
 
   const handleRemoveMenuItem = (featureName, index) => {
     setFeatureMenuSelections(prev => {
-        const current = [...(prev[featureName] || [])];
-        current.splice(index, 1);
-        return { ...prev, [featureName]: current };
+      const current = [...(prev[featureName] || [])];
+      current.splice(index, 1);
+      return { ...prev, [featureName]: current };
     });
   };
 
@@ -2315,41 +2327,41 @@ const CheckInModal = ({
 
                           {/* Menu Item Selection for this Feature */}
                           <div className="bg-white p-2 rounded border border-orange-200">
-                             <label className="text-xs font-bold text-orange-800 block mb-2">Menu Items (Optional)</label>
-                             {(featureMenuSelections[featureName] || []).map((item, idx) => (
-                                 <div key={idx} className="flex gap-2 mb-2 items-center">
-                                     <select
-                                         value={item.foodItemId}
-                                         onChange={(e) => handleUpdateMenuItem(featureName, idx, "foodItemId", e.target.value)}
-                                         className="text-xs border border-gray-300 rounded px-2 py-1 flex-1"
-                                     >
-                                         <option value="">Select Item...</option>
-                                         {foodItems.map(f => (
-                                             <option key={f.id} value={f.id}>{f.name}</option>
-                                         ))}
-                                     </select>
-                                     <input
-                                         type="number"
-                                         min="1"
-                                         value={item.quantity}
-                                         onChange={(e) => handleUpdateMenuItem(featureName, idx, "quantity", e.target.value)}
-                                         className="text-xs border border-gray-300 rounded px-2 py-1 w-16"
-                                         placeholder="Qty"
-                                     />
-                                     <button
-                                         onClick={() => handleRemoveMenuItem(featureName, idx)}
-                                         className="text-red-500 hover:text-red-700 font-bold"
-                                     >
-                                         &times;
-                                     </button>
-                                 </div>
-                             ))}
-                             <button
-                                 onClick={() => handleAddMenuItem(featureName)}
-                                 className="text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 px-2 py-1 rounded"
-                             >
-                                 + Add Item
-                             </button>
+                            <label className="text-xs font-bold text-orange-800 block mb-2">Menu Items (Optional)</label>
+                            {(featureMenuSelections[featureName] || []).map((item, idx) => (
+                              <div key={idx} className="flex gap-2 mb-2 items-center">
+                                <select
+                                  value={item.foodItemId}
+                                  onChange={(e) => handleUpdateMenuItem(featureName, idx, "foodItemId", e.target.value)}
+                                  className="text-xs border border-gray-300 rounded px-2 py-1 flex-1"
+                                >
+                                  <option value="">Select Item...</option>
+                                  {foodItems.map(f => (
+                                    <option key={f.id} value={f.id}>{f.name}</option>
+                                  ))}
+                                </select>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  value={item.quantity}
+                                  onChange={(e) => handleUpdateMenuItem(featureName, idx, "quantity", e.target.value)}
+                                  className="text-xs border border-gray-300 rounded px-2 py-1 w-16"
+                                  placeholder="Qty"
+                                />
+                                <button
+                                  onClick={() => handleRemoveMenuItem(featureName, idx)}
+                                  className="text-red-500 hover:text-red-700 font-bold"
+                                >
+                                  &times;
+                                </button>
+                              </div>
+                            ))}
+                            <button
+                              onClick={() => handleAddMenuItem(featureName)}
+                              className="text-xs bg-orange-100 hover:bg-orange-200 text-orange-700 px-2 py-1 rounded"
+                            >
+                              + Add Item
+                            </button>
                           </div>
                         </div>
                       )}
