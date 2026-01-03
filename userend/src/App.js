@@ -804,15 +804,15 @@ export default function App() {
 
         addCandidate("/logo.jpeg");
         addCandidate("/logo.png");
-        addCandidate("/orchid/logo.jpeg");
-        addCandidate("/orchid/logo.png");
+        addCandidate("/inventory/logo.jpeg");
+        addCandidate("/inventory/logo.png");
 
         if (typeof window !== "undefined") {
             const origin = window.location.origin;
             addCandidate(`${origin}/logo.jpeg`);
             addCandidate(`${origin}/logo.png`);
-            addCandidate(`${origin}/orchid/logo.jpeg`);
-            addCandidate(`${origin}/orchid/logo.png`);
+            addCandidate(`${origin}/inventory/logo.jpeg`);
+            addCandidate(`${origin}/inventory/logo.png`);
             const { pathname } = window.location;
             if (pathname && pathname !== "/") {
                 const trimmedPath = pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;

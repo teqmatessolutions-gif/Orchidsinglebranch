@@ -3,7 +3,7 @@ export const isResortDeployment = () => {
     return false;
   }
   const path = window.location.pathname || "";
-  return path.startsWith("/orchid") || path.startsWith("/admin");
+  return path.startsWith("/inventory") || path.startsWith("/admin");
 };
 
 export const getMediaBaseUrl = () => {
