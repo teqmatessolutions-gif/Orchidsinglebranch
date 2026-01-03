@@ -27,6 +27,9 @@ export const getMediaBaseUrl = () => {
   if (typeof window !== "undefined" && isOrchidDeployment()) {
     return `${window.location.origin}/orchidfiles`;
   }
+  if (typeof window !== "undefined" && isInventoryDeployment()) {
+    return `${window.location.origin}/inventoryapi`;
+  }
   if (typeof window !== "undefined" && isPommaDeployment()) {
     return `${window.location.origin}/pomma`;
   }
@@ -69,6 +72,11 @@ export const getApiBaseUrl = () => {
   if (typeof window !== "undefined" && isOrchidDeployment()) {
     const apiUrl = `${window.location.origin}/orchidapi/api`;
     console.log("Using Orchid deployment API URL:", apiUrl);
+    return apiUrl;
+  }
+  if (typeof window !== "undefined" && isInventoryDeployment()) {
+    const apiUrl = `${window.location.origin}/inventoryapi/api`;
+    console.log("Using Inventory deployment API URL:", apiUrl);
     return apiUrl;
   }
   // For assets served under /pommaadmin or /pommaholidays in production,
