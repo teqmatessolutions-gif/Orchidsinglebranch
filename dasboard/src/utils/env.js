@@ -14,6 +14,14 @@ export const isOrchidDeployment = () => {
   return path.startsWith("/orchidadmin") || path.startsWith("/orchid");
 };
 
+export const isInventoryDeployment = () => {
+  if (typeof window === "undefined") {
+    return false;
+  }
+  const path = window.location.pathname || "";
+  return path.startsWith("/inventory/admin") || path.startsWith("/inventory");
+};
+
 export const getMediaBaseUrl = () => {
   // For local development (localhost or 127.0.0.1 or LAN IP), always use port 8000 for Orchid
   if (typeof window !== "undefined") {
