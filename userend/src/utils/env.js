@@ -12,7 +12,7 @@ export const getMediaBaseUrl = () => {
     return "http://localhost:8011";
   }
   if (typeof window !== "undefined" && isResortDeployment()) {
-    return `${window.location.origin}/resortfiles`;
+    return `${window.location.origin}/inventoryfiles`;
   }
   if (process.env.REACT_APP_MEDIA_BASE_URL) {
     return process.env.REACT_APP_MEDIA_BASE_URL;
