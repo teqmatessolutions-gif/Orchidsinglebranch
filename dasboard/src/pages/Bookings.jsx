@@ -1797,7 +1797,7 @@ const AddExtraAllocationModal = ({
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">
-                        Total Quantity
+                        Total Quantity (Min 1)
                       </label>
                       <input
                         type="number"
@@ -1806,13 +1806,17 @@ const AddExtraAllocationModal = ({
                         value={item.quantity}
                         onChange={(e) => {
                           const selectedItem = inventoryItems.find(i => i.id == item.item_id);
-                          const normalizedValue = normalizeQuantity(e.target.value, selectedItem?.unit);
+                          const val = e.target.value;
+                          // Allow empty string for better typing experience, otherwise normalize
+                          const normalizedValue = val === "" ? "" : normalizeQuantity(val, selectedItem?.unit);
                           updateAllocationItem(index, "quantity", normalizedValue);
                         }}
                         onBlur={(e) => {
-                          // Ensure value is normalized on blur
+                          // Ensure value is normalized and at least 1 on blur
                           const selectedItem = inventoryItems.find(i => i.id == item.item_id);
-                          const normalizedValue = normalizeQuantity(item.quantity, selectedItem?.unit);
+                          let normalizedValue = normalizeQuantity(item.quantity, selectedItem?.unit);
+                          if (normalizedValue < 1) normalizedValue = 1;
+
                           if (normalizedValue !== item.quantity) {
                             updateAllocationItem(index, "quantity", normalizedValue);
                           }
