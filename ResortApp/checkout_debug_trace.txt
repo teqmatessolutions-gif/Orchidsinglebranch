@@ -45,3 +45,5 @@ Item: Coca Cola 750ml, Special: True, RentPrice: False, Laundry: False, Fixed: F
 Item: Mineral Water 1L, Special: False, RentPrice: False, Laundry: False, Fixed: False -> FINAL RENTABLE: False
 Item: Kitchen Hand Towel, Special: True, RentPrice: True, Laundry: True, Fixed: False -> FINAL RENTABLE: True
 Item: LED TV 43-inch, Special: True, RentPrice: True, Laundry: False, Fixed: True -> FINAL RENTABLE: True
+Item: LED TV 43-inch, Special: False, RentPrice: False, Laundry: False, Fixed: True -> FINAL RENTABLE: False
+Item: LED Bulb 9W, Special: False, RentPrice: False, Laundry: False, Fixed: True -> FINAL RENTABLE: False

@@ -1692,3 +1692,16 @@ Processing detail: item_id=30, qty=20.0
 Location Stock Logic: Dest=24
 Processing detail: item_id=29, qty=20.0
 Location Stock Logic: Dest=24
+
+=== 2026-01-04 16:39:37.780913 ===
+[DEBUG CREATE_PURCHASE] Received purchase data:
+  Status: received
+  Destination Location ID: 15
+  Details count: 2
+Checking if status is 'received': purchase.status = 'received'
+ENTERING stock update block for received purchase
+Details count in created object: 2
+Processing detail: item_id=24, qty=10.0
+Location Stock Logic: Dest=15
+Processing detail: item_id=25, qty=10.0
+Location Stock Logic: Dest=15

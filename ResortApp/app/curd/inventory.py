@@ -105,6 +105,54 @@ def update_item_stock(db: Session, item_id: int, quantity_change: float, transac
     return item
 
 
+def ensure_location_stock(db: Session, location_id: int, item_id: int):
+    """
+    Get existing LocationStock or initialize it from AssetMapping/Registry if missing.
+    Ensures continuity between Asset config and Live Stock.
+    """
+    from app.models.inventory import LocationStock, AssetMapping, AssetRegistry
+    
+    # Try to find existing record
+    loc_stock = db.query(LocationStock).filter(
+        LocationStock.location_id == location_id,
+        LocationStock.item_id == item_id
+    ).first()
+    
+    if loc_stock:
+        return loc_stock
+        
+    # Check Active Asset Mappings
+    mappings = db.query(AssetMapping).filter(
+        AssetMapping.location_id == location_id,
+        AssetMapping.item_id == item_id,
+        AssetMapping.is_active == True
+    ).all()
+    
+    initial_qty = 0
+    if mappings:
+        initial_qty = sum(m.quantity or 1 for m in mappings)
+    else:
+        # Check Active Asset Registry
+        registry_count = db.query(AssetRegistry).filter(
+            AssetRegistry.current_location_id == location_id,
+            AssetRegistry.item_id == item_id,
+            AssetRegistry.status.in_(['active', 'assigned'])
+        ).count()
+        if registry_count > 0:
+            initial_qty = registry_count
+
+    # Create new LocationStock record
+    loc_stock = LocationStock(
+        location_id=location_id,
+        item_id=item_id,
+        quantity=float(initial_qty),
+        last_updated=datetime.utcnow()
+    )
+    db.add(loc_stock)
+    db.flush()
+    return loc_stock
+
+
 # Vendor CRUD
 def create_vendor(db: Session, data: VendorCreate):
     # Check for duplicate vendor name
@@ -396,22 +444,9 @@ def update_purchase_status(db: Session, purchase_id: int, status: str):
             
             # CRITICAL FIX: Update destination location stock
             if purchase.destination_location_id:
-                loc_stock = db.query(LocationStock).filter(
-                    LocationStock.location_id == purchase.destination_location_id,
-                    LocationStock.item_id == detail.item_id
-                ).first()
-                
-                if loc_stock:
-                    loc_stock.quantity += detail.quantity
-                    loc_stock.last_updated = datetime.utcnow()
-                else:
-                    loc_stock = LocationStock(
-                        location_id=purchase.destination_location_id,
-                        item_id=detail.item_id,
-                        quantity=detail.quantity,
-                        last_updated=datetime.utcnow()
-                    )
-                    db.add(loc_stock)
+                loc_stock = ensure_location_stock(db, purchase.destination_location_id, detail.item_id)
+                loc_stock.quantity += detail.quantity
+                loc_stock.last_updated = datetime.utcnow()
             
             # Create transaction if not exists
             existing_transaction = db.query(InventoryTransaction).filter(
@@ -731,53 +766,15 @@ def create_stock_issue(db: Session, data: dict, issued_by: int):
         # This ensures the item appears in the room's inventory list
         dest_loc_id = data.get("destination_location_id")
         if dest_loc_id:
-             from app.models.inventory import LocationStock
-             
-             loc_stock = db.query(LocationStock).filter(
-                 LocationStock.location_id == dest_loc_id,
-                 LocationStock.item_id == detail_data["item_id"]
-             ).first()
-             
-             if loc_stock:
-                 loc_stock.quantity += i_qty
-                 loc_stock.last_updated = datetime.utcnow()
-             else:
-                 new_stock = LocationStock(
-                     location_id=dest_loc_id,
-                     item_id=detail_data["item_id"],
-                     quantity=i_qty,
-                     last_updated=datetime.utcnow()
-                 )
-                 db.add(new_stock)
+             loc_stock = ensure_location_stock(db, dest_loc_id, detail_data["item_id"])
+             loc_stock.quantity += i_qty
+             loc_stock.last_updated = datetime.utcnow()
 
         # Update Source Location Stock (Deduct)
         if source_loc_id:
-             from app.models.inventory import LocationStock
-             
-             source_stock = db.query(LocationStock).filter(
-                 LocationStock.location_id == source_loc_id,
-                 LocationStock.item_id == detail_data["item_id"]
-             ).first()
-             
-             if source_stock:
-                 source_stock.quantity -= i_qty
-                 # If negative, we allowed it via fallback, so just track it.
-             else:
-                 # If source stock record didn't exist but we allowed it (Fallback logic),
-                 # we should Create it with negative value (or 0) to track the gap?
-                 # Or if Global had it, maybe we just assume it was there.
-                 # Let's create it with quantity = -issued_qty (or 0 if we assume it was unrecorded positive)
-                 # Actually, if we assume it was there but unrecorded, setting to 0 is safer than negative.
-                 # BUT, for accounting, let's set it to 0 (assuming we just consumed the unrecorded stock).
-                 # Wait, if we want to be strict, we'd say -i_qty.
-                 # Let's init at 0 and subtract.
-                 new_source_stock = LocationStock(
-                     location_id=source_loc_id,
-                     item_id=detail_data["item_id"],
-                     quantity= -i_qty if i_qty > 0 else 0, # Initialize negative if we believe we owe it
-                     last_updated=datetime.utcnow()
-                 )
-                 db.add(new_source_stock)
+             source_stock = ensure_location_stock(db, source_loc_id, detail_data["item_id"])
+             source_stock.quantity -= i_qty
+             source_stock.last_updated = datetime.utcnow()
     
     db.commit()
     db.refresh(issue)
@@ -880,14 +877,10 @@ def create_waste_log(db: Session, data: dict, reported_by: int):
         if data.get("location_id"):
             from app.models.inventory import LocationStock, AssetMapping, AssetRegistry
             
-            # 1. Try Deducting from Location Stock
-            loc_stock = db.query(LocationStock).filter(
-                LocationStock.location_id == data["location_id"],
-                LocationStock.item_id == item_id
-            ).first()
-            if loc_stock:
-                loc_stock.quantity -= data["quantity"]
-                loc_stock.last_updated = datetime.utcnow()
+            # 1. Deduct from Location Stock (Initialize if missing from Assets)
+            loc_stock = ensure_location_stock(db, data["location_id"], item_id)
+            loc_stock.quantity -= data["quantity"]
+            loc_stock.last_updated = datetime.utcnow()
             
             # 2. Try Deducting from Asset Mappings (e.g. "light" in Room 101)
             # This is likely where the user's issue lies if it's an asset
