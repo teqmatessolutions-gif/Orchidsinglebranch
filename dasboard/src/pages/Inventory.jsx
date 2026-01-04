@@ -1526,6 +1526,17 @@ const Inventory = () => {
         return;
       }
 
+      // Validate that all items have unit price > 0
+      const itemsWithoutPrice = details.filter(d => d.unit_price <= 0);
+      if (itemsWithoutPrice.length > 0) {
+        addNotification({
+          title: "Validation Error",
+          message: "All items must have a unit price greater than 0. Please enter valid prices for all items.",
+          type: "error"
+        });
+        return;
+      }
+
       // Prepare purchase data according to PurchaseMasterCreate schema
       const purchaseData = {
         purchase_number: purchaseForm.purchase_number,
@@ -6030,8 +6041,8 @@ function VendorFormModal({ form, setForm, onSubmit, onClose, isEditing, submitti
               type="submit"
               disabled={submitting}
               className={`px-4 py-2 rounded-lg ${submitting
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-indigo-600 hover:bg-indigo-700'
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-indigo-600 hover:bg-indigo-700'
                 } text-white`}
             >
               {submitting ? 'Saving...' : (isEditing ? "Update Vendor" : "Save Vendor")}
