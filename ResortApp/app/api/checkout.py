@@ -3539,10 +3539,30 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                     # check_inventory_for_checkout already handled stock deduction and transaction creation.
                     # Calling it again causes double deduction (negative stock) and duplicate transactions.
                     pass
-                    # deduct_room_consumables(
-                    #    db, room.id, consumables_list, 
-                    #    new_checkout.id, current_user.id if current_user else None
-                    # )
+                
+                # Process Damaged/Missing Items -> Waste Log
+                # We perform this here to ensure Fixed Assets/Rentables marked as Damaged/Missing 
+                # are correctly removed from room inventory (LocationStock).
+                from app.curd.inventory import create_waste_log
+                for item in checkout_request.inventory_data:
+                    try:
+                        d_qty = float(item.get('damage_qty', 0))
+                        m_qty = float(item.get('missing_qty', 0))
+                        total_waste = d_qty + m_qty
+                        
+                        if total_waste > 0 and item.get('item_id'):
+                            reason = f"Checkout: {item.get('notes', 'Damaged/Missing')}"
+                            create_waste_log(
+                                db=db,
+                                item_id=int(item.get('item_id')),
+                                quantity=total_waste,
+                                reason=reason,
+                                location_id=room.inventory_location_id,
+                                created_by=current_user.id if current_user else None
+                            )
+                            # print(f"[INFO] Created waste log for item {item.get('item_id')} (Qty: {total_waste})")
+                    except Exception as e:
+                        print(f"[WARNING] Failed to create waste log for item {item.get('item_id', 'unknown')}: {e}")
             elif request.room_verifications:
                 room_verification = next(
                     (rv for rv in request.room_verifications if rv.room_number == room.number),
