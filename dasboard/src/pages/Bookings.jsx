@@ -1801,6 +1801,8 @@ const AddExtraAllocationModal = ({
                       </label>
                       <input
                         type="number"
+                        min="1"
+                        step="1"
                         value={item.quantity}
                         onChange={(e) => {
                           const selectedItem = inventoryItems.find(i => i.id == item.item_id);
@@ -1813,6 +1815,12 @@ const AddExtraAllocationModal = ({
                           const normalizedValue = normalizeQuantity(item.quantity, selectedItem?.unit);
                           if (normalizedValue !== item.quantity) {
                             updateAllocationItem(index, "quantity", normalizedValue);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          // Prevent invalid characters for quantity
+                          if (["-", "e", "E", "+"].includes(e.key)) {
+                            e.preventDefault();
                           }
                         }}
                         className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 ${(item.item_id && (itemStockCache[item.item_id]?.[item.source_location_id || getDefaultSourceLocationId()] || 0) < item.quantity)

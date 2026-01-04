@@ -35,6 +35,9 @@ export const getQuantityStep = (unit) => {
 export const normalizeQuantity = (value, unit) => {
     let numValue = parseFloat(value) || 0;
 
+    // Enforce non-negative values
+    if (numValue < 0) numValue = 0;
+
     // For countable units, round to whole number
     if (isCountableUnit(unit)) {
         numValue = Math.round(numValue);
