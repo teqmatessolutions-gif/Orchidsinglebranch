@@ -756,6 +756,7 @@ const Inventory = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [editingCategory, setEditingCategory] = useState(null);
   const [editingVendor, setEditingVendor] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   // New form states for Stock Issue & Consumption module
   const [showRequisitionForm, setShowRequisitionForm] = useState(false);
@@ -1318,6 +1319,12 @@ const Inventory = () => {
   const handleVendorSubmit = async (e) => {
     e.preventDefault();
 
+    // Prevent double submission
+    if (submitting) {
+      console.log("Already submitting, ignoring duplicate click");
+      return;
+    }
+
     // Validate account number match if bank transfer is selected
     if (vendorForm.preferred_payment_method === "Bank Transfer") {
       if (vendorForm.account_number !== vendorForm.account_number_confirm) {
@@ -1364,6 +1371,7 @@ const Inventory = () => {
     }
 
     try {
+      setSubmitting(true);
       if (editingVendor) {
         const res = await API.put(`/inventory/vendors/${editingVendor.id}`, cleanedData);
         addNotification({ title: "Success", message: "Vendor updated successfully!", type: "success" });
@@ -1423,6 +1431,8 @@ const Inventory = () => {
         error.message ||
         "Failed to submit vendor";
       addNotification({ title: "Error", message: `Failed to submit vendor: ${errorMessage}`, type: "error" });
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -2628,9 +2638,9 @@ const Inventory = () => {
                                 onChange={(e) => handleRequisitionStatusChange(req.id, e.target.value)}
                                 className={`w-full px-3 py-2 text-sm border rounded-lg ${req.status === 'approved' ? 'bg-green-50 text-green-700 border-green-200' :
                                   req.status === 'issued' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                  req.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
-                                    req.status === 'completed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                                      'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                    req.status === 'rejected' ? 'bg-red-50 text-red-700 border-red-200' :
+                                      req.status === 'completed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                        'bg-yellow-50 text-yellow-700 border-yellow-200'
                                   }`}
                               >
                                 <option value="pending">Pending</option>
@@ -3627,6 +3637,7 @@ const Inventory = () => {
           setForm={setVendorForm}
           onSubmit={handleVendorSubmit}
           isEditing={!!editingVendor}
+          submitting={submitting}
           onClose={() => {
             setShowVendorForm(false);
             setVendorForm({
@@ -5062,7 +5073,7 @@ function CategoryFormModal({ form, setForm, onSubmit, onClose }) {
 };
 
 // Vendor Form Modal - GST Friendly
-function VendorFormModal({ form, setForm, onSubmit, onClose, isEditing }) {
+function VendorFormModal({ form, setForm, onSubmit, onClose, isEditing, submitting }) {
   // Indian States list
   const indianStates = [
     "Andhra Pradesh",
@@ -6017,9 +6028,13 @@ function VendorFormModal({ form, setForm, onSubmit, onClose, isEditing }) {
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+              disabled={submitting}
+              className={`px-4 py-2 rounded-lg ${submitting
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-indigo-600 hover:bg-indigo-700'
+                } text-white`}
             >
-              {isEditing ? "Update Vendor" : "Save Vendor"}
+              {submitting ? 'Saving...' : (isEditing ? "Update Vendor" : "Save Vendor")}
             </button>
           </div>
         </form>

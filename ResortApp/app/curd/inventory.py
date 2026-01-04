@@ -107,6 +107,15 @@ def update_item_stock(db: Session, item_id: int, quantity_change: float, transac
 
 # Vendor CRUD
 def create_vendor(db: Session, data: VendorCreate):
+    # Check for duplicate vendor name
+    existing_vendor = db.query(Vendor).filter(Vendor.name == data.name).first()
+    if existing_vendor:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=400, 
+            detail=f"Vendor with name '{data.name}' already exists. Please use a different name."
+        )
+    
     vendor = Vendor(**data.model_dump())
     db.add(vendor)
     db.commit()
