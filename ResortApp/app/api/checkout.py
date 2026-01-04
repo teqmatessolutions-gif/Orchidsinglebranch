@@ -3671,11 +3671,8 @@ def process_booking_checkout(room_number: str, request: CheckoutRequest, db: Ses
                 error_msg = f"[WARNING] Failed to create journal entry for checkout {new_checkout.id}: {str(journal_error)}"
                 print(error_msg)
                 print(traceback.format_exc())
-                # Store error in checkout notes for later reference
-                if not new_checkout.notes:
-                    new_checkout.notes = f"Journal entry creation failed: {str(journal_error)}"
-                else:
-                    new_checkout.notes += f"\nJournal entry creation failed: {str(journal_error)}"
+                # NOTE: Checkout model has no 'notes' field, suppressing error storage
+                print(f"[WARNING] Journal entry creation failed for checkout {new_checkout.id}: {str(journal_error)}")
             
         except Exception as e:
             db.rollback()
