@@ -309,12 +309,18 @@ function LocationStockDetailsModal({ locationData, onClose }) {
                         </td>
                         <td className="px-3 py-2">
                           <span
-                            className={`px-2 py-1 text-xs rounded-full ${item.type === "asset"
-                              ? "bg-blue-100 text-blue-800"
-                              : "bg-green-100 text-green-800"
+                            className={`px-2 py-1 text-xs rounded-full ${item.is_rentable
+                                ? "bg-purple-100 text-purple-800"
+                                : item.type === "asset"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : "bg-green-100 text-green-800"
                               }`}
                           >
-                            {item.type === "asset" ? "Asset" : "Consumable"}
+                            {item.is_rentable
+                              ? "Rental"
+                              : item.type === "asset"
+                                ? "Asset"
+                                : "Consumable"}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-sm text-gray-900 font-medium">
