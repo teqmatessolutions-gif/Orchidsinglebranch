@@ -1819,7 +1819,7 @@ const AddExtraAllocationModal = ({
                         }}
                         onKeyDown={(e) => {
                           // Prevent invalid characters for quantity
-                          if (["-", "e", "E", "+"].includes(e.key)) {
+                          if (["-", "e", "E", "+", "Subtract"].includes(e.key)) {
                             e.preventDefault();
                           }
                         }}
